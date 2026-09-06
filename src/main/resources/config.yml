@@ -1,14 +1,13 @@
 # =========================================================
-#             Configuration de CustomMinerals
+#             Configuration de newAdventurePlugin
 # =========================================================
 
 cuprite:
   # Probabilité d'obtenir de la Cuprite en minant du cuivre
-  # 0.01 = 1% de chance, 0.05 = 5%, 0.50 = 50%, 1.0 = 100%
+  # 0.01 = 1% de chance, 0.04 = 4%, 0.50 = 50%, 1.0 = 100%
   drop-chance: 0.04
 
   # Empêche l'obtention de Cuprite lors de l'utilisation de l'enchantement Toucher de soie (Silk Touch)
-  # Recommandé sur 'true' afin d'empêcher les joueurs d'exploiter la pose/minage en boucle du minerai.
   prevent-silk-touch: true
 
   # Notification dans la barre d'action (ActionBar) lors de l'extraction
@@ -19,3 +18,20 @@ cuprite:
     sound: true
     # Affiche des particules scintillantes autour du bloc brisé
     particles: true
+
+# =========================================================
+#         Pack de Ressources Automatique à la Connexion
+# =========================================================
+resource-pack:
+  # Activer l'envoi automatique du pack à la connexion du joueur
+  auto-send-on-join: false
+
+  # Lien direct vers votre fichier newAdventurePack.zip
+  # Astuce : Déposez votre newAdventurePack.zip sur https://mc-packs.net pour obtenir un lien direct instantané
+  url: ""
+
+  # Hash SHA1 (optionnel, fourni automatiquement par https://mc-packs.net)
+  sha1: ""
+
+  # Forcer le joueur à accepter le pack pour jouer sur le serveur
+  required: false

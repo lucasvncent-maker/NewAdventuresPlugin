@@ -63,8 +63,34 @@ public class JobListener implements Listener {
 
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
-        JobRecipes.syncDiscoveredRecipes(plugin, event.getPlayer());
-        jobManager.applyJobEffects(event.getPlayer());
+        Player player = event.getPlayer();
+        JobRecipes.syncDiscoveredRecipes(plugin, player);
+        jobManager.applyJobEffects(player);
+
+        // Envoi automatique du pack de ressources si activé dans config.yml
+        if (plugin.getConfig().getBoolean("resource-pack.auto-send-on-join", false)) {
+            String url = plugin.getConfig().getString("resource-pack.url", "");
+            if (url != null && !url.isBlank()) {
+                String sha1 = plugin.getConfig().getString("resource-pack.sha1", "");
+                boolean required = plugin.getConfig().getBoolean("resource-pack.required", false);
+                Component prompt = Component.text("Veuillez accepter le pack de ressources pour profiter des textures et items personnalisés !", NamedTextColor.GOLD);
+
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (!player.isOnline()) return;
+                    try {
+                        if (sha1 != null && !sha1.isBlank()) {
+                            player.setResourcePack(url, sha1, required, prompt);
+                        } else {
+                            player.setResourcePack(url);
+                        }
+                    } catch (Exception ignored) {
+                        try {
+                            player.setResourcePack(url);
+                        } catch (Exception ignored2) {}
+                    }
+                }, 20L);
+            }
+        }
     }
 
     @EventHandler
