@@ -1,0 +1,21 @@
+# =========================================================
+#             Configuration de CustomMinerals
+# =========================================================
+
+cuprite:
+  # Probabilité d'obtenir de la Cuprite en minant du cuivre
+  # 0.01 = 1% de chance, 0.05 = 5%, 0.50 = 50%, 1.0 = 100%
+  drop-chance: 0.04
+
+  # Empêche l'obtention de Cuprite lors de l'utilisation de l'enchantement Toucher de soie (Silk Touch)
+  # Recommandé sur 'true' afin d'empêcher les joueurs d'exploiter la pose/minage en boucle du minerai.
+  prevent-silk-touch: true
+
+  # Notification dans la barre d'action (ActionBar) lors de l'extraction
+  notify-player: true
+
+  effects:
+    # Joue un son cristallin lors du drop
+    sound: true
+    # Affiche des particules scintillantes autour du bloc brisé
+    particles: true

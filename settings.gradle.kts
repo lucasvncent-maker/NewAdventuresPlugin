@@ -1,1 +1,1 @@
-rootProject.name = "CustomClasses"
+rootProject.name = "newAdventurePlugin"

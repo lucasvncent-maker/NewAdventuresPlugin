@@ -1,0 +1,19 @@
+{
+  "model": {
+    "type": "minecraft:select",
+    "property": "minecraft:custom_model_data",
+    "cases": [
+      {
+        "when": "divine_armor",
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/divine_armor"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/diamond_horse_armor"
+    }
+  }
+}

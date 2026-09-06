@@ -1,6 +1,6 @@
 package fr.loual.customclasses.jobs.commands;
 
-import fr.loual.customclasses.CustomClasses;
+import fr.loual.newadventure.NewAdventurePlugin;
 import fr.loual.customclasses.jobs.AgriculteurMissions;
 import fr.loual.customclasses.jobs.JobManager;
 import fr.loual.customclasses.jobs.JobMission;
@@ -24,7 +24,7 @@ import java.util.List;
 
 public class JobCommand implements CommandExecutor, TabCompleter {
 
-    private final CustomClasses plugin;
+    private final NewAdventurePlugin plugin;
     private final JobManager jobManager;
 
     private static final List<String> JOB_NAMES = List.of(
@@ -32,7 +32,7 @@ public class JobCommand implements CommandExecutor, TabCompleter {
             "none"
     );
 
-    public JobCommand(CustomClasses plugin) {
+    public JobCommand(NewAdventurePlugin plugin) {
         this.plugin = plugin;
         this.jobManager = plugin.getJobManager();
     }

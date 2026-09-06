@@ -1,6 +1,6 @@
 package fr.loual.customclasses.jobs.gui;
 
-import fr.loual.customclasses.CustomClasses;
+import fr.loual.newadventure.NewAdventurePlugin;
 import fr.loual.customclasses.jobs.CustomJobItems;
 import fr.loual.customclasses.jobs.JobManager;
 import fr.loual.customclasses.jobs.PlayerJob;
@@ -26,7 +26,7 @@ public class JobRecipeGui {
     public static final String RECIPE_WONDERFUL_SOUP = "wonderful_soup";
     public static final String RECIPE_WONDERFUL_HOE = "wonderful_hoe";
 
-    public static void open(CustomClasses plugin, Player player, String recipeKey) {
+    public static void open(NewAdventurePlugin plugin, Player player, String recipeKey) {
         if (recipeKey == null) recipeKey = RECIPE_FARMER_SOUP;
         String finalKey = switch (recipeKey.toLowerCase()) {
             case "space_cookie", "cookie" -> RECIPE_SPACE_COOKIE;

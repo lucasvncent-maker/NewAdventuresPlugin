@@ -1,6 +1,6 @@
 package fr.loual.customclasses.listeners;
 
-import fr.loual.customclasses.CustomClasses;
+import fr.loual.newadventure.NewAdventurePlugin;
 import fr.loual.customclasses.classes.ClassManager;
 import fr.loual.customclasses.classes.PlayerClass;
 import fr.loual.customclasses.gui.ClassGuiHolder;
@@ -30,7 +30,7 @@ import java.util.*;
 
 public class ClassListener implements Listener {
 
-    private final CustomClasses plugin;
+    private final NewAdventurePlugin plugin;
     private final ClassManager classManager;
 
     // Sirène : temps passé hors de l'eau (UUID -> timestamp dernière immersion en ms)
@@ -50,7 +50,7 @@ public class ClassListener implements Listener {
     // Archer : clé pour identifier les flèches tirées par des squelettes/monstres
     private final NamespacedKey skeletonArrowKey;
 
-    public ClassListener(CustomClasses plugin) {
+    public ClassListener(NewAdventurePlugin plugin) {
         this.plugin = plugin;
         this.classManager = plugin.getClassManager();
         this.skeletonArrowKey = new NamespacedKey(plugin, "skeleton_arrow");

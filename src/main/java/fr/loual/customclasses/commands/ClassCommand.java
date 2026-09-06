@@ -1,6 +1,6 @@
 package fr.loual.customclasses.commands;
 
-import fr.loual.customclasses.CustomClasses;
+import fr.loual.newadventure.NewAdventurePlugin;
 import fr.loual.customclasses.classes.ClassManager;
 import fr.loual.customclasses.classes.PlayerClass;
 import fr.loual.customclasses.gui.ClassSelectionGui;
@@ -21,7 +21,7 @@ import java.util.List;
 
 public class ClassCommand implements CommandExecutor, TabCompleter {
 
-    private final CustomClasses plugin;
+    private final NewAdventurePlugin plugin;
     private final ClassManager classManager;
 
     private static final List<String> CLASS_NAMES = List.of(
@@ -36,7 +36,7 @@ public class ClassCommand implements CommandExecutor, TabCompleter {
             "none"
     );
 
-    public ClassCommand(CustomClasses plugin) {
+    public ClassCommand(NewAdventurePlugin plugin) {
         this.plugin = plugin;
         this.classManager = plugin.getClassManager();
     }

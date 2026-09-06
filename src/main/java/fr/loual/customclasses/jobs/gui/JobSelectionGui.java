@@ -1,6 +1,6 @@
 package fr.loual.customclasses.jobs.gui;
 
-import fr.loual.customclasses.CustomClasses;
+import fr.loual.newadventure.NewAdventurePlugin;
 import fr.loual.customclasses.jobs.AgriculteurMissions;
 import fr.loual.customclasses.jobs.JobManager;
 import fr.loual.customclasses.jobs.JobMission;
@@ -28,7 +28,7 @@ public class JobSelectionGui {
     public static final NamespacedKey MISSION_ITEM_KEY = new NamespacedKey("customclasses", "mission_num");
     public static final NamespacedKey RECIPE_BOOK_KEY = new NamespacedKey("customclasses", "recipe_book_btn");
 
-    public static void open(CustomClasses plugin, Player player) {
+    public static void open(NewAdventurePlugin plugin, Player player) {
         JobGuiHolder holder = new JobGuiHolder();
         Inventory inv = Bukkit.createInventory(
                 holder,

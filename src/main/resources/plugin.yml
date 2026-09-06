@@ -1,8 +1,8 @@
-name: CustomClasses
+name: newAdventurePlugin
 version: 1.0.0
-main: fr.loual.customclasses.CustomClasses
+main: fr.loual.newadventure.NewAdventurePlugin
 api-version: '1.21.6'
-description: Plugin de classes de jeu (Humain, Assassin, etc.) avec GUI de selection
+description: Plugin d'aventure global combinant Classes, Métiers et Minéraux (Cuprite).
 author: Loual
 
 commands:
@@ -14,3 +14,13 @@ commands:
     description: Commandes de gestion des métiers et missions
     usage: /job [choose|reset|info|set]
     aliases: [jobs, metier, metiers]
+  cuprite:
+    description: Commande principale pour gerer la Cuprite
+    usage: /cuprite [give|reload|help]
+    aliases: [customminerals]
+    permission: customminerals.admin
+
+permissions:
+  customminerals.admin:
+    description: Permet d'administrer les minéraux personnalisés (Cuprite)
+    default: op

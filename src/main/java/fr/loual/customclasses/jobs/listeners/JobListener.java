@@ -1,6 +1,6 @@
 package fr.loual.customclasses.jobs.listeners;
 
-import fr.loual.customclasses.CustomClasses;
+import fr.loual.newadventure.NewAdventurePlugin;
 import fr.loual.customclasses.jobs.CustomJobItems;
 import fr.loual.customclasses.jobs.JobManager;
 import fr.loual.customclasses.jobs.JobRecipes;
@@ -47,13 +47,13 @@ import java.util.UUID;
 
 public class JobListener implements Listener {
 
-    private final CustomClasses plugin;
+    private final NewAdventurePlugin plugin;
     private final JobManager jobManager;
 
     // Cooldown pour éviter le double clic sur les soupes instantanées
     private final Set<UUID> instantEatCooldown = new HashSet<>();
 
-    public JobListener(CustomClasses plugin) {
+    public JobListener(NewAdventurePlugin plugin) {
         this.plugin = plugin;
         this.jobManager = plugin.getJobManager();
     }

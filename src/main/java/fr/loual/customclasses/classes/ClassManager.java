@@ -1,6 +1,6 @@
 package fr.loual.customclasses.classes;
 
-import fr.loual.customclasses.CustomClasses;
+import fr.loual.newadventure.NewAdventurePlugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -20,12 +20,12 @@ import java.util.UUID;
 
 public class ClassManager {
 
-    private final CustomClasses plugin;
+    private final NewAdventurePlugin plugin;
     private final NamespacedKey classKey;
     private final NamespacedKey warriorSpeedKey;
     private final Map<UUID, PlayerClass> cache = new HashMap<>();
 
-    public ClassManager(CustomClasses plugin) {
+    public ClassManager(NewAdventurePlugin plugin) {
         this.plugin = plugin;
         this.classKey = new NamespacedKey(plugin, "player_class");
         this.warriorSpeedKey = new NamespacedKey(plugin, "warrior_attack_speed");

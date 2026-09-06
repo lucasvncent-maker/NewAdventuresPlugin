@@ -1,6 +1,6 @@
 package fr.loual.customclasses.jobs;
 
-import fr.loual.customclasses.CustomClasses;
+import fr.loual.newadventure.NewAdventurePlugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -17,11 +17,11 @@ import java.util.UUID;
 
 public class JobManager {
 
-    private final CustomClasses plugin;
+    private final NewAdventurePlugin plugin;
     private final NamespacedKey jobKey;
     private final Map<UUID, PlayerJob> cache = new HashMap<>();
 
-    public JobManager(CustomClasses plugin) {
+    public JobManager(NewAdventurePlugin plugin) {
         this.plugin = plugin;
         this.jobKey = new NamespacedKey(plugin, "player_job");
     }

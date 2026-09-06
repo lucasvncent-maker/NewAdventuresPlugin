@@ -1,6 +1,6 @@
 package fr.loual.customclasses.gui;
 
-import fr.loual.customclasses.CustomClasses;
+import fr.loual.newadventure.NewAdventurePlugin;
 import fr.loual.customclasses.classes.PlayerClass;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -37,7 +37,7 @@ public class ClassSelectionGui {
             PlayerClass.ARCHER
     };
 
-    public static void open(CustomClasses plugin, Player player) {
+    public static void open(NewAdventurePlugin plugin, Player player) {
         ClassGuiHolder holder = new ClassGuiHolder();
         Inventory inv = Bukkit.createInventory(
                 holder,

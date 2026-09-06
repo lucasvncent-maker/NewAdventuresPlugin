@@ -1,6 +1,6 @@
 package fr.loual.customclasses.jobs;
 
-import fr.loual.customclasses.CustomClasses;
+import fr.loual.newadventure.NewAdventurePlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -18,11 +18,11 @@ public class JobRecipes {
     public static final String KEY_WONDERFUL_HOE = "recipe_wonderful_hoe";
     public static final String KEY_WONDERFUL_HOE_MIRROR = "recipe_wonderful_hoe_mirror";
 
-    public static NamespacedKey getKey(CustomClasses plugin, String name) {
+    public static NamespacedKey getKey(NewAdventurePlugin plugin, String name) {
         return new NamespacedKey(plugin, name);
     }
 
-    public static void syncDiscoveredRecipes(CustomClasses plugin, org.bukkit.entity.Player player) {
+    public static void syncDiscoveredRecipes(NewAdventurePlugin plugin, org.bukkit.entity.Player player) {
         if (player == null || !player.isOnline()) return;
 
         PlayerJob pj = plugin.getJobManager().getPlayerJob(player);
@@ -65,14 +65,14 @@ public class JobRecipes {
         }
     }
 
-    public static void registerRecipes(CustomClasses plugin) {
+    public static void registerRecipes(NewAdventurePlugin plugin) {
         registerFarmerSoupRecipe(plugin);
         registerSpaceCookieRecipe(plugin);
         registerWonderfulSoupRecipe(plugin);
         registerWonderfulHoeRecipe(plugin);
     }
 
-    private static void registerFarmerSoupRecipe(CustomClasses plugin) {
+    private static void registerFarmerSoupRecipe(NewAdventurePlugin plugin) {
         NamespacedKey key = getKey(plugin, KEY_FARMER_SOUP);
         Bukkit.removeRecipe(key);
 
@@ -85,7 +85,7 @@ public class JobRecipes {
         Bukkit.addRecipe(recipe);
     }
 
-    private static void registerSpaceCookieRecipe(CustomClasses plugin) {
+    private static void registerSpaceCookieRecipe(NewAdventurePlugin plugin) {
         NamespacedKey key = getKey(plugin, KEY_SPACE_COOKIE);
         Bukkit.removeRecipe(key);
 
@@ -96,7 +96,7 @@ public class JobRecipes {
         Bukkit.addRecipe(recipe);
     }
 
-    private static void registerWonderfulSoupRecipe(CustomClasses plugin) {
+    private static void registerWonderfulSoupRecipe(NewAdventurePlugin plugin) {
         NamespacedKey key = getKey(plugin, KEY_WONDERFUL_SOUP);
         Bukkit.removeRecipe(key);
 
@@ -115,7 +115,7 @@ public class JobRecipes {
         Bukkit.addRecipe(recipe);
     }
 
-    private static void registerWonderfulHoeRecipe(CustomClasses plugin) {
+    private static void registerWonderfulHoeRecipe(NewAdventurePlugin plugin) {
         NamespacedKey key = getKey(plugin, KEY_WONDERFUL_HOE);
         Bukkit.removeRecipe(key);
 

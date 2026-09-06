@@ -1,0 +1,162 @@
+package fr.loual.newadventure;
+
+import fr.loual.customclasses.classes.ClassManager;
+import fr.loual.customclasses.commands.ClassCommand;
+import fr.loual.customclasses.jobs.JobManager;
+import fr.loual.customclasses.jobs.JobRecipes;
+import fr.loual.customclasses.jobs.commands.JobCommand;
+import fr.loual.customclasses.jobs.listeners.JobListener;
+import fr.loual.customclasses.listeners.ClassListener;
+import fr.loual.customminerals.commands.CustomMineralsCommand;
+import fr.loual.customminerals.listeners.CopperMiningListener;
+import fr.loual.customminerals.listeners.CupriteChestListener;
+import fr.loual.customminerals.listeners.DeathChestListener;
+import fr.loual.customminerals.listeners.HammerMiningListener;
+import fr.loual.customminerals.listeners.SmithingListener;
+import fr.loual.customminerals.listeners.SpawnerMiningListener;
+import fr.loual.customminerals.listeners.TreeMiningListener;
+import fr.loual.customminerals.recipes.RecipeManager;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.PluginManager;
+import org.bukkit.plugin.java.JavaPlugin;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
+public final class NewAdventurePlugin extends JavaPlugin {
+
+    private ClassManager classManager;
+    private JobManager jobManager;
+    private RecipeManager mineralRecipeManager;
+
+    @Override
+    public void onEnable() {
+        // Sauvegarde de la configuration (custom minerals, cuprite, etc.)
+        saveDefaultConfig();
+
+        // 1. Initialisation des modules de classes et métiers
+        this.classManager = new ClassManager(this);
+        this.jobManager = new JobManager(this);
+
+        // 2. Initialisation des minéraux & Cuprite
+        this.mineralRecipeManager = new RecipeManager(this);
+        this.mineralRecipeManager.registerRecipes();
+
+        // 3. Enregistrement des écouteurs d'événements
+        PluginManager pm = getServer().getPluginManager();
+        // Classes & Métiers
+        pm.registerEvents(new ClassListener(this), this);
+        pm.registerEvents(new JobListener(this), this);
+        // CustomMinerals
+        pm.registerEvents(new CopperMiningListener(this), this);
+        pm.registerEvents(new HammerMiningListener(this), this);
+        pm.registerEvents(new SpawnerMiningListener(this), this);
+        pm.registerEvents(new SmithingListener(this), this);
+        pm.registerEvents(new TreeMiningListener(this), this);
+        pm.registerEvents(new CupriteChestListener(this), this);
+        pm.registerEvents(new DeathChestListener(this), this);
+        pm.registerEvents(this.mineralRecipeManager, this);
+
+        // 4. Enregistrement des recettes artisanales de métiers
+        JobRecipes.registerRecipes(this);
+
+        // 5. Commandes /class
+        ClassCommand classCommand = new ClassCommand(this);
+        PluginCommand cmdClass = getCommand("class");
+        if (cmdClass != null) {
+            cmdClass.setExecutor(classCommand);
+            cmdClass.setTabCompleter(classCommand);
+        }
+
+        // 6. Commandes /job
+        JobCommand jobCommand = new JobCommand(this);
+        PluginCommand cmdJob = getCommand("job");
+        if (cmdJob != null) {
+            cmdJob.setExecutor(jobCommand);
+            cmdJob.setTabCompleter(jobCommand);
+        }
+
+        // 7. Commandes /cuprite & /customminerals
+        CustomMineralsCommand mineralCommand = new CustomMineralsCommand(this);
+        PluginCommand cupriteCmd = getCommand("cuprite");
+        if (cupriteCmd != null) {
+            cupriteCmd.setExecutor(mineralCommand);
+            cupriteCmd.setTabCompleter(mineralCommand);
+        }
+        PluginCommand customMineralsCmd = getCommand("customminerals");
+        if (customMineralsCmd != null) {
+            customMineralsCmd.setExecutor(mineralCommand);
+            customMineralsCmd.setTabCompleter(mineralCommand);
+        }
+
+        // 8. Export du resource pack au format .zip
+        exportResourcePackZip();
+
+        // 9. Rafraîchissement des effets de classe pour les joueurs déjà connectés
+        for (Player player : getServer().getOnlinePlayers()) {
+            classManager.refreshPlayer(player);
+        }
+
+        getLogger().info("newAdventurePlugin v" + getPluginMeta().getVersion() + " (Classes + Métiers + Cuprite) est activé !");
+    }
+
+    @Override
+    public void onDisable() {
+        getLogger().info("newAdventurePlugin a été désactivé.");
+    }
+
+    public ClassManager getClassManager() {
+        return classManager;
+    }
+
+    public JobManager getJobManager() {
+        return jobManager;
+    }
+
+    public RecipeManager getMineralRecipeManager() {
+        return mineralRecipeManager;
+    }
+
+    public RecipeManager getRecipeManager() {
+        return mineralRecipeManager;
+    }
+
+    private void exportResourcePackZip() {
+        try {
+            File dataFolder = getDataFolder();
+            if (!dataFolder.exists()) {
+                dataFolder.mkdirs();
+            }
+
+            File zipFile = new File(dataFolder, "CustomMineralsPack.zip");
+            File localRp = new File("../resourcepack");
+            if (localRp.exists() && localRp.isDirectory()) {
+                createZipFromFolder(localRp.toPath(), zipFile.toPath());
+                getLogger().info("Pack de ressources généré dans " + zipFile.getName());
+            }
+        } catch (Exception e) {
+            getLogger().warning("Impossible de créer CustomMineralsPack.zip: " + e.getMessage());
+        }
+    }
+
+    private void createZipFromFolder(Path sourceDirPath, Path zipPath) throws IOException {
+        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zipPath.toFile()))) {
+            Files.walk(sourceDirPath).filter(path -> !Files.isDirectory(path)).forEach(path -> {
+                ZipEntry zipEntry = new ZipEntry(sourceDirPath.relativize(path).toString().replace('\\', '/'));
+                try {
+                    zos.putNextEntry(zipEntry);
+                    Files.copy(path, zos);
+                    zos.closeEntry();
+                } catch (IOException e) {
+                    getLogger().warning("Erreur lors de l'archivage: " + e.getMessage());
+                }
+            });
+        }
+    }
+}

@@ -1,0 +1,26 @@
+{
+  "model": {
+    "type": "minecraft:select",
+    "property": "minecraft:custom_model_data",
+    "cases": [
+      {
+        "when": "cuprite_block",
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/cuprite_block"
+        }
+      },
+      {
+        "when": "cuprite_reinforced_block",
+        "model": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/cuprite_reinforced_block"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:block/copper_block"
+    }
+  }
+}
