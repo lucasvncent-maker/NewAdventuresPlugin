@@ -149,14 +149,50 @@ public final class NewAdventurePlugin extends JavaPlugin {
                 dataFolder.mkdirs();
             }
 
-            File zipFile = new File(dataFolder, "CustomMineralsPack.zip");
+            File zipFile = new File(dataFolder, "newAdventurePack.zip");
+
+            // 1. Si un dossier local ../resourcepack existe
             File localRp = new File("../resourcepack");
             if (localRp.exists() && localRp.isDirectory()) {
                 createZipFromFolder(localRp.toPath(), zipFile.toPath());
                 getLogger().info("Pack de ressources généré dans " + zipFile.getName());
+                return;
+            }
+
+            // 2. Extraire directement depuis les ressources embarquées dans le jar
+            try {
+                java.net.URL jarUrl = getClass().getProtectionDomain().getCodeSource().getLocation();
+                File jarFile = new File(jarUrl.toURI());
+                if (jarFile.isFile()) {
+                    try (java.util.jar.JarFile jar = new java.util.jar.JarFile(jarFile);
+                         ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zipFile))) {
+
+                        java.util.Enumeration<java.util.jar.JarEntry> entries = jar.entries();
+                        String prefix = "resourcepack/";
+                        boolean foundAny = false;
+                        while (entries.hasMoreElements()) {
+                            java.util.jar.JarEntry entry = entries.nextElement();
+                            String name = entry.getName();
+                            if (name.startsWith(prefix) && name.length() > prefix.length() && !entry.isDirectory()) {
+                                String relName = name.substring(prefix.length());
+                                zos.putNextEntry(new ZipEntry(relName));
+                                try (InputStream is = jar.getInputStream(entry)) {
+                                    is.transferTo(zos);
+                                }
+                                zos.closeEntry();
+                                foundAny = true;
+                            }
+                        }
+                        if (foundAny) {
+                            getLogger().info("Pack de ressources extrait depuis le jar dans " + zipFile.getName());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                getLogger().warning("Impossible d'extraire le resourcepack depuis le jar: " + e.getMessage());
             }
         } catch (Exception e) {
-            getLogger().warning("Impossible de créer CustomMineralsPack.zip: " + e.getMessage());
+            getLogger().warning("Impossible de créer newAdventurePack.zip: " + e.getMessage());
         }
     }
 
