@@ -1,4 +1,4 @@
-﻿package fr.loual.customclasses.jobs.gui;
+package fr.loual.customclasses.jobs.gui;
 
 import fr.loual.customclasses.CustomClasses;
 import fr.loual.customclasses.jobs.CustomJobItems;

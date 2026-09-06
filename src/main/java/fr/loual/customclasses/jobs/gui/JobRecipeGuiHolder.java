@@ -1,4 +1,4 @@
-﻿package fr.loual.customclasses.jobs.gui;
+package fr.loual.customclasses.jobs.gui;
 
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
