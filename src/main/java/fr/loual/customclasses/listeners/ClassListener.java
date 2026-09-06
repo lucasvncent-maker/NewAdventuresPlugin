@@ -6,6 +6,8 @@ import fr.loual.customclasses.classes.PlayerClass;
 import fr.loual.customclasses.gui.ClassGuiHolder;
 import fr.loual.customclasses.gui.ClassSelectionGui;
 import fr.loual.customclasses.jobs.gui.JobSelectionGui;
+import net.kyori.adventure.resource.ResourcePackInfo;
+import net.kyori.adventure.resource.ResourcePackRequest;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -25,6 +27,9 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.potion.PotionType;
 import org.bukkit.util.Vector;
+
+import org.bukkit.entity.Player;
+import java.util.UUID;
 
 import java.util.*;
 
@@ -49,6 +54,8 @@ public class ClassListener implements Listener {
 
     // Archer : clé pour identifier les flèches tirées par des squelettes/monstres
     private final NamespacedKey skeletonArrowKey;
+
+    private static final UUID PACK_ID = UUID.nameUUIDFromBytes("mon-pack-unique-v1".getBytes());
 
     public ClassListener(NewAdventurePlugin plugin) {
         this.plugin = plugin;
@@ -242,6 +249,27 @@ public class ClassListener implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
 
+        String url = "https://github.com/lucasvncent-maker/NewAdventuresPlugin/releases/download/v1.0.0/newAdventureTexturePack.zip";
+        String hash = "04b7af75206492f0dd16dd1445a180bd0d474a82";
+
+        // 2. Créer l'info du pack
+        ResourcePackInfo packInfo = ResourcePackInfo.resourcePackInfo()
+                .id(PACK_ID)
+                .uri(java.net.URI.create(url))
+                .hash(hash) // Ici on passe la String hexadécimale directement (ou le byte[])
+                .build();
+
+        // 3. Créer la requête complète
+        ResourcePackRequest request = ResourcePackRequest.resourcePackRequest()
+                .packs(packInfo)
+                .required(true) // Si tu veux forcer le pack
+                .prompt(Component.text("Ce serveur nécessite un pack de textures custom.", NamedTextColor.YELLOW))
+                .build();
+
+        // 4. Envoyer le pack
+        player.sendResourcePacks(request);
+
+        // Gestion de la classe du joueur
         if (!classManager.hasClass(player)) {
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (player.isOnline() && !classManager.hasClass(player)) {
@@ -252,7 +280,10 @@ public class ClassListener implements Listener {
             classManager.refreshPlayer(player);
         }
 
-        sirenLastWaterTime.put(player.getUniqueId(), System.currentTimeMillis());
+        sirenLastWaterTime.put(
+                player.getUniqueId(),
+                System.currentTimeMillis()
+        );
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
