@@ -32,8 +32,10 @@ public class CustomJobItems {
                     Component.empty(),
                     Component.text("✦ Se mange instantanément !", NamedTextColor.YELLOW),
                     Component.text("✦ Saturation équivalente à une carotte dorée", NamedTextColor.YELLOW),
-                    Component.text("✦ Confère Régénération II pendant 10s", NamedTextColor.GREEN)
+                    Component.text("✦ Confère Régénération II pendant 10s", NamedTextColor.GREEN),
+                    Component.text("✦ Empilable par 64", NamedTextColor.AQUA)
             ));
+            meta.setMaxStackSize(64);
             meta.getPersistentDataContainer().set(ITEM_KEY, PersistentDataType.STRING, ID_FARMER_SOUP);
             item.setItemMeta(meta);
         }
@@ -70,8 +72,10 @@ public class CustomJobItems {
                     Component.empty(),
                     Component.text("✦ Se mange quasi instantanément !", NamedTextColor.YELLOW),
                     Component.text("✦ Rend 1 cœur (2 HP)", NamedTextColor.GREEN),
-                    Component.text("✦ Saturation Maximale (20.0)", NamedTextColor.GREEN)
+                    Component.text("✦ Saturation Maximale (20.0)", NamedTextColor.GREEN),
+                    Component.text("✦ Empilable par 64", NamedTextColor.AQUA)
             ));
+            meta.setMaxStackSize(64);
             meta.addEnchant(Enchantment.UNBREAKING, 1, true);
             meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
             meta.getPersistentDataContainer().set(ITEM_KEY, PersistentDataType.STRING, ID_WONDERFUL_SOUP);

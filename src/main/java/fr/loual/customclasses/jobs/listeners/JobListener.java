@@ -477,7 +477,10 @@ public class JobListener implements Listener {
 
         // Retirer 1 soupe et donner un bol vide
         item.subtract(1);
-        player.getInventory().addItem(new ItemStack(Material.BOWL));
+        Map<Integer, ItemStack> leftover = player.getInventory().addItem(new ItemStack(Material.BOWL));
+        if (!leftover.isEmpty()) {
+            leftover.values().forEach(b -> player.getWorld().dropItemNaturally(player.getLocation(), b));
+        }
 
         // Stats équivalentes carotte dorée (6 nourriture, 14.4 saturation)
         player.setFoodLevel(Math.min(20, player.getFoodLevel() + 6));
@@ -498,8 +501,10 @@ public class JobListener implements Listener {
         instantEatCooldown.add(uuid);
 
         item.subtract(1);
-        player.getInventory().addItem(new ItemStack(Material.BOWL));
-        player.getInventory().addItem(new ItemStack(Material.GLASS_BOTTLE));
+        Map<Integer, ItemStack> leftover = player.getInventory().addItem(new ItemStack(Material.BOWL), new ItemStack(Material.GLASS_BOTTLE));
+        if (!leftover.isEmpty()) {
+            leftover.values().forEach(b -> player.getWorld().dropItemNaturally(player.getLocation(), b));
+        }
 
         // Rend 1 cœur (2.0 HP)
         player.setHealth(Math.min(player.getMaxHealth(), player.getHealth() + 2.0));
