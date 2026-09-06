@@ -4,6 +4,7 @@ import fr.loual.newadventure.NewAdventurePlugin;
 import fr.loual.customclasses.jobs.AgriculteurMissions;
 import fr.loual.customclasses.jobs.JobManager;
 import fr.loual.customclasses.jobs.JobMission;
+import fr.loual.customclasses.jobs.MineurMissions;
 import fr.loual.customclasses.jobs.PlayerJob;
 import fr.loual.customclasses.jobs.gui.JobRecipeGui;
 import fr.loual.customclasses.jobs.gui.JobSelectionGui;

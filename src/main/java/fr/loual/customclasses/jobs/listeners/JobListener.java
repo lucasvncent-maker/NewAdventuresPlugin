@@ -64,6 +64,7 @@ public class JobListener implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         JobRecipes.syncDiscoveredRecipes(plugin, event.getPlayer());
+        jobManager.applyJobEffects(event.getPlayer());
     }
 
     @EventHandler
@@ -626,11 +627,6 @@ public class JobListener implements Listener {
         if (job != PlayerJob.NONE) {
             jobManager.checkCurrentMissionCompletion(player, job);
         }
-    }
-
-    @EventHandler
-    public void onPlayerJoin(PlayerJoinEvent event) {
-        jobManager.applyJobEffects(event.getPlayer());
     }
 
     @EventHandler
