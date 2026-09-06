@@ -5,6 +5,7 @@ import fr.loual.customclasses.classes.ClassManager;
 import fr.loual.customclasses.classes.PlayerClass;
 import fr.loual.customclasses.gui.ClassGuiHolder;
 import fr.loual.customclasses.gui.ClassSelectionGui;
+import fr.loual.customclasses.jobs.gui.JobSelectionGui;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -314,6 +315,15 @@ public class ClassListener implements Listener {
                             .append(Component.text(" !", NamedTextColor.GREEN))
             );
             sirenLastWaterTime.put(player.getUniqueId(), System.currentTimeMillis());
+
+            // Proposer ensuite le choix du métier si aucun n'est sélectionné
+            if (!plugin.getJobManager().hasJob(player)) {
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (player.isOnline() && !plugin.getJobManager().hasJob(player)) {
+                        JobSelectionGui.open(plugin, player);
+                    }
+                }, 20L);
+            }
         }
     }
 

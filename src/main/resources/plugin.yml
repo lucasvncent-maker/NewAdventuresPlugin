@@ -1,4 +1,4 @@
-﻿name: CustomClasses
+name: CustomClasses
 version: 1.0.0
 main: fr.loual.customclasses.CustomClasses
 api-version: '1.21.6'
@@ -10,3 +10,7 @@ commands:
     description: Commandes de gestion des classes
     usage: /class [choose|reset|get|set|info|help]
     aliases: [classes]
+  job:
+    description: Commandes de gestion des métiers et missions
+    usage: /job [choose|reset|info|set]
+    aliases: [jobs, metier, metiers]
