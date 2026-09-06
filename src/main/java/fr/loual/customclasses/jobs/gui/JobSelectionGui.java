@@ -25,6 +25,8 @@ import java.util.List;
 public class JobSelectionGui {
 
     public static final NamespacedKey JOB_ICON_KEY = new NamespacedKey("customclasses", "job_choice");
+    public static final NamespacedKey MISSION_ITEM_KEY = new NamespacedKey("customclasses", "mission_num");
+    public static final NamespacedKey RECIPE_BOOK_KEY = new NamespacedKey("customclasses", "recipe_book_btn");
 
     public static void open(CustomClasses plugin, Player player) {
         JobGuiHolder holder = new JobGuiHolder();
@@ -65,6 +67,22 @@ public class JobSelectionGui {
                     inv.setItem(missionSlots[i], missionItem);
                 }
             }
+
+            // Bouton du Livre de Recettes au slot 31
+            ItemStack recipeBook = new ItemStack(Material.KNOWLEDGE_BOOK);
+            ItemMeta bookMeta = recipeBook.getItemMeta();
+            if (bookMeta != null) {
+                bookMeta.displayName(Component.text("✦ Livre des Recettes de l'Agriculteur ✦", NamedTextColor.GOLD, TextDecoration.BOLD));
+                bookMeta.lore(List.of(
+                        Component.text("Consultez toutes les recettes exclusives", NamedTextColor.GRAY),
+                        Component.text("de l'Agriculteur avec leur patron de craft !", NamedTextColor.GRAY),
+                        Component.empty(),
+                        Component.text("➜ Cliquez pour ouvrir le livre des recettes", NamedTextColor.YELLOW, TextDecoration.BOLD)
+                ));
+                bookMeta.getPersistentDataContainer().set(RECIPE_BOOK_KEY, PersistentDataType.BYTE, (byte) 1);
+                recipeBook.setItemMeta(bookMeta);
+            }
+            inv.setItem(31, recipeBook);
         } else {
             // Indication pour choisir le métier
             ItemStack info = new ItemStack(Material.BOOK);
@@ -155,11 +173,31 @@ public class JobSelectionGui {
             lore.add(Component.text("✦ Récompense :", NamedTextColor.AQUA, TextDecoration.BOLD));
             lore.add(Component.text("  " + mission.getRewardDescription(), NamedTextColor.WHITE));
 
+            // Détails et raccourcis des crafts
+            if (missionNum == 1) {
+                lore.add(Component.empty());
+                lore.add(Component.text("✦ Recette de craft :", NamedTextColor.GOLD, TextDecoration.BOLD));
+                lore.add(Component.text("  • 1x Bol + 1x Carotte + 1x Patate + 1x Blé", NamedTextColor.YELLOW));
+                lore.add(Component.text("➜ Clic pour voir la recette dans l'établi", NamedTextColor.AQUA));
+            } else if (missionNum == 3) {
+                lore.add(Component.empty());
+                lore.add(Component.text("✦ Recette de craft :", NamedTextColor.GOLD, TextDecoration.BOLD));
+                lore.add(Component.text("  • 1x Cookie + 1x Baie lumineuse", NamedTextColor.YELLOW));
+                lore.add(Component.text("➜ Clic pour voir la recette dans l'établi", NamedTextColor.AQUA));
+            } else if (missionNum == 4) {
+                lore.add(Component.empty());
+                lore.add(Component.text("✦ Recettes de craft :", NamedTextColor.GOLD, TextDecoration.BOLD));
+                lore.add(Component.text("  • Soupe Merveilleuse (9 récoltes)", NamedTextColor.YELLOW));
+                lore.add(Component.text("  • Houe Merveilleuse (2 Cuivres + 2 Bâtons)", NamedTextColor.YELLOW));
+                lore.add(Component.text("➜ Clic pour voir les recettes dans l'établi", NamedTextColor.AQUA));
+            }
+
             if (isCurrent) {
                 meta.addEnchant(Enchantment.UNBREAKING, 1, true);
                 meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
             }
 
+            meta.getPersistentDataContainer().set(MISSION_ITEM_KEY, PersistentDataType.INTEGER, missionNum);
             meta.lore(lore);
             item.setItemMeta(meta);
         }

@@ -5,6 +5,7 @@ import fr.loual.customclasses.jobs.AgriculteurMissions;
 import fr.loual.customclasses.jobs.JobManager;
 import fr.loual.customclasses.jobs.JobMission;
 import fr.loual.customclasses.jobs.PlayerJob;
+import fr.loual.customclasses.jobs.gui.JobRecipeGui;
 import fr.loual.customclasses.jobs.gui.JobSelectionGui;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -56,6 +57,16 @@ public class JobCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 JobSelectionGui.open(plugin, player);
+                return true;
+            }
+
+            case "recipes", "recipe", "recettes", "recette" -> {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(Component.text("Cette commande ne peut être exécutée que par un joueur.", NamedTextColor.RED));
+                    return true;
+                }
+                String rName = (args.length >= 2) ? args[1] : JobRecipeGui.RECIPE_FARMER_SOUP;
+                JobRecipeGui.open(plugin, player, rName);
                 return true;
             }
 
@@ -162,6 +173,20 @@ public class JobCommand implements CommandExecutor, TabCompleter {
                     } else {
                         sender.sendMessage(Component.text("★ Félicitations ! Toutes les missions du métier sont accomplies !", NamedTextColor.GREEN, TextDecoration.BOLD));
                     }
+
+                    if (level >= 1) {
+                        sender.sendMessage(Component.empty());
+                        sender.sendMessage(Component.text("✦ Recettes débloquées :", NamedTextColor.GOLD, TextDecoration.BOLD));
+                        sender.sendMessage(Component.text("  • Soupe de l'Agriculteur : 1x Bol, 1x Carotte, 1x Patate, 1x Blé", NamedTextColor.YELLOW));
+                        if (level >= 3) {
+                            sender.sendMessage(Component.text("  • Space Cookie : 1x Cookie, 1x Baie Lumineuse", NamedTextColor.YELLOW));
+                        }
+                        if (level >= 4) {
+                            sender.sendMessage(Component.text("  • Soupe Merveilleuse : 9 ingrédients (Bol + récoltes variées)", NamedTextColor.YELLOW));
+                            sender.sendMessage(Component.text("  • Houe Merveilleuse : 2x Cuivres, 2x Bâtons", NamedTextColor.YELLOW));
+                        }
+                        sender.sendMessage(Component.text("➜ Tapez /" + label + " recipes pour afficher la table de craft interactive !", NamedTextColor.AQUA));
+                    }
                 }
                 return true;
             }
@@ -177,8 +202,10 @@ public class JobCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("==== [ Système de Métiers ] ====", NamedTextColor.GOLD, TextDecoration.BOLD));
         sender.sendMessage(Component.text("/" + label + " ", NamedTextColor.YELLOW)
                 .append(Component.text("- Ouvrir le menu des métiers et des missions", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.text("/" + label + " recipes [nom] ", NamedTextColor.YELLOW)
+                .append(Component.text("- Consulter les recettes de craft exclusives dans l'établi", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/" + label + " info [joueur] ", NamedTextColor.YELLOW)
-                .append(Component.text("- Voir sa progression détaillée de missions", NamedTextColor.GRAY)));
+                .append(Component.text("- Voir sa progression détaillée et ses recettes", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/" + label + " reset [joueur] ", NamedTextColor.YELLOW)
                 .append(Component.text("- Réinitialiser son métier", NamedTextColor.GRAY)));
         if (sender.hasPermission("customclasses.admin")) {
@@ -192,7 +219,7 @@ public class JobCommand implements CommandExecutor, TabCompleter {
         List<String> completions = new ArrayList<>();
 
         if (args.length == 1) {
-            List<String> subs = new ArrayList<>(List.of("choose", "menu", "info", "reset"));
+            List<String> subs = new ArrayList<>(List.of("choose", "menu", "info", "reset", "recipes", "recettes"));
             if (sender.hasPermission("customclasses.admin")) {
                 subs.add("set");
             }
@@ -207,6 +234,13 @@ public class JobCommand implements CommandExecutor, TabCompleter {
                 for (Player p : Bukkit.getOnlinePlayers()) {
                     if (p.getName().toLowerCase().startsWith(args[1].toLowerCase())) {
                         completions.add(p.getName());
+                    }
+                }
+            } else if (sub.equals("recipes") || sub.equals("recipe") || sub.equals("recettes") || sub.equals("recette")) {
+                List<String> recipeNames = List.of("farmer_soup", "space_cookie", "wonderful_soup", "wonderful_hoe");
+                for (String r : recipeNames) {
+                    if (r.toLowerCase().startsWith(args[1].toLowerCase())) {
+                        completions.add(r);
                     }
                 }
             }

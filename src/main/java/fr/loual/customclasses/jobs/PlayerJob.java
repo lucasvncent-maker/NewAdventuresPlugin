@@ -21,8 +21,8 @@ public enum PlayerJob {
             Component.empty(),
             Component.text("✦ Progression (4 Missions) :", NamedTextColor.AQUA, TextDecoration.BOLD),
             Component.text("  • M1 : Soupe nutritive instantanée (Regen II)", NamedTextColor.DARK_AQUA),
-            Component.text("  • M2 : Plantation automatique en zone (rayon 5, pousse moyenne)", NamedTextColor.DARK_AQUA),
-            Component.text("  • M3 : Space Cookie (Force III, Speed II) + Zone rayon 10 (pousse avancée)", NamedTextColor.DARK_AQUA),
+            Component.text("  • M2 : Plantation automatique en zone (rayon 3, pousse moyenne)", NamedTextColor.DARK_AQUA),
+            Component.text("  • M3 : Space Cookie (Force III, Speed II) + Zone rayon 6 (pousse avancée)", NamedTextColor.DARK_AQUA),
             Component.text("  • M4 : Soupe Merveilleuse + Houe Merveilleuse (drops dorés & blocs)", NamedTextColor.DARK_AQUA)
     ));
 

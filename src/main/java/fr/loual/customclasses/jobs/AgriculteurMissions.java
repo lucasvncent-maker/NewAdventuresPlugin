@@ -24,7 +24,7 @@ public class AgriculteurMissions {
             new JobMission(
                     2,
                     "Mission 2 : L'Expansion des Terres",
-                    "Plantation automatique en zone (rayon 5) avec croissance intermédiaire.",
+                    "Plantation automatique en zone (rayon 3) avec croissance intermédiaire.",
                     List.of(
                             new JobMission.Requirement("MELON", "Pastèques", Material.MELON_SLICE, 64),
                             new JobMission.Requirement("PUMPKIN", "Citrouilles", Material.PUMPKIN, 64),
@@ -37,7 +37,7 @@ public class AgriculteurMissions {
             new JobMission(
                     3,
                     "Mission 3 : La Pâtisserie Cosmique",
-                    "Débloque le Space Cookie + Rayon de plantation étendu à 10 avec croissance avancée.",
+                    "Débloque le Space Cookie + Rayon de plantation étendu à 6 avec croissance avancée.",
                     List.of(
                             new JobMission.Requirement("COOKIE", "Cookies", Material.COOKIE, 64),
                             new JobMission.Requirement("CAKE", "Gâteaux", Material.CAKE, 16),

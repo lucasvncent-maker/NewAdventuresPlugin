@@ -3,8 +3,11 @@ package fr.loual.customclasses.jobs.listeners;
 import fr.loual.customclasses.CustomClasses;
 import fr.loual.customclasses.jobs.CustomJobItems;
 import fr.loual.customclasses.jobs.JobManager;
+import fr.loual.customclasses.jobs.JobRecipes;
 import fr.loual.customclasses.jobs.PlayerJob;
 import fr.loual.customclasses.jobs.gui.JobGuiHolder;
+import fr.loual.customclasses.jobs.gui.JobRecipeGui;
+import fr.loual.customclasses.jobs.gui.JobRecipeGuiHolder;
 import fr.loual.customclasses.jobs.gui.JobSelectionGui;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -28,6 +31,7 @@ import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.PlayerHarvestBlockEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -54,16 +58,53 @@ public class JobListener implements Listener {
     }
 
     @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        JobRecipes.syncDiscoveredRecipes(plugin, event.getPlayer());
+    }
+
+    @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         jobManager.unloadPlayer(event.getPlayer());
         instantEatCooldown.remove(event.getPlayer().getUniqueId());
     }
 
     // ==========================================================
-    // 1. CLIC DANS LE MENU DES MÉTIERS
+    // 1. CLIC DANS LE MENU DES MÉTIERS & RECETTES
     // ==========================================================
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryClick(InventoryClickEvent event) {
+        // --- 1.A. VISUALISEUR DE RECETTES (JobRecipeGuiHolder) ---
+        if (event.getInventory().getHolder() instanceof JobRecipeGuiHolder) {
+            event.setCancelled(true);
+            if (!(event.getWhoClicked() instanceof Player player)) return;
+
+            int slot = event.getRawSlot();
+            switch (slot) {
+                case 1 -> {
+                    JobRecipeGui.open(plugin, player, JobRecipeGui.RECIPE_FARMER_SOUP);
+                    player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 0.8f, 1.2f);
+                }
+                case 3 -> {
+                    JobRecipeGui.open(plugin, player, JobRecipeGui.RECIPE_SPACE_COOKIE);
+                    player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 0.8f, 1.2f);
+                }
+                case 5 -> {
+                    JobRecipeGui.open(plugin, player, JobRecipeGui.RECIPE_WONDERFUL_SOUP);
+                    player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 0.8f, 1.2f);
+                }
+                case 7 -> {
+                    JobRecipeGui.open(plugin, player, JobRecipeGui.RECIPE_WONDERFUL_HOE);
+                    player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 0.8f, 1.2f);
+                }
+                case 40 -> {
+                    JobSelectionGui.open(plugin, player);
+                    player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.0f);
+                }
+            }
+            return;
+        }
+
+        // --- 1.B. MENU PRINCIPAL DES MÉTIERS (JobGuiHolder) ---
         if (!(event.getInventory().getHolder() instanceof JobGuiHolder)) {
             return;
         }
@@ -78,21 +119,54 @@ public class JobListener implements Listener {
         if (clicked == null || !clicked.hasItemMeta()) return;
 
         ItemMeta meta = clicked.getItemMeta();
-        String jobId = meta.getPersistentDataContainer().get(JobSelectionGui.JOB_ICON_KEY, PersistentDataType.STRING);
-        if (jobId == null) return;
 
-        PlayerJob pj = PlayerJob.fromId(jobId);
-        if (pj != PlayerJob.NONE) {
-            jobManager.setPlayerJob(player, pj);
-            jobManager.checkCurrentMissionCompletion(player, pj);
-            player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.2f);
-            player.sendMessage(
-                    Component.text("✦ Vous avez choisi le métier : ", NamedTextColor.GREEN, TextDecoration.BOLD)
-                            .append(Component.text(pj.getDisplayName(), NamedTextColor.GOLD, TextDecoration.BOLD))
-                            .append(Component.text(" !", NamedTextColor.GREEN))
-            );
-            // Réouvrir le menu actualisé
-            JobSelectionGui.open(plugin, player);
+        // Clic sur l'icône de métier
+        String jobId = meta.getPersistentDataContainer().get(JobSelectionGui.JOB_ICON_KEY, PersistentDataType.STRING);
+        if (jobId != null) {
+            PlayerJob pj = PlayerJob.fromId(jobId);
+            if (pj != PlayerJob.NONE) {
+                jobManager.setPlayerJob(player, pj);
+                jobManager.checkCurrentMissionCompletion(player, pj);
+                player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.2f);
+                player.sendMessage(
+                        Component.text("✦ Vous avez choisi le métier : ", NamedTextColor.GREEN, TextDecoration.BOLD)
+                                .append(Component.text(pj.getDisplayName(), NamedTextColor.GOLD, TextDecoration.BOLD))
+                                .append(Component.text(" !", NamedTextColor.GREEN))
+                );
+                // Réouvrir le menu actualisé
+                JobSelectionGui.open(plugin, player);
+            }
+            return;
+        }
+
+        // Clic sur le Livre de Recettes (Slot 31)
+        if (meta.getPersistentDataContainer().has(JobSelectionGui.RECIPE_BOOK_KEY, PersistentDataType.BYTE)) {
+            JobRecipeGui.open(plugin, player, JobRecipeGui.RECIPE_FARMER_SOUP);
+            player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.0f);
+            return;
+        }
+
+        // Clic sur une mission pour afficher directement son craft
+        Integer missionNum = meta.getPersistentDataContainer().get(JobSelectionGui.MISSION_ITEM_KEY, PersistentDataType.INTEGER);
+        if (missionNum != null) {
+            switch (missionNum) {
+                case 1 -> {
+                    JobRecipeGui.open(plugin, player, JobRecipeGui.RECIPE_FARMER_SOUP);
+                    player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.0f);
+                }
+                case 2 -> {
+                    player.sendMessage(Component.text("✦ La Mission 2 débloque un passif de plantation en zone (aucun craft d'item).", NamedTextColor.YELLOW));
+                    player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                }
+                case 3 -> {
+                    JobRecipeGui.open(plugin, player, JobRecipeGui.RECIPE_SPACE_COOKIE);
+                    player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.0f);
+                }
+                case 4 -> {
+                    JobRecipeGui.open(plugin, player, JobRecipeGui.RECIPE_WONDERFUL_SOUP);
+                    player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.0f);
+                }
+            }
         }
     }
 
@@ -292,7 +366,7 @@ public class JobListener implements Listener {
         if (cropType == null) return;
 
         // Paramètres de zone selon le niveau de mission
-        int radius = (level >= 3) ? 10 : 5;
+        int radius = (level >= 3) ? 6 : 3;
         int targetAge = (level >= 3) ? getAdvancedAge(cropType) : getIntermediateAge(cropType);
 
         // Exécuter la plantation de zone

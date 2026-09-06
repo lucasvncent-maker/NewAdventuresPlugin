@@ -54,6 +54,7 @@ public class JobManager {
     public void resetPlayerJob(Player player) {
         setPlayerJob(player, PlayerJob.NONE);
         setJobLevel(player, PlayerJob.AGRICULTEUR, 0);
+        JobRecipes.syncDiscoveredRecipes(plugin, player);
         player.sendMessage(
                 Component.text("[Métiers] ", NamedTextColor.GOLD, TextDecoration.BOLD)
                         .append(Component.text("Votre métier a été réinitialisé !", NamedTextColor.YELLOW))
@@ -69,6 +70,7 @@ public class JobManager {
     public void setJobLevel(Player player, PlayerJob job, int level) {
         NamespacedKey key = new NamespacedKey(plugin, "job_" + job.getId() + "_level");
         player.getPersistentDataContainer().set(key, PersistentDataType.INTEGER, level);
+        JobRecipes.syncDiscoveredRecipes(plugin, player);
     }
 
     /**
@@ -245,6 +247,9 @@ public class JobManager {
             setJobLevel(player, job, missionNumber);
             completedAny = true;
 
+            // Débloquer la recette dans le livre de craft Minecraft (vanilla)
+            JobRecipes.syncDiscoveredRecipes(plugin, player);
+
             // Célébration
             player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
             player.getWorld().spawnParticle(Particle.TOTEM_OF_UNDYING, player.getLocation().clone().add(0, 1, 0), 30, 0.5, 0.5, 0.5, 0.2);
@@ -255,6 +260,21 @@ public class JobManager {
                     .append(Component.text(mission.getTitle(), NamedTextColor.YELLOW, TextDecoration.BOLD)));
             player.sendMessage(Component.text("✦ Récompense débloquée : ", NamedTextColor.AQUA, TextDecoration.BOLD)
                     .append(Component.text(mission.getRewardDescription(), NamedTextColor.WHITE)));
+
+            if (missionNumber == 1) {
+                player.sendMessage(Component.text("✦ Ingrédients Soupe de l'Agriculteur : ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                        .append(Component.text("1x Bol, 1x Carotte, 1x Pomme de terre, 1x Blé", NamedTextColor.YELLOW)));
+                player.sendMessage(Component.text("➜ Tapez /job recipes ou consultez votre établi pour voir le craft !", NamedTextColor.GRAY));
+            } else if (missionNumber == 3) {
+                player.sendMessage(Component.text("✦ Ingrédients Space Cookie : ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                        .append(Component.text("1x Cookie, 1x Baie lumineuse", NamedTextColor.YELLOW)));
+                player.sendMessage(Component.text("➜ Tapez /job recipes ou consultez votre établi pour voir le craft !", NamedTextColor.GRAY));
+            } else if (missionNumber == 4) {
+                player.sendMessage(Component.text("✦ Crafts Suprêmes débloqués : ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                        .append(Component.text("Soupe Merveilleuse (9 ingrédients) & Houe Merveilleuse (2 Cuivres, 2 Bâtons)", NamedTextColor.YELLOW)));
+                player.sendMessage(Component.text("➜ Tapez /job recipes ou consultez votre établi pour voir les crafts !", NamedTextColor.GRAY));
+            }
+
             player.sendMessage(Component.text("★ ========================================= ★", NamedTextColor.GOLD, TextDecoration.BOLD));
             player.sendMessage(Component.empty());
         }
