@@ -7,6 +7,7 @@ import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
@@ -21,11 +22,13 @@ public class ClassManager {
 
     private final CustomClasses plugin;
     private final NamespacedKey classKey;
+    private final NamespacedKey warriorSpeedKey;
     private final Map<UUID, PlayerClass> cache = new HashMap<>();
 
     public ClassManager(CustomClasses plugin) {
         this.plugin = plugin;
         this.classKey = new NamespacedKey(plugin, "player_class");
+        this.warriorSpeedKey = new NamespacedKey(plugin, "warrior_attack_speed");
     }
 
     public PlayerClass getPlayerClass(Player player) {
@@ -68,11 +71,15 @@ public class ClassManager {
         AttributeInstance maxHealthAttr = player.getAttribute(Attribute.MAX_HEALTH);
         if (maxHealthAttr != null) {
             maxHealthAttr.setBaseValue(20.0);
+            if (player.getHealth() > 20.0) {
+                player.setHealth(20.0);
+            }
         }
 
         AttributeInstance attackSpeedAttr = player.getAttribute(Attribute.ATTACK_SPEED);
         if (attackSpeedAttr != null) {
             attackSpeedAttr.setBaseValue(4.0); // Valeur vanilla par défaut
+            removeWarriorSpeedModifier(attackSpeedAttr);
         }
 
         // 2. Nettoyer les effets permanents connus des classes
@@ -83,6 +90,8 @@ public class ClassManager {
         player.removePotionEffect(PotionEffectType.DOLPHINS_GRACE);
         player.removePotionEffect(PotionEffectType.NIGHT_VISION);
         player.removePotionEffect(PotionEffectType.FIRE_RESISTANCE);
+        player.removePotionEffect(PotionEffectType.HUNGER);
+        player.removePotionEffect(PotionEffectType.SLOWNESS);
 
         // 3. Appliquer selon la classe
         switch (pc) {
@@ -104,9 +113,15 @@ public class ClassManager {
                 }
                 // Résistance I permanente
                 player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, PotionEffect.INFINITE_DURATION, 0, false, false, true));
-                // Vitesse d'attaque réduite de 15% (4.0 * 0.85 = 3.4)
+                // Vitesse d'attaque au corps-à-corps réduite de 15% (-0.15 via modificateur scalaire)
                 if (attackSpeedAttr != null) {
-                    attackSpeedAttr.setBaseValue(3.4);
+                    removeWarriorSpeedModifier(attackSpeedAttr);
+                    AttributeModifier modifier = new AttributeModifier(
+                            warriorSpeedKey,
+                            -0.15,
+                            getAddScalarOperation()
+                    );
+                    attackSpeedAttr.addModifier(modifier);
                 }
             }
             case SAUTERELLE -> {
@@ -126,6 +141,22 @@ public class ClassManager {
             case HUMAIN, NECROMANCIEN, ARCHER, NONE -> {
                 // Pas d'attributs de base modifiés
             }
+        }
+    }
+
+    private void removeWarriorSpeedModifier(AttributeInstance attr) {
+        for (AttributeModifier mod : attr.getModifiers()) {
+            if (warriorSpeedKey.equals(mod.getKey())) {
+                attr.removeModifier(mod);
+            }
+        }
+    }
+
+    private AttributeModifier.Operation getAddScalarOperation() {
+        try {
+            return AttributeModifier.Operation.valueOf("ADD_SCALAR");
+        } catch (IllegalArgumentException e) {
+            return AttributeModifier.Operation.valueOf("MULTIPLY_SCALAR_1");
         }
     }
 

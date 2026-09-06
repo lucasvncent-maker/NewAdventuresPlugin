@@ -13,15 +13,16 @@ import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.*;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.potion.PotionType;
 import org.bukkit.util.Vector;
 
 import java.util.*;
@@ -52,60 +53,78 @@ public class ClassListener implements Listener {
     }
 
     private void startPeriodicTasks() {
-        // Tâche exécutée chaque seconde (20 ticks) pour les passifs périodiques
+        // Tâche 1 : Exécutée chaque seconde (20 ticks) pour les passifs périodiques et maintien des buffs
         Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             long now = System.currentTimeMillis();
 
             for (Player player : Bukkit.getOnlinePlayers()) {
                 PlayerClass pc = classManager.getPlayerClass(player);
+                UUID uuid = player.getUniqueId();
 
                 // --- 1. SIRÈNE : Gestion du temps hors de l'eau ---
                 if (pc == PlayerClass.SIRENE) {
-                    if (player.isInWaterOrRainOrBubbleColumn() || player.getLocation().getBlock().getType() == Material.WATER) {
-                        sirenLastWaterTime.put(player.getUniqueId(), now);
-                    } else {
-                        long lastWater = sirenLastWaterTime.getOrDefault(player.getUniqueId(), now);
-                        // 15 minutes = 15 * 60 * 1000 = 900 000 ms
+                    boolean inWater = player.isInWaterOrRainOrBubbleColumn() || player.getLocation().getBlock().getType() == Material.WATER;
+                    if (inWater) {
+                        long lastWater = sirenLastWaterTime.getOrDefault(uuid, now);
                         if (now - lastWater >= 900_000L) {
+                            player.removePotionEffect(PotionEffectType.HUNGER);
+                            player.removePotionEffect(PotionEffectType.SLOWNESS);
+                            player.sendMessage(Component.text("✦ Vous êtes de nouveau immergé, vous vous réhydratez !", NamedTextColor.AQUA));
+                        }
+                        sirenLastWaterTime.put(uuid, now);
+                    } else {
+                        long lastWater = sirenLastWaterTime.getOrDefault(uuid, now);
+                        long elapsed = now - lastWater;
+                        // 15 minutes = 15 * 60 * 1000 = 900 000 ms
+                        if (elapsed >= 900_000L) {
                             player.addPotionEffect(new PotionEffect(PotionEffectType.HUNGER, 60, 0, false, false, true));
                             player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, 0, false, false, true));
+                            player.sendActionBar(Component.text("⚠ Déshydratation ! Plongez dans l'eau ou buvez une fiole !", NamedTextColor.RED, TextDecoration.BOLD));
+                        } else if (elapsed >= 840_000L) { // 14 minutes (1 min restante)
+                            long remainingSec = (900_000L - elapsed) / 1000L;
+                            player.sendActionBar(Component.text("⚠ Déshydratation imminente (" + remainingSec + "s restantes) !", NamedTextColor.GOLD));
                         }
                     }
 
-                    // Détection du Cri sonique : s'accroupir pendant 2 secondes
-                    if (player.isSneaking()) {
-                        long start = sirenSneakStart.getOrDefault(player.getUniqueId(), now);
-                        if (now - start >= 2000L) {
-                            long lastShout = sirenLastShoutTime.getOrDefault(player.getUniqueId(), 0L);
-                            if (now - lastShout >= 10000L) { // Cooldown de 10s sur le cri sonique
-                                triggerSirenSonicShout(player);
-                                sirenLastShoutTime.put(player.getUniqueId(), now);
-                                sirenSneakStart.put(player.getUniqueId(), now + 10000L); // Reset
-                            }
-                        }
-                    }
+                    // Maintenir les effets permanents de la sirène
+                    ensurePermanentEffect(player, PotionEffectType.WATER_BREATHING, 0);
+                    ensurePermanentEffect(player, PotionEffectType.DOLPHINS_GRACE, 0);
+                    ensurePermanentEffect(player, PotionEffectType.NIGHT_VISION, 0);
                 }
 
-                // --- 2. DIABLE : Dégâts sous la pluie + noyade 3x plus rapide ---
+                // --- 2. DIABLE : Dégâts directs sous la pluie ---
                 if (pc == PlayerClass.DIABLE) {
                     Location loc = player.getLocation();
                     World world = loc.getWorld();
-                    if (world != null && world.hasStorm()) {
-                        // Si le joueur est sous le ciel ouvert et qu'il pleut
+                    if (world != null && world.getEnvironment() == World.Environment.NORMAL && world.hasStorm()) {
                         int highestY = world.getHighestBlockYAt(loc);
                         if (loc.getBlockY() >= highestY) {
-                            player.damage(1.0); // 1/2 cœur de dégât par seconde sous la pluie
-                            player.getWorld().spawnParticle(Particle.SMOKE, loc.add(0, 1, 0), 5, 0.2, 0.2, 0.2, 0.02);
+                            String biomeName = loc.getBlock().getBiome().name().toLowerCase();
+                            boolean noRainBiome = biomeName.contains("desert") || biomeName.contains("savanna") || biomeName.contains("badlands");
+                            if (!noRainBiome) {
+                                player.damage(1.5); // Dégâts directs sous la pluie
+                                world.spawnParticle(Particle.SMOKE, loc.clone().add(0, 1, 0), 8, 0.25, 0.25, 0.25, 0.05);
+                                playExtinguishSound(player);
+                                player.sendActionBar(Component.text("🌧 L'eau de pluie vous blesse ! Mettez-vous à l'abri !", NamedTextColor.RED, TextDecoration.BOLD));
+                            }
                         }
                     }
 
-                    // Se noyer 3x plus vite sous l'eau
-                    if (player.getRemainingAir() > 0 && player.getEyeLocation().getBlock().getType() == Material.WATER) {
-                        player.setRemainingAir(Math.max(0, player.getRemainingAir() - 40));
-                    }
+                    // Maintenir résistance au feu permanente
+                    ensurePermanentEffect(player, PotionEffectType.FIRE_RESISTANCE, 0);
                 }
 
-                // --- 3. ARCHER : Vitesse I permanente si arme à distance en main ---
+                // --- 3. GUERRIER : Maintenir Résistance I ---
+                if (pc == PlayerClass.GUERRIER) {
+                    ensurePermanentEffect(player, PotionEffectType.RESISTANCE, 0);
+                }
+
+                // --- 4. SAUTERELLE : Maintenir Jump Boost II ---
+                if (pc == PlayerClass.SAUTERELLE) {
+                    ensurePermanentEffect(player, PotionEffectType.JUMP_BOOST, 1);
+                }
+
+                // --- 5. ARCHER : Vitesse I permanente si arme à distance en main ---
                 if (pc == PlayerClass.ARCHER) {
                     ItemStack mainHand = player.getInventory().getItemInMainHand();
                     ItemStack offHand = player.getInventory().getItemInOffHand();
@@ -116,6 +135,64 @@ public class ClassListener implements Listener {
                 }
             }
         }, 20L, 20L);
+
+        // Tâche 2 : Exécutée toutes les 5 ticks (0.25s) pour la détection fine (sneak Sirène, noyade Diable)
+        Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            long now = System.currentTimeMillis();
+
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                PlayerClass pc = classManager.getPlayerClass(player);
+                UUID uuid = player.getUniqueId();
+
+                // Sirène : Préparation et déclenchement Cri Sonique via accroupissement de 2 secondes
+                if (pc == PlayerClass.SIRENE) {
+                    if (player.isSneaking()) {
+                        long start = sirenSneakStart.getOrDefault(uuid, now);
+                        long duration = now - start;
+                        long lastShout = sirenLastShoutTime.getOrDefault(uuid, 0L);
+                        long cooldownRemaining = 10_000L - (now - lastShout);
+
+                        if (cooldownRemaining <= 0) {
+                            if (duration >= 2000L) {
+                                triggerSirenSonicShout(player);
+                                sirenLastShoutTime.put(uuid, now);
+                                sirenSneakStart.put(uuid, now + 10_000L); // Évite de redéclencher immédiatement si on reste accroupi
+                            } else if (duration >= 500L) {
+                                int percent = (int) Math.min(100, (duration * 100) / 2000L);
+                                player.sendActionBar(Component.text("⚡ Chargement Cri Sonique : " + percent + "%", NamedTextColor.DARK_AQUA));
+                                player.getWorld().spawnParticle(Particle.SPLASH, player.getLocation().clone().add(0, 1.2, 0), 2, 0.2, 0.2, 0.2, 0.05);
+                            }
+                        }
+                    }
+                }
+
+                // Diable : Se noyer 3 fois plus vite sous l'eau
+                if (pc == PlayerClass.DIABLE) {
+                    if (player.getEyeLocation().getBlock().getType() == Material.WATER) {
+                        // En 5 ticks, vanilla retire 5 ticks d'air. On retire 10 ticks d'air de plus pour faire 15 ticks / 5 ticks = 3x plus vite !
+                        int air = player.getRemainingAir();
+                        if (air > 0) {
+                            player.setRemainingAir(Math.max(0, air - 10));
+                        } else {
+                            player.damage(1.0); // Dégâts de suffocation accélérés
+                        }
+                    }
+                }
+            }
+        }, 5L, 5L);
+    }
+
+    private void ensurePermanentEffect(Player player, PotionEffectType type, int amplifier) {
+        PotionEffect current = player.getPotionEffect(type);
+        if (current == null || current.getDuration() < 100) {
+            player.addPotionEffect(new PotionEffect(type, PotionEffect.INFINITE_DURATION, amplifier, false, false, true));
+        }
+    }
+
+    private void playExtinguishSound(Player player) {
+        try {
+            player.playSound(player.getLocation(), Sound.BLOCK_FIRE_EXTINGUISH, 0.7f, 1.3f);
+        } catch (Exception ignored) {}
     }
 
     private boolean isRangedWeapon(ItemStack item) {
@@ -236,11 +313,14 @@ public class ClassListener implements Listener {
                 }
 
                 case SAUTERELLE -> {
-                    // Knockback léger passif qui propulse les monstres en l'air
-                    if (victim instanceof Monster monster) {
+                    // Knockback léger passif qui propulse les cibles en l'air
+                    if (victim instanceof LivingEntity livingVictim && !(victim instanceof Player)) {
                         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                            Vector currentVelocity = monster.getVelocity();
-                            monster.setVelocity(currentVelocity.add(new Vector(0, 0.45, 0)));
+                            if (livingVictim.isValid() && !livingVictim.isDead()) {
+                                Vector currentVelocity = livingVictim.getVelocity();
+                                livingVictim.setVelocity(new Vector(currentVelocity.getX() * 0.5, 0.48, currentVelocity.getZ() * 0.5));
+                                livingVictim.getWorld().spawnParticle(Particle.CLOUD, livingVictim.getLocation().clone().add(0, 0.2, 0), 4, 0.1, 0.1, 0.1, 0.05);
+                            }
                         }, 1L);
                     }
                 }
@@ -248,6 +328,10 @@ public class ClassListener implements Listener {
                 case DIABLE -> {
                     // Tous les coups au corps-à-corps enflamment les cibles
                     victim.setFireTicks(100); // 5 secondes de feu
+                    victim.getWorld().spawnParticle(Particle.FLAME, victim.getLocation().clone().add(0, 1, 0), 10, 0.25, 0.3, 0.25, 0.05);
+                    try {
+                        victim.getWorld().playSound(victim.getLocation(), Sound.ITEM_FIRECHARGE_USE, 0.8f, 1.2f);
+                    } catch (Exception ignored) {}
                 }
 
                 case NECROMANCIEN -> {
@@ -324,24 +408,36 @@ public class ClassListener implements Listener {
         return item.getType().name().endsWith("_HOE");
     }
 
-    // =================================================================
-    // 4. SAUTERELLE : Dégâts de chute accrus & Onde de choc à l'atterrissage
-    // =================================================================
+    // =========================================================================
+    // DÉGÂTS GÉNÉRAUX : Diable (immunité feu/lave) & Sauterelle (chute / choc)
+    // =========================================================================
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onFallDamage(EntityDamageEvent event) {
+    public void onEntityDamage(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
+        PlayerClass pc = classManager.getPlayerClass(player);
 
-        if (event.getCause() == EntityDamageEvent.DamageCause.FALL) {
-            PlayerClass pc = classManager.getPlayerClass(player);
-            if (pc == PlayerClass.SAUTERELLE) {
-                // Malus : dégâts de chute augmentés de 50%
-                event.setDamage(event.getDamage() * 1.5);
-
-                // Déclencher une onde de choc si la chute était importante (chute >= 4 blocs)
-                float fallDistance = player.getFallDistance();
-                if (fallDistance >= 4.0f && !hopperShockwaveCooldown.contains(player.getUniqueId())) {
-                    triggerHopperShockwave(player, fallDistance);
+        // 6. DIABLE : Immunité totale au feu, à la lave et aux blocs brûlants
+        if (pc == PlayerClass.DIABLE) {
+            switch (event.getCause()) {
+                case LAVA, FIRE, FIRE_TICK, HOT_FLOOR, CAMPFIRE -> {
+                    event.setCancelled(true);
+                    player.setFireTicks(0);
+                    return;
                 }
+                default -> {}
+            }
+        }
+
+        // 4. SAUTERELLE : Dégâts de chute accrus (+50%) & Onde de choc à l'atterrissage
+        if (pc == PlayerClass.SAUTERELLE && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
+            // Malus : +50% de dégâts de chute
+            event.setDamage(event.getDamage() * 1.5);
+
+            // Déclencher une onde de choc si la chute était conséquente
+            float fallDistance = player.getFallDistance();
+            double effectiveFall = Math.max((double) fallDistance, event.getDamage() + 3.0);
+            if (effectiveFall >= 3.5 && !hopperShockwaveCooldown.contains(player.getUniqueId())) {
+                triggerHopperShockwave(player, (float) effectiveFall);
             }
         }
     }
@@ -352,21 +448,60 @@ public class ClassListener implements Listener {
         World world = loc.getWorld();
         if (world == null) return;
 
-        world.spawnParticle(Particle.EXPLOSION, loc, 3, 1.0, 0.2, 1.0, 0.1);
-        world.playSound(loc, Sound.ENTITY_GENERIC_EXPLODE, 0.8f, 1.3f);
+        world.spawnParticle(Particle.EXPLOSION, loc.clone().add(0, 0.2, 0), 2, 0.5, 0.1, 0.5, 0.05);
+        world.spawnParticle(Particle.SWEEP_ATTACK, loc.clone().add(0, 0.3, 0), 6, 1.0, 0.1, 1.0, 0.1);
 
-        double radius = Math.min(8.0, 3.0 + (fallDistance * 0.3));
-        double damage = Math.min(15.0, 3.0 + (fallDistance * 0.8));
+        try {
+            world.playSound(loc, Sound.valueOf("ITEM_MACE_SMASH_GROUND"), 1.2f, 1.0f);
+        } catch (IllegalArgumentException e) {
+            world.playSound(loc, Sound.ENTITY_GENERIC_EXPLODE, 0.9f, 1.3f);
+        }
 
-        for (Entity entity : world.getNearbyEntities(loc, radius, 3.0, radius)) {
-            if (entity instanceof Monster monster) {
-                monster.damage(damage, player);
-                Vector knockback = monster.getLocation().toVector().subtract(loc.toVector()).normalize().multiply(0.8).setY(0.4);
-                monster.setVelocity(knockback);
+        double radius = Math.min(8.0, 3.0 + (fallDistance * 0.35));
+        double damage = Math.min(16.0, 4.0 + (fallDistance * 0.8));
+
+        for (Entity entity : world.getNearbyEntities(loc, radius, 3.5, radius)) {
+            if (entity instanceof LivingEntity target && !target.equals(player)) {
+                if (necroMinions.contains(target.getUniqueId())) continue;
+
+                target.damage(damage, player);
+                Vector knockback = target.getLocation().toVector().subtract(loc.toVector()).normalize().multiply(0.85).setY(0.42);
+                target.setVelocity(knockback);
             }
         }
 
-        Bukkit.getScheduler().runTaskLater(plugin, () -> hopperShockwaveCooldown.remove(player.getUniqueId()), 40L);
+        player.sendMessage(Component.text("✦ Onde de choc à l'atterrissage !", NamedTextColor.GREEN, TextDecoration.BOLD));
+        Bukkit.getScheduler().runTaskLater(plugin, () -> hopperShockwaveCooldown.remove(player.getUniqueId()), 30L);
+    }
+
+    // =========================================================================
+    // 6. DIABLE : Nage normale dans la lave
+    // =========================================================================
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onPlayerMove(PlayerMoveEvent event) {
+        Player player = event.getPlayer();
+        if (classManager.getPlayerClass(player) == PlayerClass.DIABLE) {
+            if (player.isInLava()) {
+                Location from = event.getFrom();
+                Location to = event.getTo();
+                if (to == null) return;
+                double dx = to.getX() - from.getX();
+                double dz = to.getZ() - from.getZ();
+                double moveDistSq = dx * dx + dz * dz;
+
+                if (moveDistSq > 0.001) {
+                    Vector dir = player.getLocation().getDirection().normalize();
+                    Vector vel = player.getVelocity();
+
+                    // Vaincre la friction lourde de la lave pour nager avec la fluidité de l'eau
+                    Vector boosted = new Vector(dir.getX() * 0.22, vel.getY(), dir.getZ() * 0.22);
+                    if (vel.getY() > 0.01) {
+                        boosted.setY(0.18);
+                    }
+                    player.setVelocity(boosted);
+                }
+            }
+        }
     }
 
     // ==========================================================
@@ -389,26 +524,57 @@ public class ClassListener implements Listener {
         Player player = event.getPlayer();
         PlayerClass pc = classManager.getPlayerClass(player);
 
-        // Sirène : souffler dans une corne déclenche aussi le Cri sonique
         if (pc == PlayerClass.SIRENE && event.getAction().isRightClick()) {
             ItemStack item = event.getItem();
+            long now = System.currentTimeMillis();
+
+            // 1. Souffler dans une corne pour déclencher le Cri Sonique
             if (item != null && item.getType() == Material.GOAT_HORN) {
-                long now = System.currentTimeMillis();
                 long lastShout = sirenLastShoutTime.getOrDefault(player.getUniqueId(), 0L);
-                if (now - lastShout >= 10000L) {
+                long cooldownRemaining = 10_000L - (now - lastShout);
+                if (cooldownRemaining <= 0) {
                     triggerSirenSonicShout(player);
                     sirenLastShoutTime.put(player.getUniqueId(), now);
+                } else {
+                    long remainingSec = (cooldownRemaining / 1000L) + 1;
+                    player.sendActionBar(Component.text("⏳ Cri sonique en recharge (" + remainingSec + "s)...", NamedTextColor.RED));
                 }
             }
 
-            // Réinitialiser le chronomètre d'eau avec une fiole d'eau ou un seau d'eau
-            if (item != null && (item.getType() == Material.POTION || item.getType() == Material.WATER_BUCKET)) {
-                sirenLastWaterTime.put(player.getUniqueId(), System.currentTimeMillis());
-                player.removePotionEffect(PotionEffectType.HUNGER);
-                player.removePotionEffect(PotionEffectType.SLOWNESS);
-                player.sendMessage(Component.text("✦ Vous vous êtes réhydraté !", NamedTextColor.AQUA));
+            // 2. Se réhydrater avec un seau d'eau ou une fiole d'eau
+            if (item != null && (item.getType() == Material.WATER_BUCKET || isWaterPotion(item))) {
+                resetSirenHydration(player);
             }
         }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerItemConsume(PlayerItemConsumeEvent event) {
+        Player player = event.getPlayer();
+        if (classManager.getPlayerClass(player) == PlayerClass.SIRENE) {
+            ItemStack item = event.getItem();
+            if (isWaterPotion(item) || item.getType() == Material.POTION || item.getType() == Material.MILK_BUCKET) {
+                resetSirenHydration(player);
+            }
+        }
+    }
+
+    private boolean isWaterPotion(ItemStack item) {
+        if (item == null || item.getType() != Material.POTION) return false;
+        if (item.getItemMeta() instanceof PotionMeta meta) {
+            return meta.getBasePotionType() == PotionType.WATER;
+        }
+        return false;
+    }
+
+    private void resetSirenHydration(Player player) {
+        sirenLastWaterTime.put(player.getUniqueId(), System.currentTimeMillis());
+        player.removePotionEffect(PotionEffectType.HUNGER);
+        player.removePotionEffect(PotionEffectType.SLOWNESS);
+        try {
+            player.playSound(player.getLocation(), Sound.ITEM_BOTTLE_FILL, 0.8f, 1.2f);
+        } catch (Exception ignored) {}
+        player.sendMessage(Component.text("✦ Vous vous êtes réhydraté !", NamedTextColor.AQUA, TextDecoration.BOLD));
     }
 
     private void triggerSirenSonicShout(Player player) {
@@ -416,16 +582,26 @@ public class ClassListener implements Listener {
         World world = loc.getWorld();
         if (world == null) return;
 
-        world.playSound(loc, Sound.ENTITY_WARDEN_SONIC_BOOM, 1.0f, 1.4f);
-        world.spawnParticle(Particle.SONIC_BOOM, loc.add(0, 1, 0), 1);
+        try {
+            world.playSound(loc, Sound.ENTITY_WARDEN_SONIC_BOOM, 1.2f, 1.4f);
+        } catch (Exception e) {
+            world.playSound(loc, Sound.ENTITY_ALLAY_HURT, 1.5f, 0.5f);
+        }
+        world.spawnParticle(Particle.SONIC_BOOM, loc.clone().add(0, 1.2, 0), 1);
 
-        for (Entity e : world.getNearbyEntities(loc, 8.0, 8.0, 8.0)) {
-            if (e instanceof LivingEntity living && !e.equals(player)) {
-                living.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 100, 2)); // Lenteur III (5s)
-                living.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 100, 1)); // Faiblesse II (5s)
+        int affected = 0;
+        for (Entity entity : world.getNearbyEntities(loc, 8.0, 8.0, 8.0)) {
+            if (entity instanceof LivingEntity target && !target.equals(player)) {
+                // Lenteur III (amplifier 2) pendant 5s (100 ticks)
+                target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 100, 2, false, true, true));
+                // Faiblesse II (amplifier 1) pendant 5s (100 ticks)
+                target.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 100, 1, false, true, true));
+                affected++;
             }
         }
-        player.sendMessage(Component.text("✦ Cri sonique déclenché !", NamedTextColor.DARK_AQUA, TextDecoration.BOLD));
+
+        player.sendActionBar(Component.text("⚡ CRI SONIQUE DÉCLENCHÉ ! (" + affected + " créatures touchées) ⚡", NamedTextColor.DARK_AQUA, TextDecoration.BOLD));
+        player.sendMessage(Component.text("✦ Cri sonique libéré : toutes les créatures dans 8 blocs subissent Lenteur III et Faiblesse II pendant 5s !", NamedTextColor.DARK_AQUA));
     }
 
     // =========================================================================
