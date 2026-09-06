@@ -50,6 +50,7 @@ public class CustomJobItems {
             meta.lore(List.of(
                     Component.text("Un biscuit aux épices psychotropes d'un autre monde.", NamedTextColor.GRAY),
                     Component.empty(),
+                    Component.text("✦ Se mange instantanément (même sans avoir faim) !", NamedTextColor.YELLOW),
                     Component.text("✦ Force III & Vitesse II (30s)", NamedTextColor.GREEN),
                     Component.text("✦ Saturation Maximale (20.0)", NamedTextColor.GREEN),
                     Component.text("✖ Effet secondaire : Nausée pendant 10s après 30 secondes !", NamedTextColor.RED)
@@ -106,9 +107,24 @@ public class CustomJobItems {
         return item;
     }
 
+    public static String getJobItemId(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return null;
+        return item.getItemMeta().getPersistentDataContainer().get(ITEM_KEY, PersistentDataType.STRING);
+    }
+
     public static boolean isJobItem(ItemStack item, String id) {
-        if (item == null || !item.hasItemMeta()) return false;
-        String val = item.getItemMeta().getPersistentDataContainer().get(ITEM_KEY, PersistentDataType.STRING);
-        return id.equalsIgnoreCase(val);
+        String val = getJobItemId(item);
+        return id != null && id.equalsIgnoreCase(val);
+    }
+
+    public static ItemStack getItemById(String id) {
+        if (id == null) return null;
+        return switch (id.toLowerCase()) {
+            case ID_FARMER_SOUP -> getFarmerSoup();
+            case ID_SPACE_COOKIE -> getSpaceCookie();
+            case ID_WONDERFUL_SOUP -> getWonderfulSoup();
+            case ID_WONDERFUL_HOE -> getWonderfulHoe();
+            default -> null;
+        };
     }
 }

@@ -24,6 +24,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
@@ -300,7 +301,175 @@ public class JobListener implements Listener {
     }
 
     // ==========================================================
-    // 3. RAMASSAGE, CRAFT & INVENTAIRE DES MISSIONS
+    // 3. GESTION DES SOUPES CUSTOM : STACKING JUSQU'À 64
+    // ==========================================================
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onCustomSoupPickup(EntityPickupItemEvent event) {
+        if (!(event.getEntity() instanceof Player player)) return;
+
+        org.bukkit.entity.Item itemEntity = event.getItem();
+        ItemStack groundStack = itemEntity.getItemStack();
+        String itemId = CustomJobItems.getJobItemId(groundStack);
+        if (itemId == null) return;
+        if (!itemId.equals(CustomJobItems.ID_FARMER_SOUP) && !itemId.equals(CustomJobItems.ID_WONDERFUL_SOUP)) {
+            return;
+        }
+
+        // Vanilla sépare les soupes par défaut car BEETROOT_SOUP / RABBIT_STEW a maxStack = 1
+        // On fusionne manuellement avec les stacks existants du joueur
+        int toAdd = groundStack.getAmount();
+        org.bukkit.inventory.PlayerInventory inv = player.getInventory();
+
+        // 1. Chercher les slots contenant déjà cette même soupe avec quantité < 64
+        for (int i = 0; i < 36; i++) {
+            ItemStack slotItem = inv.getItem(i);
+            if (slotItem != null && CustomJobItems.isJobItem(slotItem, itemId)) {
+                int currentAmount = slotItem.getAmount();
+                if (currentAmount < 64) {
+                    int space = 64 - currentAmount;
+                    int transfer = Math.min(space, toAdd);
+                    slotItem.setAmount(currentAmount + transfer);
+                    toAdd -= transfer;
+                    if (toAdd <= 0) break;
+                }
+            }
+        }
+
+        // 2. S'il reste des soupes, trouver le premier slot vide
+        if (toAdd > 0) {
+            int emptySlot = inv.firstEmpty();
+            if (emptySlot != -1 && emptySlot < 36) {
+                ItemStack newStack = groundStack.clone();
+                newStack.setAmount(Math.min(64, toAdd));
+                inv.setItem(emptySlot, newStack);
+                toAdd -= newStack.getAmount();
+            }
+        }
+
+        int pickedUp = groundStack.getAmount() - toAdd;
+        if (pickedUp > 0) {
+            event.setCancelled(true);
+
+            try {
+                player.playPickupItemAnimation(itemEntity, pickedUp);
+            } catch (Exception ignored) {}
+            player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.5f, 1.8f);
+
+            if (toAdd <= 0) {
+                itemEntity.remove();
+            } else {
+                groundStack.setAmount(toAdd);
+                itemEntity.setItemStack(groundStack);
+            }
+        }
+    }
+
+    // Fusion au sol entre soupes custom proches
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onCustomSoupSpawn(ItemSpawnEvent event) {
+        org.bukkit.entity.Item spawned = event.getEntity();
+        ItemStack stack = spawned.getItemStack();
+        String id = CustomJobItems.getJobItemId(stack);
+        if (id == null) return;
+        if (!id.equals(CustomJobItems.ID_FARMER_SOUP) && !id.equals(CustomJobItems.ID_WONDERFUL_SOUP)) return;
+
+        for (org.bukkit.entity.Entity nearby : spawned.getNearbyEntities(2.0, 2.0, 2.0)) {
+            if (nearby instanceof org.bukkit.entity.Item other && !other.isDead() && !other.equals(spawned)) {
+                ItemStack otherStack = other.getItemStack();
+                if (CustomJobItems.isJobItem(otherStack, id)) {
+                    int total = stack.getAmount() + otherStack.getAmount();
+                    if (total <= 64) {
+                        stack.setAmount(total);
+                        spawned.setItemStack(stack);
+                        other.remove();
+                    }
+                }
+            }
+        }
+    }
+
+    // Empilage manuel dans l'inventaire au clic
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onCustomSoupInventoryClick(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+
+        ItemStack current = event.getCurrentItem();
+        ItemStack cursor = event.getCursor();
+
+        String currentId = CustomJobItems.getJobItemId(current);
+        String cursorId = CustomJobItems.getJobItemId(cursor);
+
+        if (currentId != null && currentId.equals(cursorId)
+                && (currentId.equals(CustomJobItems.ID_FARMER_SOUP) || currentId.equals(CustomJobItems.ID_WONDERFUL_SOUP))) {
+
+            int currentAmount = current.getAmount();
+            int cursorAmount = cursor.getAmount();
+
+            if (event.isLeftClick()) {
+                if (currentAmount < 64) {
+                    event.setCancelled(true);
+                    int space = 64 - currentAmount;
+                    int transfer = Math.min(space, cursorAmount);
+
+                    current.setAmount(currentAmount + transfer);
+                    cursor.setAmount(cursorAmount - transfer);
+
+                    event.setCurrentItem(current);
+                    player.setItemOnCursor(cursor.getAmount() > 0 ? cursor : null);
+                }
+            } else if (event.isRightClick()) {
+                if (currentAmount < 64 && cursorAmount > 0) {
+                    event.setCancelled(true);
+                    current.setAmount(currentAmount + 1);
+                    cursor.setAmount(cursorAmount - 1);
+
+                    event.setCurrentItem(current);
+                    player.setItemOnCursor(cursor.getAmount() > 0 ? cursor : null);
+                }
+            }
+        }
+    }
+
+    // Regroupe les soupes éparpillées en stacks complets de 64
+    public void consolidateSoupStacks(Player player) {
+        consolidateType(player, CustomJobItems.ID_FARMER_SOUP);
+        consolidateType(player, CustomJobItems.ID_WONDERFUL_SOUP);
+    }
+
+    private void consolidateType(Player player, String itemId) {
+        org.bukkit.inventory.PlayerInventory inv = player.getInventory();
+        int total = 0;
+        java.util.List<Integer> slots = new java.util.ArrayList<>();
+
+        for (int i = 0; i < 36; i++) {
+            ItemStack item = inv.getItem(i);
+            if (item != null && CustomJobItems.isJobItem(item, itemId)) {
+                total += item.getAmount();
+                slots.add(i);
+            }
+        }
+
+        if (slots.size() <= 1) return;
+
+        for (int slot : slots) {
+            inv.setItem(slot, null);
+        }
+
+        ItemStack template = CustomJobItems.getItemById(itemId);
+        if (template == null) return;
+
+        for (int slot : slots) {
+            if (total <= 0) break;
+            int count = Math.min(64, total);
+            ItemStack stack = template.clone();
+            stack.setAmount(count);
+            inv.setItem(slot, stack);
+            total -= count;
+        }
+    }
+
+    // ==========================================================
+    // 3bis. PROGRESSION DES MISSIONS
     // ==========================================================
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPickupItem(EntityPickupItemEvent event) {
@@ -311,7 +480,6 @@ public class JobListener implements Listener {
         String reqKey = jobManager.getRequirementKeyForMaterial(mat);
         if (reqKey == null) return;
 
-        // Attendre 1 tick pour que l'item soit bien présent dans l'inventaire
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline()) return;
             jobManager.checkAndNotifyProgress(player, PlayerJob.AGRICULTEUR, reqKey);
@@ -321,13 +489,21 @@ public class JobListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onCraftItem(CraftItemEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
+
+        // Si craft de soupes en shift-click, regrouper les stacks
+        ItemStack result = event.getRecipe().getResult();
+        if (CustomJobItems.isJobItem(result, CustomJobItems.ID_FARMER_SOUP) || CustomJobItems.isJobItem(result, CustomJobItems.ID_WONDERFUL_SOUP)) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (!player.isOnline()) return;
+                consolidateSoupStacks(player);
+            });
+        }
+
         if (jobManager.getPlayerJob(player) != PlayerJob.AGRICULTEUR) return;
 
-        ItemStack result = event.getRecipe().getResult();
         String reqKey = jobManager.getRequirementKeyForMaterial(result.getType());
         if (reqKey == null) return;
 
-        // Attendre 1 tick pour que le résultat du craft soit dans l'inventaire
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline()) return;
             jobManager.checkAndNotifyProgress(player, PlayerJob.AGRICULTEUR, reqKey);
@@ -337,8 +513,10 @@ public class JobListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onInventoryClose(InventoryCloseEvent event) {
         if (!(event.getPlayer() instanceof Player player)) return;
-        if (jobManager.getPlayerJob(player) != PlayerJob.AGRICULTEUR) return;
 
+        consolidateSoupStacks(player);
+
+        if (jobManager.getPlayerJob(player) != PlayerJob.AGRICULTEUR) return;
         jobManager.checkCurrentMissionCompletion(player, PlayerJob.AGRICULTEUR);
     }
 
@@ -469,6 +647,13 @@ public class JobListener implements Listener {
             consumeWonderfulSoup(player, item);
             return;
         }
+
+        // 3. Space Cookie (mangeable instantanément même sans avoir faim / à satiété)
+        if (CustomJobItems.isJobItem(item, CustomJobItems.ID_SPACE_COOKIE)) {
+            event.setCancelled(true);
+            consumeSpaceCookie(player, item);
+            return;
+        }
     }
 
     private void consumeFarmerSoup(Player player, ItemStack item) {
@@ -520,32 +705,44 @@ public class JobListener implements Listener {
         Bukkit.getScheduler().runTaskLater(plugin, () -> instantEatCooldown.remove(uuid), 10L);
     }
 
-    // Space Cookie (consommation via événement standard ou clic)
+    private void consumeSpaceCookie(Player player, ItemStack item) {
+        UUID uuid = player.getUniqueId();
+        instantEatCooldown.add(uuid);
+
+        // Retirer 1 cookie du stack
+        item.subtract(1);
+
+        // Force III (30s = 600t, amplificateur 2)
+        player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 600, 2, false, true, true));
+        // Vitesse II (30s = 600t, amplificateur 1)
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 600, 1, false, true, true));
+        // Saturation maximale
+        player.setSaturation(20.0f);
+        player.setFoodLevel(20);
+
+        player.sendActionBar(Component.text("✦ Space Cookie absorbé : Force III & Vitesse II (30s) !", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
+        player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_BURP, 0.8f, 1.2f);
+        player.playSound(player.getLocation(), Sound.BLOCK_PORTAL_TRAVEL, 0.4f, 1.8f);
+        player.getWorld().spawnParticle(Particle.PORTAL, player.getLocation().clone().add(0, 1.0, 0), 25, 0.4, 0.5, 0.4, 0.1);
+
+        // Effet secondaire : Nausée pendant 10s après 30 secondes
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (player.isOnline()) {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.NAUSEA, 200, 0, false, true, true));
+                player.sendActionBar(Component.text("🌀 Le contre-coup du Space Cookie frappe votre esprit...", NamedTextColor.RED, TextDecoration.BOLD));
+                player.playSound(player.getLocation(), Sound.ENTITY_ELDER_GUARDIAN_CURSE, 0.5f, 1.4f);
+            }
+        }, 600L);
+
+        Bukkit.getScheduler().runTaskLater(plugin, () -> instantEatCooldown.remove(uuid), 10L);
+    }
+
+    // Fallback au cas où le joueur le consomme via l'animation vanilla
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onConsumeSpaceCookie(PlayerItemConsumeEvent event) {
         ItemStack item = event.getItem();
         if (CustomJobItems.isJobItem(item, CustomJobItems.ID_SPACE_COOKIE)) {
-            Player player = event.getPlayer();
-
-            // Force III (30s = 600t, amplificateur 2)
-            player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 600, 2, false, true, true));
-            // Vitesse II (30s = 600t, amplificateur 1)
-            player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 600, 1, false, true, true));
-            // Saturation maximale
-            player.setSaturation(20.0f);
-            player.setFoodLevel(20);
-
-            player.sendActionBar(Component.text("✦ Space Cookie absorbé : Force III & Vitesse II (30s) !", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
-            player.playSound(player.getLocation(), Sound.BLOCK_PORTAL_TRAVEL, 0.4f, 1.8f);
-
-            // Effet secondaire : Nausée pendant 10s après 30 secondes
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                if (player.isOnline()) {
-                    player.addPotionEffect(new PotionEffect(PotionEffectType.NAUSEA, 200, 0, false, true, true));
-                    player.sendActionBar(Component.text("🌀 Le contre-coup du Space Cookie frappe votre esprit...", NamedTextColor.RED, TextDecoration.BOLD));
-                    player.playSound(player.getLocation(), Sound.ENTITY_ELDER_GUARDIAN_CURSE, 0.5f, 1.4f);
-                }
-            }, 600L);
+            consumeSpaceCookie(event.getPlayer(), item);
         }
     }
 
