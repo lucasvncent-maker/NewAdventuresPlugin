@@ -29,6 +29,7 @@ public class JobCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> JOB_NAMES = List.of(
             "agriculteur",
+            "mineur",
             "none"
     );
 
@@ -186,6 +187,40 @@ public class JobCommand implements CommandExecutor, TabCompleter {
                             sender.sendMessage(Component.text("  • Houe Merveilleuse : 2x Cuivres, 2x Bâtons", NamedTextColor.YELLOW));
                         }
                         sender.sendMessage(Component.text("➜ Tapez /" + label + " recipes pour afficher la table de craft interactive !", NamedTextColor.AQUA));
+                    }
+                } else if (pj == PlayerJob.MINEUR) {
+                    int level = jobManager.getJobLevel(target, pj);
+                    sender.sendMessage(Component.text("Niveau de mission complété : " + level + " / 3", NamedTextColor.YELLOW));
+
+                    if (level < 3) {
+                        JobMission current = MineurMissions.getMission(level + 1);
+                        if (current != null) {
+                            sender.sendMessage(Component.empty());
+                            sender.sendMessage(Component.text("✦ En cours : " + current.getTitle(), NamedTextColor.GOLD, TextDecoration.BOLD));
+                            for (JobMission.Requirement req : current.getRequirements()) {
+                                int p = jobManager.getRequirementProgress(target, pj, level + 1, req.key());
+                                NamedTextColor col = (p >= req.requiredAmount()) ? NamedTextColor.GREEN : NamedTextColor.WHITE;
+                                sender.sendMessage(Component.text("  • " + req.displayName() + " : " + p + " / " + req.requiredAmount(), col));
+                            }
+                            sender.sendMessage(Component.text("✦ Récompense : ", NamedTextColor.AQUA)
+                                    .append(Component.text(current.getRewardDescription(), NamedTextColor.GRAY)));
+                        }
+                    } else {
+                        sender.sendMessage(Component.text("★ Félicitations ! Toutes les missions du métier sont accomplies !", NamedTextColor.GREEN, TextDecoration.BOLD));
+                    }
+
+                    if (level >= 1) {
+                        sender.sendMessage(Component.empty());
+                        sender.sendMessage(Component.text("✦ Bonus actifs :", NamedTextColor.GOLD, TextDecoration.BOLD));
+                        sender.sendMessage(Component.text("  • Célérité " + (level >= 3 ? "II" : "I") + " permanent", NamedTextColor.YELLOW));
+                        sender.sendMessage(Component.text("  • Commande /nv (Vision Nocturne activable)", NamedTextColor.YELLOW));
+                        if (level >= 2) {
+                            sender.sendMessage(Component.text("  • 5% de chance de Cuprite sur tous les minerais", NamedTextColor.YELLOW));
+                            sender.sendMessage(Component.text("  • +1 niveau de Fortune supplémentaire garanti", NamedTextColor.YELLOW));
+                        }
+                        if (level >= 3) {
+                            sender.sendMessage(Component.text("  • Bénédiction sous la couche Y=30 (Regen, Résistance, Résistance au Feu)", NamedTextColor.YELLOW));
+                        }
                     }
                 }
                 return true;

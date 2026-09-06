@@ -27,6 +27,8 @@ public class RecipeManager implements Listener {
     private final NamespacedKey chestKey;
     private final NamespacedKey hammerTier2Key;
     private final NamespacedKey hammerTier3Key;
+    private final NamespacedKey hoeKey;
+    private final NamespacedKey hoeMirroredKey;
 
     public RecipeManager(NewAdventurePlugin plugin) {
         this.plugin = plugin;
@@ -39,6 +41,8 @@ public class RecipeManager implements Listener {
         this.chestKey = new NamespacedKey(plugin, "cuprite_chest_craft");
         this.hammerTier2Key = new NamespacedKey(plugin, "cuprite_hammer_upgrade_2");
         this.hammerTier3Key = new NamespacedKey(plugin, "cuprite_hammer_upgrade_3");
+        this.hoeKey = new NamespacedKey(plugin, "cuprite_hoe_craft");
+        this.hoeMirroredKey = new NamespacedKey(plugin, "cuprite_hoe_craft_mirrored");
     }
 
     public void registerRecipes() {
@@ -120,6 +124,19 @@ public class RecipeManager implements Listener {
                 false
         );
         registerOrReplace(hammerTier3Recipe);
+
+        // 9. Houe en Cuprite ("cc ", " s ", " s ") & Miroir (" cc", " s ", " s ")
+        ShapedRecipe hoeRecipe = new ShapedRecipe(hoeKey, CupriteHoe.create(plugin));
+        hoeRecipe.shape("cc ", " s ", " s ");
+        hoeRecipe.setIngredient('c', cupriteChoice);
+        hoeRecipe.setIngredient('s', Material.STICK);
+        registerOrReplace(hoeRecipe);
+
+        ShapedRecipe hoeMirroredRecipe = new ShapedRecipe(hoeMirroredKey, CupriteHoe.create(plugin));
+        hoeMirroredRecipe.shape(" cc", " s ", " s ");
+        hoeMirroredRecipe.setIngredient('c', cupriteChoice);
+        hoeMirroredRecipe.setIngredient('s', Material.STICK);
+        registerOrReplace(hoeMirroredRecipe);
     }
 
     private void registerOrReplace(org.bukkit.inventory.Recipe recipe) {
@@ -151,7 +168,7 @@ public class RecipeManager implements Listener {
             return;
         }
 
-        if (key.equals(hammerKey) || key.equals(pickaxeKey) || key.equals(axeKey) || key.equals(axeMirroredKey) || key.equals(chestKey)) {
+        if (key.equals(hammerKey) || key.equals(pickaxeKey) || key.equals(axeKey) || key.equals(axeMirroredKey) || key.equals(chestKey) || key.equals(hoeKey) || key.equals(hoeMirroredKey)) {
             for (ItemStack item : inv.getMatrix()) {
                 if (item != null && item.getType() == Cuprite.BASE_MATERIAL && !Cuprite.isCuprite(plugin, item)) {
                     inv.setResult(null);

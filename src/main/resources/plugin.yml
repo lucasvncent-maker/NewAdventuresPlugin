@@ -19,6 +19,10 @@ commands:
     usage: /cuprite [give|reload|help]
     aliases: [customminerals]
     permission: customminerals.admin
+  nv:
+    description: Activer ou desactiver la Vision Nocturne (Mineur)
+    usage: /nv
+    aliases: [nightvision]
 
 permissions:
   customminerals.admin:

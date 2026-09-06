@@ -1,10 +1,11 @@
 package fr.loual.customclasses.jobs.gui;
 
-import fr.loual.newadventure.NewAdventurePlugin;
 import fr.loual.customclasses.jobs.AgriculteurMissions;
 import fr.loual.customclasses.jobs.JobManager;
 import fr.loual.customclasses.jobs.JobMission;
+import fr.loual.customclasses.jobs.MineurMissions;
 import fr.loual.customclasses.jobs.PlayerJob;
+import fr.loual.newadventure.NewAdventurePlugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -51,11 +52,14 @@ public class JobSelectionGui {
         JobManager jobManager = plugin.getJobManager();
         PlayerJob currentJob = jobManager.getPlayerJob(player);
 
-        // 1. Icône du métier Agriculteur au centre (Slot 13)
+        // 1. Icônes des métiers (Slot 12 : Agriculteur, Slot 14 : Mineur)
         ItemStack agriIcon = createJobIcon(player, PlayerJob.AGRICULTEUR, currentJob, jobManager);
-        inv.setItem(13, agriIcon);
+        inv.setItem(12, agriIcon);
 
-        // 2. Si le joueur est Agriculteur, afficher les 4 missions en bas (Slots 20, 21, 22, 23)
+        ItemStack mineurIcon = createJobIcon(player, PlayerJob.MINEUR, currentJob, jobManager);
+        inv.setItem(14, mineurIcon);
+
+        // 2. Affichage des missions selon le métier actif
         if (currentJob == PlayerJob.AGRICULTEUR) {
             int completedLevel = jobManager.getJobLevel(player, PlayerJob.AGRICULTEUR);
 
@@ -63,7 +67,7 @@ public class JobSelectionGui {
             for (int i = 0; i < 4; i++) {
                 JobMission mission = AgriculteurMissions.getMission(i + 1);
                 if (mission != null) {
-                    ItemStack missionItem = createMissionItem(player, jobManager, mission, completedLevel);
+                    ItemStack missionItem = createMissionItem(player, jobManager, PlayerJob.AGRICULTEUR, mission, completedLevel);
                     inv.setItem(missionSlots[i], missionItem);
                 }
             }
@@ -83,6 +87,34 @@ public class JobSelectionGui {
                 recipeBook.setItemMeta(bookMeta);
             }
             inv.setItem(31, recipeBook);
+
+        } else if (currentJob == PlayerJob.MINEUR) {
+            int completedLevel = jobManager.getJobLevel(player, PlayerJob.MINEUR);
+
+            int[] missionSlots = { 20, 22, 24 };
+            for (int i = 0; i < 3; i++) {
+                JobMission mission = MineurMissions.getMission(i + 1);
+                if (mission != null) {
+                    ItemStack missionItem = createMissionItem(player, jobManager, PlayerJob.MINEUR, mission, completedLevel);
+                    inv.setItem(missionSlots[i], missionItem);
+                }
+            }
+
+            // Guide Mineur au slot 31
+            ItemStack minerInfo = new ItemStack(Material.BOOK);
+            ItemMeta infoMeta = minerInfo.getItemMeta();
+            if (infoMeta != null) {
+                infoMeta.displayName(Component.text("✦ Guide du Mineur ✦", NamedTextColor.AQUA, TextDecoration.BOLD));
+                infoMeta.lore(List.of(
+                        Component.text("Passif : 25% de chance de bonus Fortune sur les minerais", NamedTextColor.YELLOW),
+                        Component.text("M1 : Célérité I permanent + Commande /nv pour la Vision Nocturne", NamedTextColor.GRAY),
+                        Component.text("M2 : 5% de drop de Cuprite + 1 Fortune supplémentaire garanti", NamedTextColor.GRAY),
+                        Component.text("M3 : Célérité II + Bénédiction sous la couche Y=30 (Regen, Résistance, Feu)", NamedTextColor.GRAY)
+                ));
+                minerInfo.setItemMeta(infoMeta);
+            }
+            inv.setItem(31, minerInfo);
+
         } else {
             // Indication pour choisir le métier
             ItemStack info = new ItemStack(Material.BOOK);
@@ -90,8 +122,8 @@ public class JobSelectionGui {
             if (infoMeta != null) {
                 infoMeta.displayName(Component.text("Information", NamedTextColor.YELLOW, TextDecoration.BOLD));
                 infoMeta.lore(List.of(
-                        Component.text("Cliquez sur l'icône de l'Agriculteur ci-dessus", NamedTextColor.GRAY),
-                        Component.text("pour sélectionner ce métier et débloquer ses missions !", NamedTextColor.GRAY)
+                        Component.text("Cliquez sur l'un des métiers ci-dessus", NamedTextColor.GRAY),
+                        Component.text("pour sélectionner votre voie et débloquer ses missions !", NamedTextColor.GRAY)
                 ));
                 info.setItemMeta(infoMeta);
             }
@@ -114,9 +146,10 @@ public class JobSelectionGui {
             List<Component> lore = new ArrayList<>(job.getDescription());
             lore.add(Component.empty());
 
+            int maxMissions = (job == PlayerJob.AGRICULTEUR) ? 4 : 3;
             if (isCurrent) {
                 int level = jm.getJobLevel(player, job);
-                lore.add(Component.text("✔ Métier actif - Niveau de mission : " + level + " / 4", NamedTextColor.GREEN, TextDecoration.BOLD));
+                lore.add(Component.text("✔ Métier actif - Niveau de mission : " + level + " / " + maxMissions, NamedTextColor.GREEN, TextDecoration.BOLD));
             } else {
                 lore.add(Component.text("➜ Cliquez pour devenir " + job.getDisplayName() + " !", NamedTextColor.YELLOW, TextDecoration.BOLD));
             }
@@ -129,7 +162,7 @@ public class JobSelectionGui {
         return item;
     }
 
-    private static ItemStack createMissionItem(Player player, JobManager jm, JobMission mission, int completedLevel) {
+    private static ItemStack createMissionItem(Player player, JobManager jm, PlayerJob job, JobMission mission, int completedLevel) {
         int missionNum = mission.getLevel();
         boolean isCompleted = (completedLevel >= missionNum);
         boolean isCurrent = (completedLevel == missionNum - 1);
@@ -164,7 +197,7 @@ public class JobSelectionGui {
             lore.add(Component.text("Objectifs :", NamedTextColor.YELLOW, TextDecoration.BOLD));
 
             for (JobMission.Requirement req : mission.getRequirements()) {
-                int progress = isCompleted ? req.requiredAmount() : jm.getRequirementProgress(player, PlayerJob.AGRICULTEUR, missionNum, req.key());
+                int progress = isCompleted ? req.requiredAmount() : jm.getRequirementProgress(player, job, missionNum, req.key());
                 NamedTextColor reqColor = (progress >= req.requiredAmount()) ? NamedTextColor.GREEN : NamedTextColor.GRAY;
                 lore.add(Component.text("  • " + req.displayName() + " : " + progress + " / " + req.requiredAmount(), reqColor));
             }
@@ -173,23 +206,24 @@ public class JobSelectionGui {
             lore.add(Component.text("✦ Récompense :", NamedTextColor.AQUA, TextDecoration.BOLD));
             lore.add(Component.text("  " + mission.getRewardDescription(), NamedTextColor.WHITE));
 
-            // Détails et raccourcis des crafts
-            if (missionNum == 1) {
-                lore.add(Component.empty());
-                lore.add(Component.text("✦ Recette de craft :", NamedTextColor.GOLD, TextDecoration.BOLD));
-                lore.add(Component.text("  • 1x Bol + 1x Carotte + 1x Patate + 1x Blé", NamedTextColor.YELLOW));
-                lore.add(Component.text("➜ Clic pour voir la recette dans l'établi", NamedTextColor.AQUA));
-            } else if (missionNum == 3) {
-                lore.add(Component.empty());
-                lore.add(Component.text("✦ Recette de craft :", NamedTextColor.GOLD, TextDecoration.BOLD));
-                lore.add(Component.text("  • 1x Cookie + 1x Baie lumineuse", NamedTextColor.YELLOW));
-                lore.add(Component.text("➜ Clic pour voir la recette dans l'établi", NamedTextColor.AQUA));
-            } else if (missionNum == 4) {
-                lore.add(Component.empty());
-                lore.add(Component.text("✦ Recettes de craft :", NamedTextColor.GOLD, TextDecoration.BOLD));
-                lore.add(Component.text("  • Soupe Merveilleuse (9 récoltes)", NamedTextColor.YELLOW));
-                lore.add(Component.text("  • Houe Merveilleuse (2 Cuivres + 2 Bâtons)", NamedTextColor.YELLOW));
-                lore.add(Component.text("➜ Clic pour voir les recettes dans l'établi", NamedTextColor.AQUA));
+            if (job == PlayerJob.AGRICULTEUR) {
+                if (missionNum == 1) {
+                    lore.add(Component.empty());
+                    lore.add(Component.text("✦ Recette de craft :", NamedTextColor.GOLD, TextDecoration.BOLD));
+                    lore.add(Component.text("  • 1x Bol + 1x Carotte + 1x Patate + 1x Blé", NamedTextColor.YELLOW));
+                    lore.add(Component.text("➜ Clic pour voir la recette dans l'établi", NamedTextColor.AQUA));
+                } else if (missionNum == 3) {
+                    lore.add(Component.empty());
+                    lore.add(Component.text("✦ Recette de craft :", NamedTextColor.GOLD, TextDecoration.BOLD));
+                    lore.add(Component.text("  • 1x Cookie + 1x Baie lumineuse", NamedTextColor.YELLOW));
+                    lore.add(Component.text("➜ Clic pour voir la recette dans l'établi", NamedTextColor.AQUA));
+                } else if (missionNum == 4) {
+                    lore.add(Component.empty());
+                    lore.add(Component.text("✦ Recettes de craft :", NamedTextColor.GOLD, TextDecoration.BOLD));
+                    lore.add(Component.text("  • Soupe Merveilleuse (9 récoltes)", NamedTextColor.YELLOW));
+                    lore.add(Component.text("  • Houe Merveilleuse (2 Cuivres + 2 Bâtons)", NamedTextColor.YELLOW));
+                    lore.add(Component.text("➜ Clic pour voir les recettes dans l'établi", NamedTextColor.AQUA));
+                }
             }
 
             if (isCurrent) {

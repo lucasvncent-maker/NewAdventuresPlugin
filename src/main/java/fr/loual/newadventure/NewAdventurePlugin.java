@@ -5,6 +5,7 @@ import fr.loual.customclasses.commands.ClassCommand;
 import fr.loual.customclasses.jobs.JobManager;
 import fr.loual.customclasses.jobs.JobRecipes;
 import fr.loual.customclasses.jobs.commands.JobCommand;
+import fr.loual.customclasses.jobs.commands.NightVisionCommand;
 import fr.loual.customclasses.jobs.listeners.JobListener;
 import fr.loual.customclasses.listeners.ClassListener;
 import fr.loual.customminerals.commands.CustomMineralsCommand;
@@ -95,12 +96,26 @@ public final class NewAdventurePlugin extends JavaPlugin {
             customMineralsCmd.setTabCompleter(mineralCommand);
         }
 
-        // 8. Export du resource pack au format .zip
+        // 8. Commande /nv (Night Vision pour le Mineur)
+        NightVisionCommand nvCommand = new NightVisionCommand(this);
+        PluginCommand cmdNv = getCommand("nv");
+        if (cmdNv != null) {
+            cmdNv.setExecutor(nvCommand);
+            cmdNv.setTabCompleter(nvCommand);
+        }
+
+        // 9. Tâche périodique pour les auras sous la couche Y=30 (Mineur M3)
+        getServer().getScheduler().runTaskTimer(this, () -> {
+            jobManager.tickLayerEffects();
+        }, 20L, 20L);
+
+        // 10. Export du resource pack au format .zip
         exportResourcePackZip();
 
-        // 9. Rafraîchissement des effets de classe pour les joueurs déjà connectés
+        // 11. Rafraîchissement des effets pour les joueurs déjà connectés
         for (Player player : getServer().getOnlinePlayers()) {
             classManager.refreshPlayer(player);
+            jobManager.applyJobEffects(player);
         }
 
         getLogger().info("newAdventurePlugin v" + getPluginMeta().getVersion() + " (Classes + Métiers + Cuprite) est activé !");

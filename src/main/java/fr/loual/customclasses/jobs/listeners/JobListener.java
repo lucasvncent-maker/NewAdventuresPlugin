@@ -40,6 +40,9 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.event.player.PlayerRespawnEvent;
+import fr.loual.customminerals.items.Cuprite;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -147,25 +150,43 @@ public class JobListener implements Listener {
             return;
         }
 
-        // Clic sur une mission pour afficher directement son craft
+        // Clic sur une mission pour afficher directement ses détails
         Integer missionNum = meta.getPersistentDataContainer().get(JobSelectionGui.MISSION_ITEM_KEY, PersistentDataType.INTEGER);
         if (missionNum != null) {
-            switch (missionNum) {
-                case 1 -> {
-                    JobRecipeGui.open(plugin, player, JobRecipeGui.RECIPE_FARMER_SOUP);
-                    player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.0f);
+            PlayerJob pj = jobManager.getPlayerJob(player);
+            if (pj == PlayerJob.AGRICULTEUR) {
+                switch (missionNum) {
+                    case 1 -> {
+                        JobRecipeGui.open(plugin, player, JobRecipeGui.RECIPE_FARMER_SOUP);
+                        player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.0f);
+                    }
+                    case 2 -> {
+                        player.sendMessage(Component.text("✦ La Mission 2 débloque un passif de plantation en zone (aucun craft d'item).", NamedTextColor.YELLOW));
+                        player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                    }
+                    case 3 -> {
+                        JobRecipeGui.open(plugin, player, JobRecipeGui.RECIPE_SPACE_COOKIE);
+                        player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.0f);
+                    }
+                    case 4 -> {
+                        JobRecipeGui.open(plugin, player, JobRecipeGui.RECIPE_WONDERFUL_SOUP);
+                        player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.0f);
+                    }
                 }
-                case 2 -> {
-                    player.sendMessage(Component.text("✦ La Mission 2 débloque un passif de plantation en zone (aucun craft d'item).", NamedTextColor.YELLOW));
-                    player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
-                }
-                case 3 -> {
-                    JobRecipeGui.open(plugin, player, JobRecipeGui.RECIPE_SPACE_COOKIE);
-                    player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.0f);
-                }
-                case 4 -> {
-                    JobRecipeGui.open(plugin, player, JobRecipeGui.RECIPE_WONDERFUL_SOUP);
-                    player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.0f);
+            } else if (pj == PlayerJob.MINEUR) {
+                switch (missionNum) {
+                    case 1 -> {
+                        player.sendMessage(Component.text("✦ Mission 1 Mineur : Récoltez 64 charbons, 64 fers et 64 d'or pour débloquer Célérité I et /nv !", NamedTextColor.YELLOW));
+                        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.2f);
+                    }
+                    case 2 -> {
+                        player.sendMessage(Component.text("✦ Mission 2 Mineur : Récoltez 64 diamants, 64 émeraudes et 16 cuprites pour débloquer 5% de chance de Cuprite et Fortune +1 !", NamedTextColor.YELLOW));
+                        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.2f);
+                    }
+                    case 3 -> {
+                        player.sendMessage(Component.text("✦ Mission 3 Mineur : Récoltez 64 améthystes, 64 capteurs sculk et 3 spawners pour débloquer Célérité II et la bénédiction sous Y=30 !", NamedTextColor.YELLOW));
+                        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.2f);
+                    }
                 }
             }
         }
@@ -298,6 +319,89 @@ public class JobListener implements Listener {
                 });
             }
         }
+    }
+
+    // ==========================================================
+    // 2bis. MINAGE DES MINERAIS (Passif du Mineur, Fortune, Cuprite)
+    // ==========================================================
+    private static final Set<Material> MINER_ORES = Set.of(
+            Material.COAL_ORE, Material.DEEPSLATE_COAL_ORE,
+            Material.IRON_ORE, Material.DEEPSLATE_IRON_ORE,
+            Material.COPPER_ORE, Material.DEEPSLATE_COPPER_ORE,
+            Material.GOLD_ORE, Material.DEEPSLATE_GOLD_ORE, Material.NETHER_GOLD_ORE,
+            Material.REDSTONE_ORE, Material.DEEPSLATE_REDSTONE_ORE,
+            Material.LAPIS_ORE, Material.DEEPSLATE_LAPIS_ORE,
+            Material.DIAMOND_ORE, Material.DEEPSLATE_DIAMOND_ORE,
+            Material.EMERALD_ORE, Material.DEEPSLATE_EMERALD_ORE,
+            Material.NETHER_QUARTZ_ORE, Material.ANCIENT_DEBRIS
+    );
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onOreMine(BlockBreakEvent event) {
+        Player player = event.getPlayer();
+        if (player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR) return;
+        if (jobManager.getPlayerJob(player) != PlayerJob.MINEUR) return;
+
+        Block block = event.getBlock();
+        Material type = block.getType();
+        if (!MINER_ORES.contains(type)) return;
+
+        ItemStack tool = player.getInventory().getItemInMainHand();
+        int level = jobManager.getJobLevel(player, PlayerJob.MINEUR);
+        boolean hasSilkTouch = tool.containsEnchantment(Enchantment.SILK_TOUCH);
+
+        // 1. Passif Fortune supplémentaire (si pas Toucher de Soie)
+        if (!hasSilkTouch) {
+            ItemStack extraDrop = getOreProduct(type);
+            if (extraDrop != null) {
+                int extraCount = 0;
+                // Base passive : 25% de chance de drop supplémentaire
+                if (Math.random() <= 0.25) {
+                    extraCount++;
+                }
+                // Récompense Mission 2 : 1 niveau de Fortune supplémentaire garanti (+1)
+                if (level >= 2) {
+                    extraCount++;
+                }
+
+                if (extraCount > 0) {
+                    ItemStack dropStack = extraDrop.clone();
+                    dropStack.setAmount(extraCount);
+                    block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), dropStack);
+                    block.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, block.getLocation().add(0.5, 0.5, 0.5), 6, 0.3, 0.3, 0.3, 0.05);
+                    try {
+                        player.playSound(block.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.6f, 1.8f);
+                    } catch (Exception ignored) {}
+                }
+            }
+        }
+
+        // 2. Récompense Mission 2 : 5% de chance de drop de la Cuprite sur les minerais
+        if (level >= 2) {
+            if (Math.random() <= 0.05) {
+                block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), Cuprite.create(plugin, 1));
+                block.getWorld().spawnParticle(Particle.TOTEM_OF_UNDYING, block.getLocation().add(0.5, 0.5, 0.5), 10, 0.3, 0.3, 0.3, 0.1);
+                player.playSound(block.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_RESONATE, 0.9f, 1.5f);
+                player.sendActionBar(Component.text("✦ [Mineur M2] Cuprite découverte !", NamedTextColor.GOLD, TextDecoration.BOLD));
+            }
+        }
+    }
+
+    private ItemStack getOreProduct(Material ore) {
+        return switch (ore) {
+            case COAL_ORE, DEEPSLATE_COAL_ORE -> new ItemStack(Material.COAL, 1);
+            case IRON_ORE, DEEPSLATE_IRON_ORE -> new ItemStack(Material.RAW_IRON, 1);
+            case COPPER_ORE, DEEPSLATE_COPPER_ORE -> new ItemStack(Material.RAW_COPPER, 1);
+            case GOLD_ORE, DEEPSLATE_GOLD_ORE -> new ItemStack(Material.RAW_GOLD, 1);
+            case NETHER_GOLD_ORE -> new ItemStack(Material.GOLD_NUGGET, 4);
+            case REDSTONE_ORE, DEEPSLATE_REDSTONE_ORE -> new ItemStack(Material.REDSTONE, 2);
+            case LAPIS_ORE, DEEPSLATE_LAPIS_ORE -> new ItemStack(Material.LAPIS_LAZULI, 4);
+            case DIAMOND_ORE, DEEPSLATE_DIAMOND_ORE -> new ItemStack(Material.DIAMOND, 1);
+            case EMERALD_ORE, DEEPSLATE_EMERALD_ORE -> new ItemStack(Material.EMERALD, 1);
+            case NETHER_QUARTZ_ORE -> new ItemStack(Material.QUARTZ, 1);
+            case ANCIENT_DEBRIS -> new ItemStack(Material.ANCIENT_DEBRIS, 1);
+            default -> null;
+        };
     }
 
     // ==========================================================
@@ -474,7 +578,8 @@ public class JobListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPickupItem(EntityPickupItemEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
-        if (jobManager.getPlayerJob(player) != PlayerJob.AGRICULTEUR) return;
+        PlayerJob job = jobManager.getPlayerJob(player);
+        if (job == PlayerJob.NONE) return;
 
         Material mat = event.getItem().getItemStack().getType();
         String reqKey = jobManager.getRequirementKeyForMaterial(mat);
@@ -482,7 +587,7 @@ public class JobListener implements Listener {
 
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline()) return;
-            jobManager.checkAndNotifyProgress(player, PlayerJob.AGRICULTEUR, reqKey);
+            jobManager.checkAndNotifyProgress(player, job, reqKey);
         });
     }
 
@@ -499,14 +604,15 @@ public class JobListener implements Listener {
             });
         }
 
-        if (jobManager.getPlayerJob(player) != PlayerJob.AGRICULTEUR) return;
+        PlayerJob job = jobManager.getPlayerJob(player);
+        if (job == PlayerJob.NONE) return;
 
         String reqKey = jobManager.getRequirementKeyForMaterial(result.getType());
         if (reqKey == null) return;
 
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline()) return;
-            jobManager.checkAndNotifyProgress(player, PlayerJob.AGRICULTEUR, reqKey);
+            jobManager.checkAndNotifyProgress(player, job, reqKey);
         });
     }
 
@@ -516,8 +622,24 @@ public class JobListener implements Listener {
 
         consolidateSoupStacks(player);
 
-        if (jobManager.getPlayerJob(player) != PlayerJob.AGRICULTEUR) return;
-        jobManager.checkCurrentMissionCompletion(player, PlayerJob.AGRICULTEUR);
+        PlayerJob job = jobManager.getPlayerJob(player);
+        if (job != PlayerJob.NONE) {
+            jobManager.checkCurrentMissionCompletion(player, job);
+        }
+    }
+
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        jobManager.applyJobEffects(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onPlayerRespawn(PlayerRespawnEvent event) {
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (event.getPlayer().isOnline()) {
+                jobManager.applyJobEffects(event.getPlayer());
+            }
+        });
     }
 
     // =========================================================================

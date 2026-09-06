@@ -28,6 +28,7 @@ public class CustomMineralsCommand implements CommandExecutor, TabCompleter {
             "hammer3",
             "pickaxe",
             "axe",
+            "hoe",
             "chest",
             "block",
             "reinforced_block"
@@ -133,6 +134,7 @@ public class CustomMineralsCommand implements CommandExecutor, TabCompleter {
             case "hammer3", "hammer_reinforced" -> CupriteHammer.create(plugin, 3);
             case "pickaxe" -> CupritePickaxe.create(plugin);
             case "axe" -> CupriteAxe.create(plugin);
+            case "hoe" -> CupriteHoe.create(plugin);
             case "chest" -> CupriteChest.create(plugin, amount);
             case "block" -> CupriteBlock.create(plugin, amount);
             case "reinforced_block" -> ReinforcedCupriteBlock.create(plugin, amount);

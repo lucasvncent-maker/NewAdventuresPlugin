@@ -24,6 +24,19 @@ public enum PlayerJob {
             Component.text("  • M2 : Plantation automatique en zone (rayon 3, pousse moyenne)", NamedTextColor.DARK_AQUA),
             Component.text("  • M3 : Space Cookie (Force III, Speed II) + Zone rayon 6 (pousse avancée)", NamedTextColor.DARK_AQUA),
             Component.text("  • M4 : Soupe Merveilleuse + Houe Merveilleuse (drops dorés & blocs)", NamedTextColor.DARK_AQUA)
+    )),
+
+    MINEUR("Mineur", "mineur", Material.DIAMOND_PICKAXE, List.of(
+            Component.text("L'Expert des Tréfonds", NamedTextColor.BLUE, TextDecoration.ITALIC),
+            Component.text("Maître de l'extraction minière capable de maximiser les filons et de prospérer sous terre.", NamedTextColor.GRAY),
+            Component.empty(),
+            Component.text("✦ Passif :", NamedTextColor.GOLD, TextDecoration.BOLD),
+            Component.text("  • 25% de chances d'appliquer un effet Fortune supplémentaire lors du minage d'un minerai.", NamedTextColor.YELLOW),
+            Component.empty(),
+            Component.text("✦ Progression (3 Missions) :", NamedTextColor.AQUA, TextDecoration.BOLD),
+            Component.text("  • M1 : Célérité I permanent + Vision nocturne activable (/nv)", NamedTextColor.DARK_AQUA),
+            Component.text("  • M2 : 5% de chances d'obtenir de la Cuprite + 1 niveau de Fortune supplémentaire", NamedTextColor.DARK_AQUA),
+            Component.text("  • M3 : Célérité II permanent + Régénération, Résistance et Résistance au Feu sous la couche Y=30", NamedTextColor.DARK_AQUA)
     ));
 
     private final String displayName;
