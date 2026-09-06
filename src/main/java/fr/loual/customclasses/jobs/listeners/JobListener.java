@@ -20,8 +20,10 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.PlayerHarvestBlockEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -82,6 +84,7 @@ public class JobListener implements Listener {
         PlayerJob pj = PlayerJob.fromId(jobId);
         if (pj != PlayerJob.NONE) {
             jobManager.setPlayerJob(player, pj);
+            jobManager.checkCurrentMissionCompletion(player, pj);
             player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.2f);
             player.sendMessage(
                     Component.text("✦ Vous avez choisi le métier : ", NamedTextColor.GREEN, TextDecoration.BOLD)
@@ -130,8 +133,6 @@ public class JobListener implements Listener {
             }
         }
 
-        // --- PROGRESSION DES MISSIONS DE L'AGRICULTEUR ---
-        trackHarvestMission(player, block, type);
     }
 
     private boolean isMatureCrop(Block block) {
@@ -188,43 +189,7 @@ public class JobListener implements Listener {
         return false;
     }
 
-    private void trackHarvestMission(Player player, Block block, Material type) {
-        // Mission 1 : Carottes, Blés, Patates, Pissenlits
-        if (type == Material.CARROTS && isMatureCrop(block)) {
-            jobManager.addProgress(player, PlayerJob.AGRICULTEUR, "CARROT", 1);
-        } else if (type == Material.WHEAT && isMatureCrop(block)) {
-            jobManager.addProgress(player, PlayerJob.AGRICULTEUR, "WHEAT", 1);
-        } else if (type == Material.POTATOES && isMatureCrop(block)) {
-            jobManager.addProgress(player, PlayerJob.AGRICULTEUR, "POTATO", 1);
-        } else if (type == Material.DANDELION) {
-            jobManager.addProgress(player, PlayerJob.AGRICULTEUR, "DANDELION", 1);
-        }
-
-        // Mission 2 : Pastèques, Citrouilles, Betteraves, Coquelicots
-        else if (type == Material.MELON) {
-            jobManager.addProgress(player, PlayerJob.AGRICULTEUR, "MELON", 1);
-        } else if (type == Material.PUMPKIN || type == Material.CARVED_PUMPKIN) {
-            jobManager.addProgress(player, PlayerJob.AGRICULTEUR, "PUMPKIN", 1);
-        } else if (type == Material.BEETROOTS && isMatureCrop(block)) {
-            jobManager.addProgress(player, PlayerJob.AGRICULTEUR, "BEETROOT", 1);
-        } else if (type == Material.POPPY) {
-            jobManager.addProgress(player, PlayerJob.AGRICULTEUR, "POPPY", 1);
-        }
-
-        // Mission 3 : Baies lumineuses
-        else if (type == Material.CAVE_VINES || type == Material.CAVE_VINES_PLANT) {
-            jobManager.addProgress(player, PlayerJob.AGRICULTEUR, "GLOW_BERRIES", 1);
-        }
-
-        // Mission 4 : Fleur de chorus, Planturne
-        else if (type == Material.CHORUS_FLOWER) {
-            jobManager.addProgress(player, PlayerJob.AGRICULTEUR, "CHORUS_FLOWER", 1);
-        } else if (type == Material.PITCHER_PLANT || type == Material.PITCHER_CROP) {
-            jobManager.addProgress(player, PlayerJob.AGRICULTEUR, "PITCHER_PLANT", 1);
-        }
-    }
-
-    // Récolte interactive (clic droit sur baies ou ruche)
+    // Récolte interactive (clic droit sur baies lumineuses)
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPlayerHarvest(PlayerHarvestBlockEvent event) {
         Player player = event.getPlayer();
@@ -232,7 +197,10 @@ public class JobListener implements Listener {
 
         Material harvested = event.getHarvestedBlock().getType();
         if (harvested == Material.CAVE_VINES || harvested == Material.CAVE_VINES_PLANT) {
-            jobManager.addProgress(player, PlayerJob.AGRICULTEUR, "GLOW_BERRIES", 1);
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (!player.isOnline()) return;
+                jobManager.checkAndNotifyProgress(player, PlayerJob.AGRICULTEUR, "GLOW_BERRIES");
+            });
         }
     }
 
@@ -249,27 +217,55 @@ public class JobListener implements Listener {
         ItemStack item = event.getItem();
         if (item != null && item.getType() == Material.SHEARS) {
             if (block.getBlockData() instanceof Beehive beehive && beehive.getHoneyLevel() >= beehive.getMaximumHoneyLevel()) {
-                jobManager.addProgress(player, PlayerJob.AGRICULTEUR, "HONEYCOMB", 3);
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (!player.isOnline()) return;
+                    jobManager.checkAndNotifyProgress(player, PlayerJob.AGRICULTEUR, "HONEYCOMB");
+                });
             }
         }
     }
 
     // ==========================================================
-    // 3. CRAFT DES COOKIES ET GÂTEAUX (Mission 3)
+    // 3. RAMASSAGE, CRAFT & INVENTAIRE DES MISSIONS
     // ==========================================================
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPickupItem(EntityPickupItemEvent event) {
+        if (!(event.getEntity() instanceof Player player)) return;
+        if (jobManager.getPlayerJob(player) != PlayerJob.AGRICULTEUR) return;
+
+        Material mat = event.getItem().getItemStack().getType();
+        String reqKey = jobManager.getRequirementKeyForMaterial(mat);
+        if (reqKey == null) return;
+
+        // Attendre 1 tick pour que l'item soit bien présent dans l'inventaire
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline()) return;
+            jobManager.checkAndNotifyProgress(player, PlayerJob.AGRICULTEUR, reqKey);
+        });
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onCraftItem(CraftItemEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
         if (jobManager.getPlayerJob(player) != PlayerJob.AGRICULTEUR) return;
 
         ItemStack result = event.getRecipe().getResult();
-        int amount = result.getAmount();
+        String reqKey = jobManager.getRequirementKeyForMaterial(result.getType());
+        if (reqKey == null) return;
 
-        if (result.getType() == Material.COOKIE) {
-            jobManager.addProgress(player, PlayerJob.AGRICULTEUR, "COOKIE", amount);
-        } else if (result.getType() == Material.CAKE) {
-            jobManager.addProgress(player, PlayerJob.AGRICULTEUR, "CAKE", amount);
-        }
+        // Attendre 1 tick pour que le résultat du craft soit dans l'inventaire
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline()) return;
+            jobManager.checkAndNotifyProgress(player, PlayerJob.AGRICULTEUR, reqKey);
+        });
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onInventoryClose(InventoryCloseEvent event) {
+        if (!(event.getPlayer() instanceof Player player)) return;
+        if (jobManager.getPlayerJob(player) != PlayerJob.AGRICULTEUR) return;
+
+        jobManager.checkCurrentMissionCompletion(player, PlayerJob.AGRICULTEUR);
     }
 
     // =========================================================================
