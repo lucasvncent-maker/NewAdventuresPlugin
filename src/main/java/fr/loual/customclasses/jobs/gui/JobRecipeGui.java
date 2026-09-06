@@ -61,10 +61,10 @@ public class JobRecipeGui {
         inv.setItem(7, createTabItem("Houe Merveilleuse", Material.GOLDEN_HOE, RECIPE_WONDERFUL_HOE, finalKey, 4, playerLevel));
 
         // Grille de craft 3x3 :
-        // Ligne 1 : 11, 12, 13
-        // Ligne 2 : 20, 21, 22
-        // Ligne 3 : 29, 30, 31
-        int[] gridSlots = { 11, 12, 13, 20, 21, 22, 29, 30, 31 };
+        // Ligne 1 : 12, 13, 14
+        // Ligne 2 : 21, 22, 23
+        // Ligne 3 : 30, 31, 32
+        int[] gridSlots = { 12, 13, 14, 21, 22, 23, 30, 31, 32 };
         ItemStack emptySlot = createNamedItem(Material.LIGHT_GRAY_STAINED_GLASS_PANE, "§8(Vide)");
         for (int s : gridSlots) {
             inv.setItem(s, emptySlot);
@@ -72,92 +72,42 @@ public class JobRecipeGui {
 
         // Configuration des recettes
         ItemStack resultItem;
-        ItemStack indicator = new ItemStack(Material.CRAFTING_TABLE);
-        ItemMeta indMeta = indicator.getItemMeta();
-
         int reqLevel = getRequiredLevel(finalKey);
         boolean isUnlocked = playerLevel >= reqLevel;
 
         switch (finalKey) {
             case RECIPE_SPACE_COOKIE -> {
-                inv.setItem(11, new ItemStack(Material.COOKIE));
-                inv.setItem(12, new ItemStack(Material.GLOW_BERRIES));
+                inv.setItem(12, new ItemStack(Material.COOKIE));
+                inv.setItem(13, new ItemStack(Material.GLOW_BERRIES));
                 resultItem = CustomJobItems.getSpaceCookie();
-                if (indMeta != null) {
-                    indMeta.displayName(Component.text("➜ Fabrication : Space Cookie", NamedTextColor.YELLOW, TextDecoration.BOLD));
-                    indMeta.lore(List.of(
-                            Component.text("Type : Recette Informe (n'importe où)", NamedTextColor.GRAY),
-                            Component.text("Ingrédients nécessaires :", NamedTextColor.GOLD),
-                            Component.text("  • 1x Cookie", NamedTextColor.WHITE),
-                            Component.text("  • 1x Baie lumineuse", NamedTextColor.WHITE)
-                    ));
-                    indicator.setItemMeta(indMeta);
-                }
             }
             case RECIPE_WONDERFUL_SOUP -> {
-                inv.setItem(11, new ItemStack(Material.PUMPKIN));
-                inv.setItem(12, new ItemStack(Material.MELON_SLICE));
-                inv.setItem(13, new ItemStack(Material.GOLDEN_CARROT));
-                inv.setItem(20, new ItemStack(Material.POTATO));
-                inv.setItem(21, new ItemStack(Material.WHEAT));
-                inv.setItem(22, new ItemStack(Material.SUGAR_CANE));
-                inv.setItem(29, new ItemStack(Material.EGG));
-                inv.setItem(30, new ItemStack(Material.HONEY_BOTTLE));
-                inv.setItem(31, new ItemStack(Material.BEETROOT));
+                inv.setItem(12, new ItemStack(Material.PUMPKIN));
+                inv.setItem(13, new ItemStack(Material.MELON_SLICE));
+                inv.setItem(14, new ItemStack(Material.GOLDEN_CARROT));
+                inv.setItem(21, new ItemStack(Material.POTATO));
+                inv.setItem(22, new ItemStack(Material.WHEAT));
+                inv.setItem(23, new ItemStack(Material.SUGAR_CANE));
+                inv.setItem(30, new ItemStack(Material.EGG));
+                inv.setItem(31, new ItemStack(Material.HONEY_BOTTLE));
+                inv.setItem(32, new ItemStack(Material.BEETROOT));
                 resultItem = CustomJobItems.getWonderfulSoup();
-                if (indMeta != null) {
-                    indMeta.displayName(Component.text("➜ Fabrication : Soupe Merveilleuse", NamedTextColor.YELLOW, TextDecoration.BOLD));
-                    indMeta.lore(List.of(
-                            Component.text("Type : Recette Informe (remplit les 9 cases)", NamedTextColor.GRAY),
-                            Component.text("Ingrédients nécessaires (9) :", NamedTextColor.GOLD),
-                            Component.text("  • Citrouille + Tranche de pastèque", NamedTextColor.WHITE),
-                            Component.text("  • Carotte dorée + Patate + Blé", NamedTextColor.WHITE),
-                            Component.text("  • Canne à sucre + Œuf", NamedTextColor.WHITE),
-                            Component.text("  • Fiole de miel + Betterave", NamedTextColor.WHITE)
-                    ));
-                    indicator.setItemMeta(indMeta);
-                }
             }
             case RECIPE_WONDERFUL_HOE -> {
-                inv.setItem(11, new ItemStack(Material.COPPER_INGOT));
                 inv.setItem(12, new ItemStack(Material.COPPER_INGOT));
-                inv.setItem(21, new ItemStack(Material.STICK));
-                inv.setItem(30, new ItemStack(Material.STICK));
+                inv.setItem(13, new ItemStack(Material.COPPER_INGOT));
+                inv.setItem(22, new ItemStack(Material.STICK));
+                inv.setItem(31, new ItemStack(Material.STICK));
                 resultItem = CustomJobItems.getWonderfulHoe();
-                if (indMeta != null) {
-                    indMeta.displayName(Component.text("➜ Fabrication : Houe Merveilleuse", NamedTextColor.YELLOW, TextDecoration.BOLD));
-                    indMeta.lore(List.of(
-                            Component.text("Type : Recette Façonnée (forme de houe)", NamedTextColor.GRAY),
-                            Component.text("Ingrédients nécessaires :", NamedTextColor.GOLD),
-                            Component.text("  • 2x Lingots de cuivre (ou cuivre brut)", NamedTextColor.WHITE),
-                            Component.text("  • 2x Bâtons", NamedTextColor.WHITE)
-                    ));
-                    indicator.setItemMeta(indMeta);
-                }
             }
             default -> { // FARMER_SOUP
-                inv.setItem(11, new ItemStack(Material.BOWL));
-                inv.setItem(12, new ItemStack(Material.CARROT));
-                inv.setItem(20, new ItemStack(Material.POTATO));
-                inv.setItem(21, new ItemStack(Material.WHEAT));
+                inv.setItem(12, new ItemStack(Material.BOWL));
+                inv.setItem(13, new ItemStack(Material.CARROT));
+                inv.setItem(21, new ItemStack(Material.POTATO));
+                inv.setItem(22, new ItemStack(Material.WHEAT));
                 resultItem = CustomJobItems.getFarmerSoup();
-                if (indMeta != null) {
-                    indMeta.displayName(Component.text("➜ Fabrication : Soupe de l'Agriculteur", NamedTextColor.YELLOW, TextDecoration.BOLD));
-                    indMeta.lore(List.of(
-                            Component.text("Type : Recette Informe (n'importe où)", NamedTextColor.GRAY),
-                            Component.text("Ingrédients nécessaires :", NamedTextColor.GOLD),
-                            Component.text("  • 1x Bol", NamedTextColor.WHITE),
-                            Component.text("  • 1x Carotte", NamedTextColor.WHITE),
-                            Component.text("  • 1x Pomme de terre", NamedTextColor.WHITE),
-                            Component.text("  • 1x Blé", NamedTextColor.WHITE)
-                    ));
-                    indicator.setItemMeta(indMeta);
-                }
             }
         }
-
-        // Flèche / Établi au slot 23
-        inv.setItem(23, indicator);
 
         // Résultat au slot 25
         inv.setItem(25, resultItem);
