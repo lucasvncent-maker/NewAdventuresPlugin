@@ -42,12 +42,17 @@ public class ClassListener implements Listener {
     // Sauterelle : gestion onde de choc à la chute
     private final Set<UUID> hopperShockwaveCooldown = new HashSet<>();
 
-    // Nécromancien : UUIDs des serviteurs temporaires invoqués
+    // Nécromancien : UUIDs des serviteurs temporaires invoqués & lien vers le maître
     private final Set<UUID> necroMinions = new HashSet<>();
+    private final Map<UUID, UUID> minionToMaster = new HashMap<>();
+
+    // Archer : clé pour identifier les flèches tirées par des squelettes/monstres
+    private final NamespacedKey skeletonArrowKey;
 
     public ClassListener(CustomClasses plugin) {
         this.plugin = plugin;
         this.classManager = plugin.getClassManager();
+        this.skeletonArrowKey = new NamespacedKey(plugin, "skeleton_arrow");
 
         startPeriodicTasks();
     }
@@ -178,6 +183,37 @@ public class ClassListener implements Listener {
                         }
                     }
                 }
+
+                // 8. ARCHER : Visée sans ralentissement (vitesse normale) + ramassage flèches de squelettes
+                if (pc == PlayerClass.ARCHER) {
+                    ItemStack mainHand = player.getInventory().getItemInMainHand();
+                    ItemStack offHand = player.getInventory().getItemInOffHand();
+                    boolean holdsRanged = isRangedWeapon(mainHand) || isRangedWeapon(offHand);
+
+                    if (holdsRanged) {
+                        if (player.isHandRaised()) {
+                            // Neutralise le ralentissement de 80% causé par la visée de l'arc
+                            player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 10, 4, false, false, false));
+                        } else {
+                            player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 0, false, false, true));
+                        }
+                    }
+
+                    // Ramassage automatique des flèches au sol tirées par des squelettes/monstres
+                    for (Entity nearby : player.getNearbyEntities(2.0, 2.0, 2.0)) {
+                        if (nearby instanceof AbstractArrow arrow && (arrow.isInBlock() || arrow.isOnGround())) {
+                            if (arrow.getPickupStatus() != AbstractArrow.PickupStatus.ALLOWED
+                                    || arrow.getPersistentDataContainer().has(skeletonArrowKey, PersistentDataType.BYTE)) {
+                                player.getInventory().addItem(new ItemStack(Material.ARROW));
+                                try {
+                                    player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.6f, 1.3f);
+                                } catch (Exception ignored) {}
+                                player.sendActionBar(Component.text("✦ Flèche de squelette ramassée !", NamedTextColor.YELLOW));
+                                arrow.remove();
+                            }
+                        }
+                    }
+                }
             }
         }, 5L, 5L);
     }
@@ -238,6 +274,13 @@ public class ClassListener implements Listener {
         sirenSneakStart.remove(uuid);
         sirenLastShoutTime.remove(uuid);
         hopperShockwaveCooldown.remove(uuid);
+        removePlayerMinions(uuid);
+    }
+
+    @EventHandler
+    public void onPlayerDeath(PlayerDeathEvent event) {
+        Player player = event.getPlayer();
+        removePlayerMinions(player.getUniqueId());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -302,6 +345,17 @@ public class ClassListener implements Listener {
             PlayerClass pc = classManager.getPlayerClass(player);
             ItemStack hand = player.getInventory().getItemInMainHand();
 
+            // Empêcher le maître d'attaquer ses propres serviteurs
+            if (necroMinions.contains(victim.getUniqueId()) && player.getUniqueId().equals(minionToMaster.get(victim.getUniqueId()))) {
+                event.setCancelled(true);
+                return;
+            }
+
+            // Nécromancien : ordonner aux serviteurs de se focaliser sur la cible attaquée
+            if (pc == PlayerClass.NECROMANCIEN && victim instanceof LivingEntity target && !necroMinions.contains(victim.getUniqueId())) {
+                focusMinionsOnTarget(player.getUniqueId(), target);
+            }
+
             switch (pc) {
                 case ASSASSIN -> {
                     // Sneak attack sur monstre
@@ -340,17 +394,20 @@ public class ClassListener implements Listener {
                         event.setDamage(event.getDamage() * 0.20);
                     }
 
-                    // Bonus houe : Poison II (6s), Wither II (3s), Lenteur I (4s)
+                    // Bonus houe : Poison II (6s = 120t), Wither II (3s = 60t), Lenteur (4s = 80t)
                     if (isHoe(hand) && victim instanceof LivingEntity livingVictim) {
                         livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.POISON, 120, 1));
                         livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 60, 1));
-                        livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 80, 0));
-                        player.playSound(player.getLocation(), Sound.ENTITY_EVOKER_CAST_SPELL, 0.7f, 1.8f);
+                        livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 80, 1));
+                        livingVictim.getWorld().spawnParticle(Particle.WITCH, livingVictim.getLocation().clone().add(0, 1, 0), 12, 0.3, 0.3, 0.3, 0.05);
+                        try {
+                            player.playSound(player.getLocation(), Sound.ENTITY_EVOKER_CAST_SPELL, 0.7f, 1.8f);
+                        } catch (Exception ignored) {}
                     }
                 }
 
                 case ARCHER -> {
-                    // Malus : -50% de dégâts avec épées et haches
+                    // Malus : Dégâts réduits de moitié (-50%) avec épées et haches
                     if (isSwordOrAxe(hand)) {
                         event.setDamage(event.getDamage() * 0.50);
                     }
@@ -360,7 +417,7 @@ public class ClassListener implements Listener {
             }
         }
 
-        // Cas 2 : Flèche tirée par un joueur (ARCHER)
+        // Cas 2 : Flèche tirée par un joueur (ARCHER ou NÉCROMANCIEN)
         if (damager instanceof Arrow arrow && arrow.getShooter() instanceof Player shooter) {
             PlayerClass pc = classManager.getPlayerClass(shooter);
 
@@ -368,22 +425,26 @@ public class ClassListener implements Listener {
                 // +30% de dégâts avec arc/arbalète
                 event.setDamage(event.getDamage() * 1.30);
 
-                // Surbrillance (Glowing) pendant 5 secondes sur la cible
+                // Révèle les cibles touchées à travers les blocs (Surbrillance 5 secondes)
                 if (victim instanceof LivingEntity livingVictim) {
                     livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 100, 0, false, false, true));
                 }
 
-                // Tir à plus de 20 blocs : Critique garanti + Knockback II
+                // Tir à plus de 20 blocs : Critique garanti + Fort recul (Knockback II)
                 Location shootLoc = arrow.getOrigin();
                 if (shootLoc != null && shootLoc.distance(victim.getLocation()) >= 20.0) {
                     arrow.setCritical(true);
-                    event.setDamage(event.getDamage() * 1.25); // Bonus critique
+                    event.setDamage(event.getDamage() * 1.25); // Bonus critique garanti
 
-                    Vector dir = arrow.getVelocity().normalize().multiply(1.5).setY(0.4);
+                    Vector dir = arrow.getVelocity().normalize().multiply(1.6).setY(0.4);
                     victim.setVelocity(dir);
 
-                    shooter.playSound(shooter.getLocation(), Sound.ENTITY_ARROW_HIT_PLAYER, 1.0f, 1.5f);
-                    shooter.sendMessage(Component.text("✦ Tir d'élite longue distance (+20 blocs) !", NamedTextColor.GOLD, TextDecoration.BOLD));
+                    try {
+                        shooter.playSound(shooter.getLocation(), Sound.ENTITY_ARROW_HIT_PLAYER, 1.0f, 1.5f);
+                        shooter.playSound(shooter.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.0f, 1.2f);
+                    } catch (Exception ignored) {}
+                    shooter.sendActionBar(Component.text("✦ Tir d'élite longue distance (+20 blocs) ! Coup Critique + Fort Recul !", NamedTextColor.GOLD, TextDecoration.BOLD));
+                    victim.getWorld().spawnParticle(Particle.CRIT, victim.getLocation().clone().add(0, 1, 0), 12, 0.3, 0.3, 0.3, 0.2);
                 }
             } else if (pc == PlayerClass.NECROMANCIEN) {
                 // Malus Nécromancien : tir inefficace (-80% dégâts)
@@ -391,9 +452,24 @@ public class ClassListener implements Listener {
             }
         }
 
-        // Empêcher les serviteurs du nécromancien d'attaquer leur maître
-        if (damager instanceof LivingEntity minion && necroMinions.contains(minion.getUniqueId()) && victim instanceof Player) {
-            event.setCancelled(true);
+        // Cas 3 : Serviteurs du nécromancien (pas d'attaque envers le maître ni entre serviteurs du même maître)
+        if (damager instanceof LivingEntity minion && necroMinions.contains(minion.getUniqueId())) {
+            UUID masterId = minionToMaster.get(minion.getUniqueId());
+            if (victim.getUniqueId().equals(masterId)) {
+                event.setCancelled(true);
+                return;
+            }
+            if (necroMinions.contains(victim.getUniqueId()) && masterId != null && masterId.equals(minionToMaster.get(victim.getUniqueId()))) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+
+        // Si le maître est attaqué, riposte coordonnée de ses serviteurs
+        if (victim instanceof Player master && minionToMaster.containsValue(master.getUniqueId())) {
+            if (damager instanceof LivingEntity attacker && !necroMinions.contains(attacker.getUniqueId())) {
+                focusMinionsOnTarget(master.getUniqueId(), attacker);
+            }
         }
     }
 
@@ -604,6 +680,34 @@ public class ClassListener implements Listener {
         player.sendMessage(Component.text("✦ Cri sonique libéré : toutes les créatures dans 8 blocs subissent Lenteur III et Faiblesse II pendant 5s !", NamedTextColor.DARK_AQUA));
     }
 
+    private void focusMinionsOnTarget(UUID masterId, LivingEntity target) {
+        for (Map.Entry<UUID, UUID> entry : minionToMaster.entrySet()) {
+            if (entry.getValue().equals(masterId)) {
+                Entity m = Bukkit.getEntity(entry.getKey());
+                if (m instanceof Monster minion && minion.isValid()) {
+                    minion.setTarget(target);
+                }
+            }
+        }
+    }
+
+    private void removePlayerMinions(UUID masterId) {
+        List<UUID> toRemove = new ArrayList<>();
+        for (Map.Entry<UUID, UUID> entry : minionToMaster.entrySet()) {
+            if (entry.getValue().equals(masterId)) {
+                Entity m = Bukkit.getEntity(entry.getKey());
+                if (m != null && m.isValid()) {
+                    m.remove();
+                }
+                toRemove.add(entry.getKey());
+            }
+        }
+        for (UUID id : toRemove) {
+            necroMinions.remove(id);
+            minionToMaster.remove(id);
+        }
+    }
+
     // =========================================================================
     // 7. NÉCROMANCIEN : 40% de réanimer Zombie/Squelette à la mort d'un monstre
     // =========================================================================
@@ -614,7 +718,7 @@ public class ClassListener implements Listener {
         if (killer == null) return;
 
         if (classManager.getPlayerClass(killer) == PlayerClass.NECROMANCIEN && entity instanceof Monster) {
-            // 40% de chances
+            // 40% de chances de réanimer un serviteur
             if (Math.random() <= 0.40) {
                 spawnNecroMinion(killer, entity.getLocation());
             }
@@ -629,48 +733,91 @@ public class ClassListener implements Listener {
         Entity spawned = world.spawnEntity(loc, minionType);
 
         if (spawned instanceof Monster minion) {
-            necroMinions.add(minion.getUniqueId());
+            UUID minionId = minion.getUniqueId();
+            necroMinions.add(minionId);
+            minionToMaster.put(minionId, master.getUniqueId());
 
-            // Apparence du serviteur
+            // Nom du serviteur
             minion.customName(Component.text("Serviteur de " + master.getName(), NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
             minion.setCustomNameVisible(true);
 
+            // Équiper pour immuniser au soleil et armer le serviteur
+            org.bukkit.inventory.EntityEquipment equip = minion.getEquipment();
+            if (equip != null) {
+                equip.setHelmet(new ItemStack(Material.CHAINMAIL_HELMET));
+                equip.setHelmetDropChance(0.0f);
+
+                if (minionType == EntityType.ZOMBIE) {
+                    equip.setItemInMainHand(new ItemStack(Material.IRON_HOE));
+                    equip.setItemInMainHandDropChance(0.0f);
+                } else {
+                    equip.setItemInMainHand(new ItemStack(Material.BOW));
+                    equip.setItemInMainHandDropChance(0.0f);
+                }
+            }
+
             // Cibler les monstres ennemis autour
-            for (Entity nearby : world.getNearbyEntities(loc, 12, 6, 12)) {
+            for (Entity nearby : world.getNearbyEntities(loc, 14, 6, 14)) {
                 if (nearby instanceof Monster target && !necroMinions.contains(target.getUniqueId()) && !target.equals(minion)) {
                     minion.setTarget(target);
                     break;
                 }
             }
 
-            world.spawnParticle(Particle.SOUL_FIRE_FLAME, loc, 15, 0.5, 0.5, 0.5, 0.05);
-            world.playSound(loc, Sound.ENTITY_ZOMBIE_VILLAGER_CONVERTED, 0.8f, 1.8f);
+            world.spawnParticle(Particle.SOUL_FIRE_FLAME, loc.clone().add(0, 0.5, 0), 20, 0.5, 0.5, 0.5, 0.05);
+            world.spawnParticle(Particle.WITCH, loc.clone().add(0, 0.5, 0), 12, 0.4, 0.4, 0.4, 0.05);
+            try {
+                world.playSound(loc, Sound.ENTITY_ZOMBIE_VILLAGER_CONVERTED, 0.8f, 1.8f);
+            } catch (Exception ignored) {}
+
+            master.sendActionBar(Component.text("✦ Serviteur " + (minionType == EntityType.ZOMBIE ? "Zombie" : "Squelette") + " réanimé (25s) !", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
 
             // Serviteur éphémère (25 secondes max = 500 ticks)
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                if (!minion.isDead()) {
-                    world.spawnParticle(Particle.SMOKE, minion.getLocation(), 10, 0.3, 0.5, 0.3, 0.05);
+                if (!minion.isDead() && minion.isValid()) {
+                    world.spawnParticle(Particle.SMOKE, minion.getLocation().clone().add(0, 1, 0), 12, 0.3, 0.5, 0.3, 0.05);
+                    try {
+                        world.playSound(minion.getLocation(), Sound.ENTITY_SKELETON_DEATH, 0.8f, 1.4f);
+                    } catch (Exception ignored) {}
                     minion.remove();
-                    necroMinions.remove(minion.getUniqueId());
                 }
+                necroMinions.remove(minionId);
+                minionToMaster.remove(minionId);
             }, 500L);
         }
     }
 
     // =========================================================================
-    // 8. ARCHER : 35% de chance de pas consommer de flèche & ramassage flèches squelettes
+    // 8. ARCHER : 35% d'économie de flèche & restriction de tir NÉCROMANCIEN
     // =========================================================================
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onShootBow(EntityShootBowEvent event) {
-        if (!(event.getEntity() instanceof Player player)) return;
+        LivingEntity shooter = event.getEntity();
 
-        PlayerClass pc = classManager.getPlayerClass(player);
-        if (pc == PlayerClass.ARCHER) {
-            // 35% de chance de préserver la munition
+        // 7. NÉCROMANCIEN : Tir impossible avec arc ou arbalète
+        if (shooter instanceof Player player && classManager.getPlayerClass(player) == PlayerClass.NECROMANCIEN) {
+            event.setCancelled(true);
+            player.sendActionBar(Component.text("❌ Le Nécromancien est incapable d'utiliser des armes à distance !", NamedTextColor.RED, TextDecoration.BOLD));
+            try {
+                player.playSound(player.getLocation(), Sound.ENTITY_ITEM_BREAK, 0.8f, 0.8f);
+            } catch (Exception ignored) {}
+            return;
+        }
+
+        // 8. ARCHER : 35% de chance de préserver la munition
+        if (shooter instanceof Player player && classManager.getPlayerClass(player) == PlayerClass.ARCHER) {
             if (Math.random() <= 0.35) {
                 event.setConsumeItem(false);
-                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 0.5f, 2.0f);
+                try {
+                    player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 0.6f, 2.0f);
+                } catch (Exception ignored) {}
+                player.sendActionBar(Component.text("✦ Munition préservée (35%) !", NamedTextColor.AQUA, TextDecoration.BOLD));
             }
+        }
+
+        // Identifier les flèches tirées par des monstres pour l'Archer
+        if (shooter instanceof Monster && event.getProjectile() instanceof AbstractArrow arrow) {
+            arrow.getPersistentDataContainer().set(skeletonArrowKey, PersistentDataType.BYTE, (byte) 1);
         }
     }
 
