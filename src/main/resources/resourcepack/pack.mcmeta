@@ -1,6 +1,10 @@
 {
   "pack": {
-    "pack_format": 63,
-    "description": "newAdventurePack - Textures & Modèles Custom"
+    "pack_format": 46,
+    "supported_formats": {
+      "min_inclusive": 34,
+      "max_inclusive": 65
+    },
+    "description": "newAdventurePack - Textures et Modeles Custom"
   }
 }
