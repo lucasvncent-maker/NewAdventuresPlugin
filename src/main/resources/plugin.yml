@@ -2,7 +2,7 @@
 version: 1.0.0
 main: fr.loual.customclasses.CustomClasses
 api-version: '1.21.6'
-description: Plugin de classes de jeu (Humain, Assassin, etc.) avec GUI de selection.
+description: Plugin de classes de jeu (Humain, Assassin, etc.) avec GUI de selection
 author: Loual
 
 commands:
