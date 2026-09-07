@@ -52,6 +52,10 @@ commands:
     description: Se teleporter a votre point de Home (Aventurier M1)
     usage: /home
     aliases: [h]
+  chlorine:
+    description: Joue la musique Chlorine de Twenty One Pilots
+    usage: /chlorine [play|stop]
+    aliases: [top, ned]
 
 permissions:
   customminerals.admin:
