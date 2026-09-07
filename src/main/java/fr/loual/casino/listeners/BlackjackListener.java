@@ -75,8 +75,15 @@ public class BlackjackListener implements Listener {
 
         // 1. Clics dans l'inventaire du haut (La table de Blackjack)
         if (rawSlot < topInv.getSize()) {
-            if (game.getState() == BlackjackGame.State.BETTING) {
                 if (rawSlot == BlackjackGui.BET_SLOT) {
+                    ItemStack clicked = event.getCurrentItem();
+                    if (clicked != null && (clicked.getType() == Material.GREEN_STAINED_GLASS_PANE 
+                            || clicked.getType() == Material.BLACK_STAINED_GLASS_PANE 
+                            || clicked.getType() == Material.YELLOW_STAINED_GLASS_PANE)) {
+                        event.setCancelled(true);
+                        topInv.setItem(BlackjackGui.BET_SLOT, null);
+                        return;
+                    }
                     // Autoriser le joueur à placer / retirer son item de mise
                     Bukkit.getScheduler().runTask(plugin, () -> BlackjackGui.render(topInv, game));
                     return;
@@ -87,6 +94,14 @@ public class BlackjackListener implements Listener {
                 if (rawSlot == BlackjackGui.BUTTON_START_BET) {
                     ItemStack bet = topInv.getItem(BlackjackGui.BET_SLOT);
                     if (bet != null && !bet.getType().isAir() && bet.getAmount() > 0) {
+                        // Sécurité : Ne jamais accepter une vitre du GUI comme mise
+                        if (bet.getType() == Material.GREEN_STAINED_GLASS_PANE 
+                                || bet.getType() == Material.BLACK_STAINED_GLASS_PANE 
+                                || bet.getType() == Material.YELLOW_STAINED_GLASS_PANE) {
+                            topInv.setItem(BlackjackGui.BET_SLOT, null);
+                            return;
+                        }
+
                         topInv.setItem(BlackjackGui.BET_SLOT, null);
                         game.startAnimated(plugin, bet, () -> {
                             if (player.getOpenInventory().getTopInventory().getHolder() instanceof BlackjackGuiHolder) {
@@ -121,6 +136,7 @@ public class BlackjackListener implements Listener {
 
                 if (rawSlot == BlackjackGui.BUTTON_REPLAY) {
                     game.resetToBetting();
+                    topInv.setItem(BlackjackGui.BET_SLOT, null);
                     BlackjackGui.render(topInv, game);
                     player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.2f);
                 } else if (rawSlot == BlackjackGui.BUTTON_QUIT) {
@@ -174,14 +190,18 @@ public class BlackjackListener implements Listener {
 
         BlackjackGame game = holder.getGame();
 
-        // Si le joueur ferme en phase de mise : lui restituer l'item posé dans le slot central
+        // Si le joueur ferme en phase de mise : lui restituer l'item posé dans le slot central (sauf si c'est une vitre)
         if (game.getState() == BlackjackGame.State.BETTING) {
             ItemStack betInSlot = event.getInventory().getItem(BlackjackGui.BET_SLOT);
             if (betInSlot != null && !betInSlot.getType().isAir() && betInSlot.getAmount() > 0) {
                 event.getInventory().setItem(BlackjackGui.BET_SLOT, null);
-                HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(betInSlot);
-                for (ItemStack rem : leftover.values()) {
-                    player.getWorld().dropItemNaturally(player.getLocation(), rem);
+                if (betInSlot.getType() != Material.GREEN_STAINED_GLASS_PANE 
+                        && betInSlot.getType() != Material.BLACK_STAINED_GLASS_PANE 
+                        && betInSlot.getType() != Material.YELLOW_STAINED_GLASS_PANE) {
+                    HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(betInSlot);
+                    for (ItemStack rem : leftover.values()) {
+                        player.getWorld().dropItemNaturally(player.getLocation(), rem);
+                    }
                 }
             }
         } else if (game.getState() == BlackjackGame.State.PLAYING) {

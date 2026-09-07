@@ -47,9 +47,17 @@ public class BlackjackGui {
         ItemStack darkFelt = createItem(Material.BLACK_STAINED_GLASS_PANE, Component.text(" "));
 
         for (int i = 0; i < 54; i++) {
-            if (game.getState() == BlackjackGame.State.BETTING && i == BET_SLOT) {
-                // Laisser le slot de mise intact si le joueur y a déjà déposé un item
-                continue;
+            if (i == BET_SLOT) {
+                if (game.getState() == BlackjackGame.State.BETTING) {
+                    // S'assurer que le slot de mise n'a JAMAIS de vitre de fond
+                    ItemStack current = inv.getItem(BET_SLOT);
+                    if (current != null && (current.getType() == Material.GREEN_STAINED_GLASS_PANE 
+                            || current.getType() == Material.BLACK_STAINED_GLASS_PANE 
+                            || current.getType() == Material.YELLOW_STAINED_GLASS_PANE)) {
+                        inv.setItem(BET_SLOT, null);
+                    }
+                    continue;
+                }
             }
             inv.setItem(i, greenFelt);
         }
@@ -189,8 +197,10 @@ public class BlackjackGui {
             }
 
             ItemStack currentBetInSlot = inv.getItem(BET_SLOT);
-            if (currentBetInSlot == null || currentBetInSlot.getType().isAir()) {
-                // Laisser vide pour que le joueur puisse y cliquer librement
+            if (currentBetInSlot != null && (currentBetInSlot.getType() == Material.GREEN_STAINED_GLASS_PANE 
+                    || currentBetInSlot.getType() == Material.BLACK_STAINED_GLASS_PANE 
+                    || currentBetInSlot.getType() == Material.YELLOW_STAINED_GLASS_PANE)) {
+                inv.setItem(BET_SLOT, null);
             }
         } else {
             List<Card> pHand = game.getPlayerHand();
