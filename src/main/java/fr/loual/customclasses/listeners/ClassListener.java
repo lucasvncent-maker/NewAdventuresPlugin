@@ -1165,8 +1165,8 @@ public class ClassListener implements Listener {
         sauterelleFallImmunity.add(uuid);
 
         world.spawnParticle(Particle.EXPLOSION, loc, 3, 0.4, 0.2, 0.4, 0.05);
-        world.spawnParticle(Particle.WIND_BURST, loc, 2, 0.3, 0.2, 0.3, 0.05);
-        world.spawnParticle(Particle.SLIME, loc.clone().add(0, 0.5, 0), 30, 0.6, 0.3, 0.6, 0.1);
+        world.spawnParticle(Particle.POOF, loc, 20, 0.4, 0.2, 0.4, 0.08);
+        world.spawnParticle(Particle.ITEM_SLIME, loc.clone().add(0, 0.5, 0), 30, 0.6, 0.3, 0.6, 0.1);
         world.spawnParticle(Particle.CLOUD, loc, 20, 0.5, 0.2, 0.5, 0.1);
 
         try {
@@ -1189,7 +1189,7 @@ public class ClassListener implements Listener {
                     return;
                 }
 
-                player.getWorld().spawnParticle(Particle.SLIME, player.getLocation().clone().add(0, 0.2, 0), 4, 0.2, 0.2, 0.2, 0.02);
+                player.getWorld().spawnParticle(Particle.ITEM_SLIME, player.getLocation().clone().add(0, 0.2, 0), 4, 0.2, 0.2, 0.2, 0.02);
                 player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 2, 0.1, 0.1, 0.1, 0.02);
 
                 if (ticks >= 15 && (player.isOnGround() || player.getLocation().getBlock().getRelative(0, -1, 0).getType().isSolid())) {
@@ -1211,7 +1211,7 @@ public class ClassListener implements Listener {
         for (int deg = 0; deg < 360; deg += 15) {
             double rad = Math.toRadians(deg);
             Location pLoc = loc.clone().add(Math.cos(rad) * 4.5, 0.2, Math.sin(rad) * 4.5);
-            world.spawnParticle(Particle.SLIME, pLoc, 6, 0.2, 0.1, 0.2, 0.05);
+            world.spawnParticle(Particle.ITEM_SLIME, pLoc, 6, 0.2, 0.1, 0.2, 0.05);
             world.spawnParticle(Particle.SWEEP_ATTACK, pLoc, 1, 0.1, 0.1, 0.1, 0.02);
         }
 
@@ -1409,7 +1409,7 @@ public class ClassListener implements Listener {
             double rad = Math.toRadians(deg);
             Location pLoc = targetCenter.clone().add(Math.cos(rad) * 4.0, 0.2, Math.sin(rad) * 4.0);
             world.spawnParticle(Particle.ENCHANTED_HIT, pLoc, 4, 0.1, 0.1, 0.1, 0.05);
-            world.spawnParticle(Particle.TARGET_HIT, pLoc, 1, 0.05, 0.05, 0.05, 0);
+            world.spawnParticle(Particle.CRIT, pLoc, 2, 0.05, 0.05, 0.05, 0.02);
         }
 
         player.sendActionBar(Component.text("🏹 PLUIE DE FLÈCHES DÉCLENCHÉE ! 🏹", NamedTextColor.YELLOW, TextDecoration.BOLD));
