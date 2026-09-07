@@ -68,6 +68,7 @@ public class ClassListener implements Listener {
         }
     }
     private final Map<UUID, NecroPlague> activePlagues = new HashMap<>();
+    private final Set<UUID> plagueDamageInProgress = new HashSet<>();
 
     private record NecroHoeTier(double poisonTotalDamage, int poisonAmp, int witherAmp, int slownessAmp, int durationTicks) {}
 
@@ -288,7 +289,13 @@ public class ClassListener implements Listener {
                 double dmgToApply = Math.min(plague.remainingDamage, 1.0);
                 plague.remainingDamage -= dmgToApply;
 
-                victim.damage(dmgToApply, master);
+                plagueDamageInProgress.add(victimId);
+                try {
+                    victim.setNoDamageTicks(0);
+                    victim.damage(dmgToApply, master);
+                } finally {
+                    plagueDamageInProgress.remove(victimId);
+                }
 
                 World world = victim.getWorld();
                 Location center = victim.getLocation().add(0, victim.getHeight() * 0.55, 0);
@@ -310,15 +317,15 @@ public class ClassListener implements Listener {
     }
 
     private NecroHoeTier getNecroHoeTier(Material mat) {
-        if (mat == null) return new NecroHoeTier(3.0, 0, -1, 0, 80);
+        if (mat == null) return new NecroHoeTier(2.0, 0, -1, 0, 60);
         return switch (mat) {
-            case WOODEN_HOE -> new NecroHoeTier(2.5, 0, -1, 0, 80);
-            case STONE_HOE -> new NecroHoeTier(4.0, 0, -1, 0, 100);
-            case IRON_HOE -> new NecroHoeTier(5.5, 1, 0, 0, 120);
-            case GOLDEN_HOE -> new NecroHoeTier(6.0, 1, 1, 0, 100);
-            case DIAMOND_HOE -> new NecroHoeTier(7.5, 2, 1, 1, 140);
-            case NETHERITE_HOE -> new NecroHoeTier(10.0, 3, 2, 1, 160);
-            default -> new NecroHoeTier(3.0, 0, -1, 0, 80);
+            case WOODEN_HOE -> new NecroHoeTier(1.2, 0, -1, 0, 60);
+            case STONE_HOE -> new NecroHoeTier(2.5, 0, -1, 0, 80);
+            case IRON_HOE -> new NecroHoeTier(4.2, 1, -1, 0, 100);
+            case GOLDEN_HOE -> new NecroHoeTier(4.8, 1, 0, 0, 80);
+            case DIAMOND_HOE -> new NecroHoeTier(6.5, 2, 1, 1, 130);
+            case NETHERITE_HOE -> new NecroHoeTier(9.0, 3, 2, 1, 150);
+            default -> new NecroHoeTier(2.0, 0, -1, 0, 60);
         };
     }
 
@@ -512,6 +519,11 @@ public class ClassListener implements Listener {
     public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
         Entity damager = event.getDamager();
         Entity victim = event.getEntity();
+
+        // Ne pas déclencher les effets de frappe du joueur lors des dégâts périodiques internes de la Peste
+        if (plagueDamageInProgress.contains(victim.getUniqueId())) {
+            return;
+        }
 
         // Cas 1 : Le joueur attaque directement au corps-à-corps
         if (damager instanceof Player player) {
