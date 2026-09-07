@@ -75,6 +75,7 @@ public class BlackjackListener implements Listener {
 
         // 1. Clics dans l'inventaire du haut (La table de Blackjack)
         if (rawSlot < topInv.getSize()) {
+            if (game.getState() == BlackjackGame.State.BETTING) {
                 if (rawSlot == BlackjackGui.BET_SLOT) {
                     ItemStack clicked = event.getCurrentItem();
                     if (clicked != null && (clicked.getType() == Material.GREEN_STAINED_GLASS_PANE 
