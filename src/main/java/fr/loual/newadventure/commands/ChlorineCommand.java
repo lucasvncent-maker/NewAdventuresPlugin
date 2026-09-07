@@ -21,7 +21,9 @@ import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.time.Duration;
 import java.util.*;
+import net.kyori.adventure.title.Title;
 
 /**
  * Commande /chlorine pour jouer "Chlorine" de Twenty One Pilots en jeu.
@@ -78,7 +80,11 @@ public class ChlorineCommand implements CommandExecutor, TabCompleter, Listener 
     }
 
     private void startMusic(Player player) {
-        player.sendTitle("§b§lCHLORINE", "§7Twenty One Pilots ♫", 10, 45, 10);
+        player.showTitle(Title.title(
+                Component.text("CHLORINE", NamedTextColor.AQUA, TextDecoration.BOLD),
+                Component.text("Twenty One Pilots ♫", NamedTextColor.GRAY),
+                Title.Times.times(Duration.ofMillis(500), Duration.ofMillis(2250), Duration.ofMillis(500))
+        ));
         player.sendMessage(
                 Component.text("------------------------------------------------", NamedTextColor.DARK_AQUA)
                         .append(Component.newline())

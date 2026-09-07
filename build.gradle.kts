@@ -22,6 +22,7 @@ java {
 
 tasks.processResources {
     filteringCharset = "UTF-8"
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }
 
 tasks.register<Copy>("copyToServer") {
