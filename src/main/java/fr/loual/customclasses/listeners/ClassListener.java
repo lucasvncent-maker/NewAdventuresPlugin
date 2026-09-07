@@ -427,6 +427,7 @@ public class ClassListener implements Listener {
         ItemStack[] savedAssassin = assassinStoredArmor.remove(uuid);
         if (savedAssassin != null) {
             player.getInventory().setArmorContents(savedAssassin);
+            player.setCollidable(true);
         }
     }
 
@@ -452,6 +453,7 @@ public class ClassListener implements Listener {
         }
         ItemStack[] savedAssassin = assassinStoredArmor.remove(uuid);
         if (savedAssassin != null) {
+            player.setCollidable(true);
             for (ItemStack item : savedAssassin) {
                 if (item != null && item.getType() != Material.AIR) {
                     event.getDrops().add(item);
@@ -1296,10 +1298,21 @@ public class ClassListener implements Listener {
 
         // Téléportation sécurisée 15 blocs en avant
         Vector dir = startLoc.getDirection();
+        Vector dashDir = dir.clone();
+        // Clamper la direction vers le bas pour ne pas s'écraser dans le sol si on regarde un mob en face/en bas
+        if (dashDir.getY() < -0.1) {
+            dashDir.setY(-0.1);
+        }
+        dashDir.normalize();
+
         Location targetLoc = startLoc.clone();
 
         for (double d = 1.0; d <= 15.0; d += 0.5) {
-            Location test = startLoc.clone().add(dir.clone().multiply(d));
+            Location test = startLoc.clone().add(dashDir.clone().multiply(d));
+            // Si le sol monte ou est solide, tenter de s'adapter en montant de 1 bloc
+            if (!test.getBlock().isPassable()) {
+                test.add(0, 1, 0);
+            }
             Block feetBlock = test.getBlock();
             Block headBlock = test.clone().add(0, 1, 0).getBlock();
             if (!feetBlock.isPassable() || !headBlock.isPassable()) {
@@ -1310,6 +1323,8 @@ public class ClassListener implements Listener {
         targetLoc.setYaw(startLoc.getYaw());
         targetLoc.setPitch(startLoc.getPitch());
 
+        // Désactiver les collisions physiques avec les mobs pour traverser sans être bloqué
+        player.setCollidable(false);
         player.teleport(targetLoc);
 
         // Dégâts et traînée tranchante aux ennemis traversés par le Dash
@@ -1327,7 +1342,7 @@ public class ClassListener implements Listener {
                 world.spawnParticle(Particle.SQUID_INK, current.clone().add(0, 0.9, 0), 3, 0.15, 0.15, 0.15, 0.02);
                 world.spawnParticle(Particle.LARGE_SMOKE, current.clone().add(0, 0.6, 0), 2, 0.1, 0.1, 0.1, 0.02);
 
-                for (Entity ent : world.getNearbyEntities(current.clone().add(0, 0.9, 0), 1.25, 1.25, 1.25)) {
+                for (Entity ent : world.getNearbyEntities(current.clone().add(0, 0.9, 0), 1.35, 1.35, 1.35)) {
                     if (ent instanceof LivingEntity target && !target.equals(player) && !target.isDead() && target.isValid()) {
                         if (!necroMinions.contains(target.getUniqueId()) && hitTargets.add(target.getUniqueId())) {
                             // Dégâts tranchants de l'ombre
@@ -1351,7 +1366,7 @@ public class ClassListener implements Listener {
         world.playSound(targetLoc, Sound.ENTITY_PHANTOM_FLAP, 1.2f, 1.6f);
         world.playSound(targetLoc, Sound.ITEM_CHORUS_FRUIT_TELEPORT, 1.0f, 1.5f);
 
-        // Invisibilité totale (armure masquée comme le Diable) pendant 1 seconde (20 ticks)
+        // Invisibilité totale (armure masquée comme le Diable) pendant 3 secondes (60 ticks)
         ItemStack[] prevArmor = assassinStoredArmor.remove(uuid);
         if (prevArmor != null) {
             player.getInventory().setArmorContents(prevArmor);
@@ -1365,13 +1380,14 @@ public class ClassListener implements Listener {
         assassinStoredArmor.put(uuid, savedArmor);
         player.getInventory().setArmorContents(new ItemStack[4]);
 
-        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 25, 0, false, false, false));
-        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 45, 1, false, false, true));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 65, 0, false, false, false));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 70, 1, false, false, true));
 
-        // Rétablissement de l'armure et fin de l'invisibilité après 1 seconde (20 ticks)
+        // Rétablissement de l'armure, des collisions et fin de l'invisibilité après 3 secondes (60 ticks)
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             ItemStack[] saved = assassinStoredArmor.remove(uuid);
             if (player.isOnline()) {
+                player.setCollidable(true);
                 if (saved != null) {
                     player.getInventory().setArmorContents(saved);
                 }
@@ -1384,13 +1400,13 @@ public class ClassListener implements Listener {
                     w.playSound(exitLoc, Sound.ENTITY_ILLUSIONER_MIRROR_MOVE, 0.8f, 1.5f);
                 }
             }
-        }, 20L);
+        }, 60L);
 
         assassinBackstabBuff.put(uuid, System.currentTimeMillis() + 10_000L);
 
         String sliceMsg = hitTargets.isEmpty() ? "" : " (" + hitTargets.size() + " ennemis tranchés !)";
-        player.sendActionBar(Component.text("✦ PAS DE L'OMBRE ! Invisible 1s" + sliceMsg + " - Prochain coup dos x2 ! ✦", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
-        player.sendMessage(Component.text("✦ Pas de l'Ombre : Vous traversez les ombres (invisible 1s avec armure masquée) ! Ennemis tranchés : " + hitTargets.size() + ". Prochain coup dans le dos doublé !", NamedTextColor.LIGHT_PURPLE));
+        player.sendActionBar(Component.text("✦ PAS DE L'OMBRE ! Invisible 3s" + sliceMsg + " - Prochain coup dos x2 ! ✦", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
+        player.sendMessage(Component.text("✦ Pas de l'Ombre : Vous traversez les ombres et les ennemis (invisible 3s avec collision désactivée) ! Ennemis tranchés : " + hitTargets.size() + ". Prochain coup dans le dos doublé !", NamedTextColor.LIGHT_PURPLE));
     }
 
     // 2. GUERRIER : Choc Tellurique (Frappe au sol en cône, projette puis étourdit 3s)
