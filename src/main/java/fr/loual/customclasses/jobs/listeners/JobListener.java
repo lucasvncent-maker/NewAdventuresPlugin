@@ -38,6 +38,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -1163,11 +1164,13 @@ public class JobListener implements Listener {
 
     private void handleAventurierFirework(Player player) {
         if (player.isGliding()) {
-            Firework fw = player.getWorld().spawn(player.getLocation(), Firework.class);
-            FireworkMeta fwm = fw.getFireworkMeta();
-            fwm.setPower(2);
-            fw.setFireworkMeta(fwm);
-            player.boostElytra(fw);
+            ItemStack fwItem = new ItemStack(Material.FIREWORK_ROCKET);
+            FireworkMeta fwm = (FireworkMeta) fwItem.getItemMeta();
+            if (fwm != null) {
+                fwm.setPower(2);
+                fwItem.setItemMeta(fwm);
+            }
+            player.boostElytra(fwItem);
             player.getWorld().playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 1.0f, 1.2f);
         } else {
             Firework fw = player.getWorld().spawn(player.getLocation().add(0, 1, 0), Firework.class);
@@ -1267,7 +1270,7 @@ public class JobListener implements Listener {
         int cupriteChance = level >= 1 ? 70 : 35;
         if (rnd.nextInt(100) < cupriteChance) {
             int amount = (level >= 1 ? 2 : 1) + rnd.nextInt(2);
-            inv.addItem(Cuprite.getCuprite(amount));
+            inv.addItem(Cuprite.create(plugin, amount));
         }
 
         // 3. Épée en or Sharpness 7 Looting 4 (40% niveau 0, 70% niveau 1+)
@@ -1336,17 +1339,17 @@ public class JobListener implements Listener {
             int level = jobManager.getJobLevel(player, PlayerJob.AVENTURIER);
             if (level == 1) {
                 org.bukkit.block.Biome b = player.getLocation().getBlock().getBiome();
-                String name = b.name().toUpperCase();
-                if (name.contains("WASTES") || name.contains("CRIMSON") || name.contains("WARPED") || name.contains("VALLEY") || name.contains("DELTAS")) {
-                    String displayName = switch (b) {
-                        case NETHER_WASTES -> "Nether Wastes";
-                        case CRIMSON_FOREST -> "Crimson Forest";
-                        case WARPED_FOREST -> "Warped Forest";
-                        case SOUL_SAND_VALLEY -> "Soul Sand Valley";
-                        case BASALT_DELTAS -> "Basalt Deltas";
-                        default -> b.name();
+                String key = b.getKey().value().toLowerCase();
+                if (key.contains("wastes") || key.contains("crimson") || key.contains("warped") || key.contains("valley") || key.contains("deltas")) {
+                    String displayName = switch (key) {
+                        case "nether_wastes" -> "Nether Wastes";
+                        case "crimson_forest" -> "Crimson Forest";
+                        case "warped_forest" -> "Warped Forest";
+                        case "soul_sand_valley" -> "Soul Sand Valley";
+                        case "basalt_deltas" -> "Basalt Deltas";
+                        default -> key;
                     };
-                    jobManager.addDiscoveredBiome(player, b.name(), displayName);
+                    jobManager.addDiscoveredBiome(player, key, displayName);
                 }
             }
         }
