@@ -31,6 +31,11 @@ public class CustomJobItems {
     public static final String ID_ARCHITECT_BOOTS = "architect_boots";
     public static final String ID_ARCHITECT_FEATHER = "architect_feather";
 
+    public static final String ID_AVENTURIER_GOLDEN_SWORD = "aventurier_golden_sword";
+    public static final String ID_AVENTURIER_INFINITE_PEARL = "aventurier_infinite_pearl";
+    public static final String ID_AVENTURIER_UNBREAKABLE_ELYTRA = "aventurier_unbreakable_elytra";
+    public static final String ID_AVENTURIER_INFINITE_FIREWORK = "aventurier_infinite_firework";
+
     public static final Color ARCHITECT_COLOR = Color.fromRGB(235, 180, 50);
 
     public static ItemStack getFarmerSoup() {
@@ -222,6 +227,101 @@ public class CustomJobItems {
         return item;
     }
 
+    public static ItemStack getAventurierGoldenSword() {
+        ItemStack item = new ItemStack(Material.GOLDEN_SWORD);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text("✦ Épée Dorée de l'Aventurier ✦", NamedTextColor.GOLD, TextDecoration.BOLD));
+            meta.lore(List.of(
+                    Component.text("Trésor ancestral déniché dans une structure antique.", NamedTextColor.GRAY),
+                    Component.empty(),
+                    Component.text("✦ Tranchant VII (Sharpness VII)", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                    Component.text("✦ Butin IV (Looting IV)", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                    Component.text("✦ Solidité V & Raccommodage", NamedTextColor.AQUA),
+                    Component.empty(),
+                    Component.text("✦ Butin Exclusif de l'Aventurier ✦", NamedTextColor.GOLD)
+            ));
+            meta.addEnchant(Enchantment.SHARPNESS, 7, true);
+            meta.addEnchant(Enchantment.LOOTING, 4, true);
+            meta.addEnchant(Enchantment.UNBREAKING, 5, true);
+            meta.addEnchant(Enchantment.MENDING, 1, true);
+            meta.getPersistentDataContainer().set(ITEM_KEY, PersistentDataType.STRING, ID_AVENTURIER_GOLDEN_SWORD);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    public static ItemStack getAventurierInfinitePearl() {
+        ItemStack item = new ItemStack(Material.ENDER_PEARL);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text("✦ Perle Infinie de l'Aventurier ✦", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
+            meta.lore(List.of(
+                    Component.text("Une perle magique imprégnée par l'exploration des 5 biomes du Nether.", NamedTextColor.GRAY),
+                    Component.empty(),
+                    Component.text("✔ Ne s'épuise JAMAIS (Utilisations infinies) !", NamedTextColor.GREEN, TextDecoration.BOLD),
+                    Component.text("✔ AUCUN dégât de chute à l'atterrissage !", NamedTextColor.GREEN, TextDecoration.BOLD),
+                    Component.text("✦ Temps de recharge léger : 1.5s", NamedTextColor.YELLOW),
+                    Component.empty(),
+                    Component.text("✦ Récompense Mission 2 de l'Aventurier ✦", NamedTextColor.DARK_PURPLE)
+            ));
+            meta.setEnchantmentGlintOverride(true);
+            meta.getPersistentDataContainer().set(ITEM_KEY, PersistentDataType.STRING, ID_AVENTURIER_INFINITE_PEARL);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    public static ItemStack getAventurierUnbreakableElytra() {
+        ItemStack item = new ItemStack(Material.ELYTRA);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text("✦ Élytres Incassables de l'Aventurier ✦", NamedTextColor.AQUA, TextDecoration.BOLD));
+            meta.lore(List.of(
+                    Component.text("Ailes légendaires forgées par le souffle des explorateurs des cieux.", NamedTextColor.GRAY),
+                    Component.empty(),
+                    Component.text("✔ INCASSABLE (Durabilité infinie) !", NamedTextColor.GREEN, TextDecoration.BOLD),
+                    Component.text("✦ Protection V & Raccommodage", NamedTextColor.YELLOW),
+                    Component.empty(),
+                    Component.text("✦ Récompense Suprême Mission 3 de l'Aventurier ✦", NamedTextColor.GOLD)
+            ));
+            meta.setUnbreakable(true);
+            meta.addEnchant(Enchantment.PROTECTION, 5, true);
+            meta.addEnchant(Enchantment.UNBREAKING, 10, true);
+            meta.addEnchant(Enchantment.MENDING, 1, true);
+            meta.getPersistentDataContainer().set(ITEM_KEY, PersistentDataType.STRING, ID_AVENTURIER_UNBREAKABLE_ELYTRA);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    public static ItemStack getAventurierInfiniteFirework() {
+        ItemStack item = new ItemStack(Material.FIREWORK_ROCKET);
+        org.bukkit.inventory.meta.FireworkMeta meta = (org.bukkit.inventory.meta.FireworkMeta) item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text("✦ Fusée Infinie de l'Aventurier ✦", NamedTextColor.GOLD, TextDecoration.BOLD));
+            meta.lore(List.of(
+                    Component.text("Une fusée pyrotechnique magique alimentée par la flamme des pionniers.", NamedTextColor.GRAY),
+                    Component.empty(),
+                    Component.text("✔ Ne s'épuise JAMAIS (Propulsion infinie) !", NamedTextColor.GREEN, TextDecoration.BOLD),
+                    Component.text("✦ Utilisez en vol avec vos Élytres pour vous propulser !", NamedTextColor.YELLOW),
+                    Component.empty(),
+                    Component.text("✦ Récompense Suprême Mission 3 de l'Aventurier ✦", NamedTextColor.GOLD)
+            ));
+            meta.setPower(2);
+            meta.addEffect(org.bukkit.FireworkEffect.builder()
+                    .with(org.bukkit.FireworkEffect.Type.BALL)
+                    .withColor(Color.YELLOW, Color.ORANGE, Color.AQUA)
+                    .withFade(Color.WHITE)
+                    .trail(true)
+                    .build());
+            meta.setEnchantmentGlintOverride(true);
+            meta.getPersistentDataContainer().set(ITEM_KEY, PersistentDataType.STRING, ID_AVENTURIER_INFINITE_FIREWORK);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
     public static boolean hasFullArchitectSet(Player player) {
         if (player == null) return false;
         var inv = player.getInventory();
@@ -253,6 +353,10 @@ public class CustomJobItems {
             case ID_ARCHITECT_LEGGINGS -> getArchitectLeggings();
             case ID_ARCHITECT_BOOTS -> getArchitectBoots();
             case ID_ARCHITECT_FEATHER -> getArchitectFeather();
+            case ID_AVENTURIER_GOLDEN_SWORD -> getAventurierGoldenSword();
+            case ID_AVENTURIER_INFINITE_PEARL -> getAventurierInfinitePearl();
+            case ID_AVENTURIER_UNBREAKABLE_ELYTRA -> getAventurierUnbreakableElytra();
+            case ID_AVENTURIER_INFINITE_FIREWORK -> getAventurierInfiniteFirework();
             default -> null;
         };
     }

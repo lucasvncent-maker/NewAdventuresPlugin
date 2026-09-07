@@ -54,6 +54,20 @@ public enum PlayerJob {
             Component.text("  • M3 : Chemise de l'Architecte (Célérité II)", NamedTextColor.DARK_AQUA),
             Component.text("  • M4 : Pantalon de l'Architecte (Vision Nocturne activable avec /nv)", NamedTextColor.DARK_AQUA),
             Component.text("  • M5 : Chaussures de l'Architecte (Saut II avec /jb) + Plume de l'Architecte (Vol 30s)", NamedTextColor.DARK_AQUA)
+    ),
+
+    AVENTURIER("Aventurier", "aventurier", Material.COMPASS, List.of(
+            Component.text("L'Explorateur Légendaire", NamedTextColor.GOLD, TextDecoration.ITALIC),
+            Component.text("Voyageur intrépide arpentant les contrées à la recherche de trésors oubliés.", NamedTextColor.GRAY),
+            Component.empty(),
+            Component.text("✦ Passif :", NamedTextColor.GOLD, TextDecoration.BOLD),
+            Component.text("  • Vitesse I permanente pour parcourir le monde sans faiblir.", NamedTextColor.YELLOW),
+            Component.text("  • Coffres de structures enrichis : minerais précieux, cuprite, épée en or Sharpness VII Looting IV !", NamedTextColor.YELLOW),
+            Component.empty(),
+            Component.text("✦ Progression (3 Missions) :", NamedTextColor.AQUA, TextDecoration.BOLD),
+            Component.text("  • M1 : Explorer 5 structures Overworld ➔ Meilleurs loots + /sethome & /home", NamedTextColor.DARK_AQUA),
+            Component.text("  • M2 : Explorer les 5 biomes du Nether ➔ Perle infinie sans dégât de chute", NamedTextColor.DARK_AQUA),
+            Component.text("  • M3 : 3 Pommes Cheat, 3 Élytres, 8 Éponges ➔ Élytres Incassables & Feu d'artifice infini", NamedTextColor.DARK_AQUA)
     ));
 
     private final String displayName;

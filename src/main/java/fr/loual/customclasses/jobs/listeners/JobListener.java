@@ -46,6 +46,14 @@ import org.bukkit.potion.PotionEffectType;
 
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.generator.structure.GeneratedStructure;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.entity.EnderPearl;
+import org.bukkit.entity.Firework;
+import org.bukkit.inventory.meta.FireworkMeta;
+import org.bukkit.block.Container;
+import org.bukkit.loot.Lootable;
 import fr.loual.customminerals.items.Cuprite;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -66,9 +74,17 @@ public class JobListener implements Listener {
     private final Map<UUID, BukkitTask> activeFlightTasks = new HashMap<>();
     private final Set<UUID> fallImmunity = new HashSet<>();
 
+    // Aventurier
+    private final Map<UUID, Long> pearlCooldowns = new HashMap<>();
+    private final Set<UUID> aventurierPearlImmunity = new HashSet<>();
+    private final NamespacedKey chestBoostKey;
+    private final NamespacedKey noFallPearlKey;
+
     public JobListener(NewAdventurePlugin plugin) {
         this.plugin = plugin;
         this.jobManager = plugin.getJobManager();
+        this.chestBoostKey = new NamespacedKey(plugin, "aventurier_boosted_chest");
+        this.noFallPearlKey = new NamespacedKey(plugin, "no_fall_pearl");
     }
 
     @EventHandler
@@ -114,6 +130,8 @@ public class JobListener implements Listener {
             ft.cancel();
         }
         fallImmunity.remove(player.getUniqueId());
+        pearlCooldowns.remove(player.getUniqueId());
+        aventurierPearlImmunity.remove(player.getUniqueId());
     }
 
     // ==========================================================
@@ -263,6 +281,21 @@ public class JobListener implements Listener {
                     }
                     case 5 -> {
                         player.sendMessage(Component.text("✦ Mission 5 Architecte : 64 Sea Lantern, 64 Calcite, 64 Blocs Quartz, 64 End Rod, 64 Grélampe pour les Chaussures et la Plume de l'Architecte !", NamedTextColor.YELLOW));
+                        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.2f);
+                    }
+                }
+            } else if (pj == PlayerJob.AVENTURIER) {
+                switch (missionNum) {
+                    case 1 -> {
+                        player.sendMessage(Component.text("✦ Mission 1 Aventurier : Explorez 5 structures différentes de l'Overworld pour débloquer de meilleurs coffres et /sethome !", NamedTextColor.YELLOW));
+                        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.2f);
+                    }
+                    case 2 -> {
+                        player.sendMessage(Component.text("✦ Mission 2 Aventurier : Explorez les 5 biomes du Nether pour débloquer la Perle Infinie sans dégât de chute !", NamedTextColor.YELLOW));
+                        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.2f);
+                    }
+                    case 3 -> {
+                        player.sendMessage(Component.text("✦ Mission 3 Aventurier : Obtenez 3 pommes cheat, 3 élytres et 8 éponges pour débloquer les Élytres Incassables et le Feu d'artifice infini !", NamedTextColor.YELLOW));
                         player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.2f);
                     }
                 }
@@ -856,6 +889,20 @@ public class JobListener implements Listener {
             handleArchitectFeather(player);
             return;
         }
+
+        // 5. Perle Infinie de l'Aventurier (quantité infinie, aucun dégât de chute)
+        if (CustomJobItems.isJobItem(item, CustomJobItems.ID_AVENTURIER_INFINITE_PEARL)) {
+            event.setCancelled(true);
+            handleAventurierPearl(player);
+            return;
+        }
+
+        // 6. Fusée Infinie de l'Aventurier (propulsion infinie sans s'épuiser)
+        if (CustomJobItems.isJobItem(item, CustomJobItems.ID_AVENTURIER_INFINITE_FIREWORK)) {
+            event.setCancelled(true);
+            handleAventurierFirework(player);
+            return;
+        }
     }
 
     private void consumeFarmerSoup(Player player, ItemStack item) {
@@ -1099,13 +1146,261 @@ public class JobListener implements Listener {
         player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation().clone().add(0, 1, 0), 20, 0.4, 0.5, 0.4, 0.05);
     }
 
+    private void handleAventurierPearl(Player player) {
+        UUID uuid = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        Long last = pearlCooldowns.get(uuid);
+        if (last != null && now - last < 1500L) {
+            return;
+        }
+        pearlCooldowns.put(uuid, now);
+
+        EnderPearl pearl = player.launchProjectile(EnderPearl.class);
+        pearl.getPersistentDataContainer().set(noFallPearlKey, PersistentDataType.BYTE, (byte) 1);
+        player.playSound(player.getLocation(), Sound.ENTITY_ENDER_PEARL_THROW, 1.0f, 1.2f);
+        player.setCooldown(Material.ENDER_PEARL, 30);
+    }
+
+    private void handleAventurierFirework(Player player) {
+        if (player.isGliding()) {
+            Firework fw = player.getWorld().spawn(player.getLocation(), Firework.class);
+            FireworkMeta fwm = fw.getFireworkMeta();
+            fwm.setPower(2);
+            fw.setFireworkMeta(fwm);
+            player.boostElytra(fw);
+            player.getWorld().playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 1.0f, 1.2f);
+        } else {
+            Firework fw = player.getWorld().spawn(player.getLocation().add(0, 1, 0), Firework.class);
+            FireworkMeta fwm = fw.getFireworkMeta();
+            fwm.setPower(1);
+            fw.setFireworkMeta(fwm);
+            player.getWorld().playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 1.0f, 1.0f);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPearlTeleport(PlayerTeleportEvent event) {
+        if (event.getCause() == PlayerTeleportEvent.TeleportCause.ENDER_PEARL) {
+            Player player = event.getPlayer();
+            Long lastPearl = pearlCooldowns.get(player.getUniqueId());
+            if (lastPearl != null && System.currentTimeMillis() - lastPearl < 10_000L) {
+                aventurierPearlImmunity.add(player.getUniqueId());
+                player.getWorld().spawnParticle(Particle.PORTAL, event.getTo(), 25, 0.4, 0.5, 0.4, 0.1);
+            }
+        }
+    }
+
+    // ==========================================================
+    // 6. AVENTURIER : COFFRES DE STRUCTURES & EXPLORATION
+    // ==========================================================
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onAventurierChestInteract(PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        Block block = event.getClickedBlock();
+        if (block == null) return;
+        Material type = block.getType();
+        if (type != Material.CHEST && type != Material.TRAPPED_CHEST && type != Material.BARREL) return;
+
+        Player player = event.getPlayer();
+        if (jobManager.getPlayerJob(player) != PlayerJob.AVENTURIER) return;
+
+        if (!(block.getState() instanceof Container container)) return;
+
+        if (container.getPersistentDataContainer().has(chestBoostKey)) return;
+
+        // Vérifier si le coffre est dans une structure ou a une LootTable
+        boolean inStructure = false;
+        if (container instanceof Lootable lootable && lootable.hasLootTable()) {
+            inStructure = true;
+        } else {
+            try {
+                for (GeneratedStructure struct : block.getChunk().getStructures()) {
+                    if (struct != null && struct.getBoundingBox().contains(block.getX(), block.getY(), block.getZ())) {
+                        inStructure = true;
+                        break;
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        if (!inStructure) return;
+
+        container.getPersistentDataContainer().set(chestBoostKey, PersistentDataType.BYTE, (byte) 1);
+        container.update();
+
+        int level = jobManager.getJobLevel(player, PlayerJob.AVENTURIER);
+
+        // Laisser 1 tick pour que Bukkit résolve la LootTable éventuelle lors de l'ouverture
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (!container.isPlaced()) return;
+            Inventory inv = container.getInventory();
+            populateAventurierChestLoot(inv, level);
+
+            Location loc = block.getLocation().add(0.5, 1.0, 0.5);
+            loc.getWorld().spawnParticle(Particle.TOTEM_OF_UNDYING, loc, 25, 0.4, 0.4, 0.4, 0.1);
+            loc.getWorld().spawnParticle(Particle.WAX_ON, loc, 15, 0.3, 0.3, 0.3, 0.05);
+            loc.getWorld().playSound(loc, Sound.BLOCK_AMETHYST_BLOCK_CHIME, 1.0f, 1.4f);
+            loc.getWorld().playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.6f);
+
+            player.sendActionBar(Component.text("✦ Coffre de structure : Butin rare d'Aventurier découvert ! ✦", NamedTextColor.GOLD, TextDecoration.BOLD));
+        }, 1L);
+    }
+
+    private void populateAventurierChestLoot(Inventory inv, int level) {
+        java.util.Random rnd = new java.util.Random();
+
+        // 1. Minerais précieux
+        int diamondCount = 2 + rnd.nextInt(4); // 2-5 diamants
+        inv.addItem(new ItemStack(Material.DIAMOND, diamondCount));
+
+        int goldCount = 4 + rnd.nextInt(7); // 4-10 lingots d'or
+        inv.addItem(new ItemStack(Material.GOLD_INGOT, goldCount));
+
+        int ironCount = 5 + rnd.nextInt(9); // 5-13 fers
+        inv.addItem(new ItemStack(Material.IRON_INGOT, ironCount));
+
+        if (rnd.nextBoolean()) {
+            inv.addItem(new ItemStack(Material.EMERALD, 3 + rnd.nextInt(6)));
+        }
+
+        // 2. Cuprite (35% niveau 0, 70% niveau 1+)
+        int cupriteChance = level >= 1 ? 70 : 35;
+        if (rnd.nextInt(100) < cupriteChance) {
+            int amount = (level >= 1 ? 2 : 1) + rnd.nextInt(2);
+            inv.addItem(Cuprite.getCuprite(amount));
+        }
+
+        // 3. Épée en or Sharpness 7 Looting 4 (40% niveau 0, 70% niveau 1+)
+        int swordChance = level >= 1 ? 70 : 40;
+        if (rnd.nextInt(100) < swordChance) {
+            inv.addItem(CustomJobItems.getAventurierGoldenSword());
+        }
+
+        // 4. Pomme cheat (Pomme dorée enchantée)
+        int appleChance = level >= 1 ? 40 : 20;
+        if (rnd.nextInt(100) < appleChance) {
+            inv.addItem(new ItemStack(Material.ENCHANTED_GOLDEN_APPLE, 1));
+        }
+
+        // 5. Totem d'immortalité
+        int totemChance = level >= 1 ? 35 : 15;
+        if (rnd.nextInt(100) < totemChance) {
+            inv.addItem(new ItemStack(Material.TOTEM_OF_UNDYING, 1));
+        }
+
+        // 6. Butins suprêmes débloqués avec Mission 1 (Meilleurs Loots)
+        if (level >= 1) {
+            if (rnd.nextInt(100) < 30) {
+                inv.addItem(new ItemStack(Material.NETHERITE_INGOT, 1));
+            }
+            if (rnd.nextInt(100) < 25) {
+                inv.addItem(new ItemStack(Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE, 1));
+            }
+        }
+    }
+
+    // ==========================================================
+    // 7. EXPLORATION DES STRUCTURES (Overworld) & BIOMES (Nether)
+    // ==========================================================
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerMove(PlayerMoveEvent event) {
+        if (event.getFrom().getBlockX() == event.getTo().getBlockX()
+                && event.getFrom().getBlockY() == event.getTo().getBlockY()
+                && event.getFrom().getBlockZ() == event.getTo().getBlockZ()) {
+            return;
+        }
+
+        Player player = event.getPlayer();
+        if (jobManager.getPlayerJob(player) != PlayerJob.AVENTURIER) return;
+
+        World world = player.getWorld();
+
+        // Overworld (Mission 1 : 5 structures différentes)
+        if (world.getEnvironment() == World.Environment.NORMAL) {
+            int level = jobManager.getJobLevel(player, PlayerJob.AVENTURIER);
+            if (level == 0) {
+                try {
+                    for (GeneratedStructure genStructure : player.getLocation().getChunk().getStructures()) {
+                        if (genStructure == null || genStructure.getStructure() == null) continue;
+                        if (genStructure.getBoundingBox().contains(player.getLocation().toVector())) {
+                            String rawKey = genStructure.getStructure().key().value().toLowerCase();
+                            String typeId = normalizeStructureKey(rawKey);
+                            String displayName = getStructureDisplayName(typeId);
+                            jobManager.addDiscoveredStructure(player, typeId, displayName);
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+        } else if (world.getEnvironment() == World.Environment.NETHER) {
+            // Nether (Mission 2 : Explorer tous les biomes du Nether)
+            int level = jobManager.getJobLevel(player, PlayerJob.AVENTURIER);
+            if (level == 1) {
+                org.bukkit.block.Biome b = player.getLocation().getBlock().getBiome();
+                String name = b.name().toUpperCase();
+                if (name.contains("WASTES") || name.contains("CRIMSON") || name.contains("WARPED") || name.contains("VALLEY") || name.contains("DELTAS")) {
+                    String displayName = switch (b) {
+                        case NETHER_WASTES -> "Nether Wastes";
+                        case CRIMSON_FOREST -> "Crimson Forest";
+                        case WARPED_FOREST -> "Warped Forest";
+                        case SOUL_SAND_VALLEY -> "Soul Sand Valley";
+                        case BASALT_DELTAS -> "Basalt Deltas";
+                        default -> b.name();
+                    };
+                    jobManager.addDiscoveredBiome(player, b.name(), displayName);
+                }
+            }
+        }
+    }
+
+    private String normalizeStructureKey(String key) {
+        if (key.contains("village")) return "village";
+        if (key.contains("mineshaft")) return "mineshaft";
+        if (key.contains("pyramid") || key.contains("desert")) return "desert_pyramid";
+        if (key.contains("jungle")) return "jungle_temple";
+        if (key.contains("shipwreck")) return "shipwreck";
+        if (key.contains("ocean_ruin")) return "ocean_ruin";
+        if (key.contains("monument")) return "monument";
+        if (key.contains("outpost")) return "pillager_outpost";
+        if (key.contains("mansion")) return "woodland_mansion";
+        if (key.contains("stronghold")) return "stronghold";
+        if (key.contains("ancient_city")) return "ancient_city";
+        if (key.contains("swamp_hut")) return "swamp_hut";
+        if (key.contains("igloo")) return "igloo";
+        if (key.contains("trail_ruins")) return "trail_ruins";
+        if (key.contains("trial_chambers")) return "trial_chambers";
+        if (key.contains("buried_treasure")) return "buried_treasure";
+        return key;
+    }
+
+    private String getStructureDisplayName(String key) {
+        return switch (key) {
+            case "village" -> "Village";
+            case "mineshaft" -> "Mineshaft Abandonné";
+            case "desert_pyramid" -> "Pyramide du Désert";
+            case "jungle_temple" -> "Temple de la Jungle";
+            case "shipwreck" -> "Épave de Navire";
+            case "ocean_ruin" -> "Ruines Océaniques";
+            case "monument" -> "Monument Sous-marin";
+            case "pillager_outpost" -> "Avant-poste de Pillards";
+            case "woodland_mansion" -> "Manoir des Bois";
+            case "stronghold" -> "Forteresse (Stronghold)";
+            case "ancient_city" -> "Cité Antique (Ancient City)";
+            case "swamp_hut" -> "Hutte de Sorcière";
+            case "igloo" -> "Igloo";
+            case "trail_ruins" -> "Ruines du Sentier (Trail Ruins)";
+            case "trial_chambers" -> "Chambres des Épreuves (Trial Chambers)";
+            case "buried_treasure" -> "Trésor Enfoui";
+            default -> "Structure Mystérieuse";
+        };
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onEntityDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player player && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
-            if (fallImmunity.contains(player.getUniqueId())) {
+            if (fallImmunity.contains(player.getUniqueId()) || aventurierPearlImmunity.remove(player.getUniqueId())) {
                 event.setCancelled(true);
-                player.getWorld().spawnParticle(Particle.POOF, player.getLocation(), 15, 0.3, 0.2, 0.3, 0.05);
-                player.playSound(player.getLocation(), Sound.BLOCK_WOOL_FALL, 0.8f, 1.2f);
+                player.getWorld().spawnParticle(Particle.PORTAL, player.getLocation(), 20, 0.3, 0.2, 0.3, 0.05);
+                player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 0.8f, 1.4f);
             }
         }
     }
@@ -1163,6 +1458,16 @@ public class JobListener implements Listener {
                 player.sendMessage(
                         Component.text("[Architecte] ", NamedTextColor.GOLD, TextDecoration.BOLD)
                                 .append(Component.text("Vous devez équiper les Chaussures de l'Architecte pour utiliser /" + parts[0] + " !", NamedTextColor.RED))
+                );
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+            }
+        } else if (cmd.equals("sethome") || cmd.equals("set_home") || cmd.equals("sh") || cmd.equals("home") || cmd.equals("h")) {
+            boolean isAventurier = jobManager.getPlayerJob(player) == PlayerJob.AVENTURIER && jobManager.getJobLevel(player, PlayerJob.AVENTURIER) >= 1;
+            if (!isAventurier && !player.isOp()) {
+                event.setCancelled(true);
+                player.sendMessage(
+                        Component.text("[Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                                .append(Component.text("Vous devez être Aventurier de niveau 1 minimum pour utiliser /" + parts[0] + " !", NamedTextColor.RED))
                 );
                 player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
             }

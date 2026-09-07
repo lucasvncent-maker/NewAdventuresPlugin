@@ -2,6 +2,7 @@ package fr.loual.customclasses.jobs.gui;
 
 import fr.loual.customclasses.jobs.AgriculteurMissions;
 import fr.loual.customclasses.jobs.ArchitecteMissions;
+import fr.loual.customclasses.jobs.AventurierMissions;
 import fr.loual.customclasses.jobs.JobManager;
 import fr.loual.customclasses.jobs.JobMission;
 import fr.loual.customclasses.jobs.MineurMissions;
@@ -53,15 +54,18 @@ public class JobSelectionGui {
         JobManager jobManager = plugin.getJobManager();
         PlayerJob currentJob = jobManager.getPlayerJob(player);
 
-        // 1. Icônes des métiers (Slot 11 : Agriculteur, Slot 13 : Mineur, Slot 15 : Architecte)
+        // 1. Icônes des métiers (Slot 10 : Agriculteur, Slot 12 : Mineur, Slot 14 : Architecte, Slot 16 : Aventurier)
         ItemStack agriIcon = createJobIcon(player, PlayerJob.AGRICULTEUR, currentJob, jobManager);
-        inv.setItem(11, agriIcon);
+        inv.setItem(10, agriIcon);
 
         ItemStack mineurIcon = createJobIcon(player, PlayerJob.MINEUR, currentJob, jobManager);
-        inv.setItem(13, mineurIcon);
+        inv.setItem(12, mineurIcon);
 
         ItemStack archIcon = createJobIcon(player, PlayerJob.ARCHITECTE, currentJob, jobManager);
-        inv.setItem(15, archIcon);
+        inv.setItem(14, archIcon);
+
+        ItemStack aventurierIcon = createJobIcon(player, PlayerJob.AVENTURIER, currentJob, jobManager);
+        inv.setItem(16, aventurierIcon);
 
         // 2. Affichage des missions selon le métier actif
         if (currentJob == PlayerJob.AGRICULTEUR) {
@@ -149,6 +153,33 @@ public class JobSelectionGui {
                 archInfo.setItemMeta(infoMeta);
             }
             inv.setItem(31, archInfo);
+
+        } else if (currentJob == PlayerJob.AVENTURIER) {
+            int completedLevel = jobManager.getJobLevel(player, PlayerJob.AVENTURIER);
+
+            int[] missionSlots = { 20, 22, 24 };
+            for (int i = 0; i < 3; i++) {
+                JobMission mission = AventurierMissions.getMission(i + 1);
+                if (mission != null) {
+                    ItemStack missionItem = createMissionItem(player, jobManager, PlayerJob.AVENTURIER, mission, completedLevel);
+                    inv.setItem(missionSlots[i], missionItem);
+                }
+            }
+
+            // Guide de l'Aventurier au slot 31
+            ItemStack advInfo = new ItemStack(Material.BOOK);
+            ItemMeta infoMeta = advInfo.getItemMeta();
+            if (infoMeta != null) {
+                infoMeta.displayName(Component.text("✦ Guide de l'Aventurier ✦", NamedTextColor.GOLD, TextDecoration.BOLD));
+                infoMeta.lore(List.of(
+                        Component.text("Passif : Vitesse I permanente + Trésors rares dans les coffres de structures", NamedTextColor.YELLOW),
+                        Component.text("M1 : 5 structures Overworld ➔ Meilleurs butins + /sethome & /home", NamedTextColor.GRAY),
+                        Component.text("M2 : 5 biomes du Nether ➔ Perle Infinie (infinie & sans dégât de chute)", NamedTextColor.GRAY),
+                        Component.text("M3 : 3 Pommes Cheat, 3 Élytres, 8 Éponges ➔ Élytres Incassables + Fusée Infinie !", NamedTextColor.GRAY)
+                ));
+                advInfo.setItemMeta(infoMeta);
+            }
+            inv.setItem(31, advInfo);
 
         } else {
             // Indication pour choisir le métier

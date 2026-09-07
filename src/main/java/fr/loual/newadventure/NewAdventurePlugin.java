@@ -6,6 +6,7 @@ import fr.loual.customclasses.jobs.JobManager;
 import fr.loual.customclasses.jobs.JobRecipes;
 import fr.loual.customclasses.jobs.commands.CraftCommand;
 import fr.loual.customclasses.jobs.commands.JobCommand;
+import fr.loual.customclasses.jobs.commands.HomeCommand;
 import fr.loual.customclasses.jobs.commands.JumpBoostCommand;
 import fr.loual.customclasses.jobs.commands.NightVisionCommand;
 import fr.loual.customclasses.jobs.commands.StonecutterCommand;
@@ -131,6 +132,19 @@ public final class NewAdventurePlugin extends JavaPlugin {
         if (cmdJb != null) {
             cmdJb.setExecutor(jbCommand);
             cmdJb.setTabCompleter(jbCommand);
+        }
+
+        // 8ter. Commandes de l'Aventurier (/sethome, /home)
+        HomeCommand homeCommand = new HomeCommand(this);
+        PluginCommand cmdSetHome = getCommand("sethome");
+        if (cmdSetHome != null) {
+            cmdSetHome.setExecutor(homeCommand);
+            cmdSetHome.setTabCompleter(homeCommand);
+        }
+        PluginCommand cmdHome = getCommand("home");
+        if (cmdHome != null) {
+            cmdHome.setExecutor(homeCommand);
+            cmdHome.setTabCompleter(homeCommand);
         }
 
         // 9. Tâche périodique pour les auras sous la couche Y=30 (Mineur M3) et l'armure de l'Architecte

@@ -74,32 +74,48 @@ public class BlackjackListener implements Listener {
         int rawSlot = event.getRawSlot();
         Inventory topInv = event.getView().getTopInventory();
 
+        // Sécurité universelle : Interdire le double-clic (COLLECT_TO_CURSOR) qui pourrait aspirer des blocs du GUI
+        if (event.getAction() == org.bukkit.event.inventory.InventoryAction.COLLECT_TO_CURSOR) {
+            event.setCancelled(true);
+            return;
+        }
+
         // 1. Clics dans l'inventaire du haut (La table de Blackjack)
         if (rawSlot < topInv.getSize()) {
-            if (game.getState() == BlackjackGame.State.BETTING) {
-                if (rawSlot == BlackjackGui.BET_SLOT) {
-                    ItemStack clicked = event.getCurrentItem();
-                    if (clicked != null && (clicked.getType() == Material.GREEN_STAINED_GLASS_PANE 
-                            || clicked.getType() == Material.BLACK_STAINED_GLASS_PANE 
-                            || clicked.getType() == Material.YELLOW_STAINED_GLASS_PANE)) {
-                        event.setCancelled(true);
-                        topInv.setItem(BlackjackGui.BET_SLOT, null);
-                        return;
-                    }
-                    // Autoriser le joueur à placer / retirer son item de mise
-                    Bukkit.getScheduler().runTask(plugin, () -> BlackjackGui.render(topInv, game));
+            // Toujours interdire les touches numériques (1-9) pour échanger des items avec la barre d'action
+            if (event.getClick() == org.bukkit.event.inventory.ClickType.NUMBER_KEY) {
+                event.setCancelled(true);
+                return;
+            }
+
+            // SEUL le slot de mise en phase BETTING est modifiable
+            if (game.getState() == BlackjackGame.State.BETTING && rawSlot == BlackjackGui.BET_SLOT) {
+                ItemStack cursor = event.getCursor();
+                if (cursor != null && isGuiMaterial(cursor.getType())) {
+                    event.setCancelled(true);
                     return;
                 }
 
-                event.setCancelled(true);
+                ItemStack clicked = event.getCurrentItem();
+                if (clicked != null && isGuiMaterial(clicked.getType())) {
+                    event.setCancelled(true);
+                    topInv.setItem(BlackjackGui.BET_SLOT, null);
+                    return;
+                }
+                // Autoriser le joueur à placer / retirer son item de mise
+                Bukkit.getScheduler().runTask(plugin, () -> BlackjackGui.render(topInv, game));
+                return;
+            }
 
+            // Tout autre clic dans l'inventaire du haut est STRICTEMENT ANNULÉ (distribution, croupier, boutons, cartes, etc.)
+            event.setCancelled(true);
+
+            if (game.getState() == BlackjackGame.State.BETTING) {
                 if (rawSlot == BlackjackGui.BUTTON_START_BET) {
                     ItemStack bet = topInv.getItem(BlackjackGui.BET_SLOT);
                     if (bet != null && !bet.getType().isAir() && bet.getAmount() > 0) {
-                        // Sécurité : Ne jamais accepter une vitre du GUI comme mise
-                        if (bet.getType() == Material.GREEN_STAINED_GLASS_PANE 
-                                || bet.getType() == Material.BLACK_STAINED_GLASS_PANE 
-                                || bet.getType() == Material.YELLOW_STAINED_GLASS_PANE) {
+                        // Sécurité : Ne jamais accepter une vitre ou un bloc du GUI comme mise
+                        if (isGuiMaterial(bet.getType())) {
                             topInv.setItem(BlackjackGui.BET_SLOT, null);
                             return;
                         }
@@ -117,8 +133,6 @@ public class BlackjackListener implements Listener {
                 }
 
             } else if (game.getState() == BlackjackGame.State.PLAYING) {
-                event.setCancelled(true);
-
                 if (rawSlot == BlackjackGui.BUTTON_HIT) {
                     game.hitAnimated(plugin, () -> {
                         if (player.getOpenInventory().getTopInventory().getHolder() instanceof BlackjackGuiHolder) {
@@ -134,8 +148,6 @@ public class BlackjackListener implements Listener {
                 }
 
             } else if (game.getState() == BlackjackGame.State.GAME_OVER) {
-                event.setCancelled(true);
-
                 if (rawSlot == BlackjackGui.BUTTON_REPLAY) {
                     game.resetToBetting();
                     topInv.setItem(BlackjackGui.BET_SLOT, null);
@@ -147,16 +159,39 @@ public class BlackjackListener implements Listener {
             }
         } else {
             // 2. Clics dans l'inventaire du joueur
-            if (game.getState() == BlackjackGame.State.BETTING) {
-                // Si shift-click depuis son inventaire, mettre à jour le bouton de mise
-                Bukkit.getScheduler().runTask(plugin, () -> BlackjackGui.render(topInv, game));
-            } else {
-                // Interdire le shift-click pour ne pas injecter d'items dans la table en cours de partie
-                if (event.isShiftClick()) {
-                    event.setCancelled(true);
+            if (event.isShiftClick()) {
+                event.setCancelled(true);
+                // Si en phase de mise et le slot de mise est vide, transférer l'item vers BET_SLOT
+                if (game.getState() == BlackjackGame.State.BETTING) {
+                    ItemStack current = event.getCurrentItem();
+                    if (current != null && !current.getType().isAir() && !isGuiMaterial(current.getType())) {
+                        ItemStack betSlotItem = topInv.getItem(BlackjackGui.BET_SLOT);
+                        if (betSlotItem == null || betSlotItem.getType().isAir() || isGuiMaterial(betSlotItem.getType())) {
+                            topInv.setItem(BlackjackGui.BET_SLOT, current.clone());
+                            event.setCurrentItem(null);
+                            Bukkit.getScheduler().runTask(plugin, () -> BlackjackGui.render(topInv, game));
+                        }
+                    }
                 }
             }
         }
+    }
+
+    private boolean isGuiMaterial(Material mat) {
+        if (mat == null) return false;
+        return mat == Material.GREEN_STAINED_GLASS_PANE
+                || mat == Material.BLACK_STAINED_GLASS_PANE
+                || mat == Material.GRAY_STAINED_GLASS_PANE
+                || mat == Material.YELLOW_STAINED_GLASS_PANE
+                || mat == Material.GRAY_CONCRETE
+                || mat == Material.LIME_CONCRETE
+                || mat == Material.RED_CONCRETE
+                || mat == Material.BARRIER
+                || mat == Material.GOLD_BLOCK
+                || mat == Material.REDSTONE_BLOCK
+                || mat == Material.EMERALD_BLOCK
+                || mat == Material.TOTEM_OF_UNDYING
+                || mat == Material.PLAYER_HEAD;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -168,7 +203,7 @@ public class BlackjackListener implements Listener {
         BlackjackGame game = holder.getGame();
         for (int slot : event.getRawSlots()) {
             if (slot < event.getView().getTopInventory().getSize()) {
-                if (game.getState() != BlackjackGame.State.BETTING || slot != BlackjackGui.BET_SLOT) {
+                if (game.getState() != BlackjackGame.State.BETTING || slot != BlackjackGui.BET_SLOT || isGuiMaterial(event.getOldCursor().getType())) {
                     event.setCancelled(true);
                     return;
                 }

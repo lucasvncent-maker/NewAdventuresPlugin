@@ -16,8 +16,12 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class JobManager {
@@ -26,6 +30,9 @@ public class JobManager {
     private final NamespacedKey jobKey;
     private final NamespacedKey nvKey;
     private final NamespacedKey jbKey;
+    private final NamespacedKey structKey;
+    private final NamespacedKey biomesKey;
+    private final NamespacedKey homeKey;
     private final Map<UUID, PlayerJob> cache = new HashMap<>();
 
     public JobManager(NewAdventurePlugin plugin) {
@@ -33,6 +40,9 @@ public class JobManager {
         this.jobKey = new NamespacedKey(plugin, "player_job");
         this.nvKey = new NamespacedKey(plugin, "mineur_nv_enabled");
         this.jbKey = new NamespacedKey(plugin, "architect_jb_enabled");
+        this.structKey = new NamespacedKey(plugin, "aventurier_structures");
+        this.biomesKey = new NamespacedKey(plugin, "aventurier_biomes");
+        this.homeKey = new NamespacedKey(plugin, "aventurier_home");
     }
 
     public PlayerJob getPlayerJob(Player player) {
@@ -66,6 +76,10 @@ public class JobManager {
         setJobLevel(player, PlayerJob.AGRICULTEUR, 0);
         setJobLevel(player, PlayerJob.MINEUR, 0);
         setJobLevel(player, PlayerJob.ARCHITECTE, 0);
+        setJobLevel(player, PlayerJob.AVENTURIER, 0);
+        player.getPersistentDataContainer().remove(structKey);
+        player.getPersistentDataContainer().remove(biomesKey);
+        player.getPersistentDataContainer().remove(homeKey);
         setNightVisionEnabled(player, false);
         setJumpBoostEnabled(player, false);
         applyJobEffects(player);
@@ -96,6 +110,8 @@ public class JobManager {
             return MineurMissions.getMission(level);
         } else if (job == PlayerJob.ARCHITECTE) {
             return ArchitecteMissions.getMission(level);
+        } else if (job == PlayerJob.AVENTURIER) {
+            return AventurierMissions.getMission(level);
         }
         return null;
     }
@@ -172,9 +188,19 @@ public class JobManager {
             player.removePotionEffect(PotionEffectType.HASTE);
         }
 
-        // 2. Vitesse (Speed II avec Chapeau de l'Architecte)
+        // 2. Vitesse (Speed II avec Chapeau de l'Architecte, Speed I permanent pour Aventurier)
+        boolean hasSpeed = false;
+        int speedAmp = 0;
         if (CustomJobItems.isJobItem(inv.getHelmet(), CustomJobItems.ID_ARCHITECT_HELMET)) {
-            player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, PotionEffect.INFINITE_DURATION, 1, false, false, true));
+            hasSpeed = true;
+            speedAmp = 1; // Vitesse II
+        } else if (job == PlayerJob.AVENTURIER) {
+            hasSpeed = true;
+            speedAmp = 0; // Vitesse I permanent
+        }
+
+        if (hasSpeed) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, PotionEffect.INFINITE_DURATION, speedAmp, false, false, true));
         } else {
             if (player.hasPotionEffect(PotionEffectType.SPEED)) {
                 PotionEffect pe = player.getPotionEffect(PotionEffectType.SPEED);
@@ -305,6 +331,11 @@ public class JobManager {
             case AMETHYST_SHARD, AMETHYST_BLOCK -> "AMETHYST";
             case SCULK_SENSOR -> "SCULK_SENSOR";
             case SPAWNER -> "SPAWNER";
+
+            // Aventurier
+            case ENCHANTED_GOLDEN_APPLE -> "ENCHANTED_GOLDEN_APPLE";
+            case ELYTRA -> "ELYTRA";
+            case SPONGE, WET_SPONGE -> "SPONGE";
             default -> null;
         };
     }
@@ -314,6 +345,12 @@ public class JobManager {
      */
     public int getInventoryItemCount(Player player, String reqKey) {
         if (player == null || reqKey == null) return 0;
+        if ("OVERWORLD_STRUCTURES".equalsIgnoreCase(reqKey)) {
+            return getDiscoveredStructures(player).size();
+        }
+        if ("NETHER_BIOMES".equalsIgnoreCase(reqKey)) {
+            return getDiscoveredBiomes(player).size();
+        }
         int count = 0;
         for (org.bukkit.inventory.ItemStack item : player.getInventory().getContents()) {
             if (item == null || item.getType().isAir()) continue;
@@ -479,6 +516,17 @@ public class JobManager {
                         count += item.getAmount();
                     }
                 }
+
+                // --- AVENTURIER ---
+                case "ENCHANTED_GOLDEN_APPLE" -> {
+                    if (type == Material.ENCHANTED_GOLDEN_APPLE) count += item.getAmount();
+                }
+                case "ELYTRA" -> {
+                    if (type == Material.ELYTRA) count += item.getAmount();
+                }
+                case "SPONGE" -> {
+                    if (type == Material.SPONGE || type == Material.WET_SPONGE) count += item.getAmount();
+                }
                 default -> {}
             }
         }
@@ -620,6 +668,20 @@ public class JobManager {
                     giveOrDropItem(player, CustomJobItems.getArchitectBoots());
                     giveOrDropItem(player, CustomJobItems.getArchitectFeather());
                 }
+            } else if (job == PlayerJob.AVENTURIER) {
+                if (missionNumber == 1) {
+                    player.sendMessage(Component.text("✦ Récompenses Aventurier M1 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("Meilleurs loots dans les coffres de structures + Accès aux commandes /sethome et /home !", NamedTextColor.YELLOW)));
+                } else if (missionNumber == 2) {
+                    player.sendMessage(Component.text("✦ Récompense Aventurier M2 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("Perle Infinie de l'Aventurier reçue (infinie et aucun dégât de chute) !", NamedTextColor.YELLOW)));
+                    giveOrDropItem(player, CustomJobItems.getAventurierInfinitePearl());
+                } else if (missionNumber == 3) {
+                    player.sendMessage(Component.text("✦ Récompenses Suprêmes Aventurier M3 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("Élytres Incassables + Fusée Infinie reçues pour explorer sans limites !", NamedTextColor.YELLOW)));
+                    giveOrDropItem(player, CustomJobItems.getAventurierUnbreakableElytra());
+                    giveOrDropItem(player, CustomJobItems.getAventurierInfiniteFirework());
+                }
             }
 
             player.sendMessage(Component.text("★ ========================================= ★", NamedTextColor.GOLD, TextDecoration.BOLD));
@@ -627,6 +689,82 @@ public class JobManager {
         }
 
         return completedAny;
+    }
+
+    public Set<String> getDiscoveredStructures(Player player) {
+        if (player == null) return Collections.emptySet();
+        String raw = player.getPersistentDataContainer().get(structKey, PersistentDataType.STRING);
+        if (raw == null || raw.isBlank()) return new HashSet<>();
+        return new HashSet<>(Arrays.asList(raw.split(",")));
+    }
+
+    public boolean addDiscoveredStructure(Player player, String structId, String structDisplayName) {
+        if (player == null || structId == null) return false;
+        Set<String> set = getDiscoveredStructures(player);
+        if (set.add(structId.toLowerCase())) {
+            player.getPersistentDataContainer().set(structKey, PersistentDataType.STRING, String.join(",", set));
+            int count = Math.min(5, set.size());
+            player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8f, 1.3f);
+            player.sendActionBar(Component.text("✦ [Aventurier] Structure explorée : " + structDisplayName + " (" + count + " / 5) ✦", NamedTextColor.GOLD));
+            player.sendMessage(Component.text("✦ [Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                    .append(Component.text("Nouvelle structure découverte : ", NamedTextColor.YELLOW))
+                    .append(Component.text(structDisplayName, NamedTextColor.AQUA, TextDecoration.BOLD))
+                    .append(Component.text(" (" + count + "/5) !", NamedTextColor.GREEN)));
+            checkCurrentMissionCompletion(player, PlayerJob.AVENTURIER);
+            return true;
+        }
+        return false;
+    }
+
+    public Set<String> getDiscoveredBiomes(Player player) {
+        if (player == null) return Collections.emptySet();
+        String raw = player.getPersistentDataContainer().get(biomesKey, PersistentDataType.STRING);
+        if (raw == null || raw.isBlank()) return new HashSet<>();
+        return new HashSet<>(Arrays.asList(raw.split(",")));
+    }
+
+    public boolean addDiscoveredBiome(Player player, String biomeId, String biomeDisplayName) {
+        if (player == null || biomeId == null) return false;
+        Set<String> set = getDiscoveredBiomes(player);
+        if (set.add(biomeId.toLowerCase())) {
+            player.getPersistentDataContainer().set(biomesKey, PersistentDataType.STRING, String.join(",", set));
+            int count = Math.min(5, set.size());
+            player.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.8f, 1.4f);
+            player.sendActionBar(Component.text("✦ [Aventurier] Biome du Nether exploré : " + biomeDisplayName + " (" + count + " / 5) ✦", NamedTextColor.LIGHT_PURPLE));
+            player.sendMessage(Component.text("✦ [Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                    .append(Component.text("Nouveau biome du Nether exploré : ", NamedTextColor.YELLOW))
+                    .append(Component.text(biomeDisplayName, NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD))
+                    .append(Component.text(" (" + count + "/5) !", NamedTextColor.GREEN)));
+            checkCurrentMissionCompletion(player, PlayerJob.AVENTURIER);
+            return true;
+        }
+        return false;
+    }
+
+    public void setHomeLocation(Player player, org.bukkit.Location loc) {
+        if (player == null || loc == null || loc.getWorld() == null) return;
+        String val = loc.getWorld().getName() + ";" + loc.getX() + ";" + loc.getY() + ";" + loc.getZ() + ";" + loc.getYaw() + ";" + loc.getPitch();
+        player.getPersistentDataContainer().set(homeKey, PersistentDataType.STRING, val);
+    }
+
+    public org.bukkit.Location getHomeLocation(Player player) {
+        if (player == null) return null;
+        String val = player.getPersistentDataContainer().get(homeKey, PersistentDataType.STRING);
+        if (val == null || val.isBlank()) return null;
+        String[] parts = val.split(";");
+        if (parts.length < 6) return null;
+        org.bukkit.World w = org.bukkit.Bukkit.getWorld(parts[0]);
+        if (w == null) return null;
+        try {
+            double x = Double.parseDouble(parts[1]);
+            double y = Double.parseDouble(parts[2]);
+            double z = Double.parseDouble(parts[3]);
+            float yaw = Float.parseFloat(parts[4]);
+            float pitch = Float.parseFloat(parts[5]);
+            return new org.bukkit.Location(w, x, y, z, yaw, pitch);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     public void giveOrDropItem(Player player, org.bukkit.inventory.ItemStack item) {

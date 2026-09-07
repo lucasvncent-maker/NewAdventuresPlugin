@@ -44,6 +44,14 @@ commands:
     description: Raccourci pour faire apparaitre un Croupier de Blackjack
     usage: /croupier
     permission: casino.admin
+  sethome:
+    description: Definir votre point de Home (Aventurier M1)
+    usage: /sethome
+    aliases: [set_home, sh]
+  home:
+    description: Se teleporter a votre point de Home (Aventurier M1)
+    usage: /home
+    aliases: [h]
 
 permissions:
   customminerals.admin:
