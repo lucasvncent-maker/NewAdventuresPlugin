@@ -74,6 +74,7 @@ public class Card {
 
     public ItemStack toItemStack() {
         ItemStack item = new ItemStack(Material.PAPER);
+        item.setAmount(Math.max(1, getValue()));
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             String shortSymbol = rank.getLabel().equals("10") ? "10" : rank.getLabel().substring(0, 1);

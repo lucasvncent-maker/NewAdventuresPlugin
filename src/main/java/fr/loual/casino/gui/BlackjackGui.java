@@ -67,6 +67,21 @@ public class BlackjackGui {
 
         // Section COMMANDES & ÉTATS (Ligne 5)
         renderControls(inv, game);
+
+        // Affichage dynamique et permanent de l'ActionBar pour voir le score en direct sans survol de souris
+        if (game.getState() == BlackjackGame.State.PLAYING || game.getState() == BlackjackGame.State.GAME_OVER) {
+            int pScore = BlackjackGame.calculateScore(game.getPlayerHand());
+            String pColor = pScore > 21 ? "§c" : (pScore == 21 ? "§6" : "§a");
+            String dText;
+            if (game.getState() == BlackjackGame.State.PLAYING) {
+                int visible = game.getDealerHand().isEmpty() ? 0 : game.getDealerHand().get(0).getValue();
+                dText = "§e" + visible + " + ?";
+            } else {
+                int dScore = BlackjackGame.calculateScore(game.getDealerHand());
+                dText = (dScore > 21 ? "§c" : "§e") + dScore + (dScore > 21 ? " §c(Bust)" : "");
+            }
+            game.getPlayer().sendActionBar(Component.text("§f✦ Votre Score : " + pColor + "§l" + pScore + " §8| §fCroupier : " + dText + " ✦"));
+        }
     }
 
     private static void renderDealerSection(Inventory inv, BlackjackGame game) {
@@ -79,18 +94,21 @@ public class BlackjackGui {
             );
         } else if (game.getState() == BlackjackGame.State.PLAYING) {
             int visibleScore = game.getDealerHand().isEmpty() ? 0 : game.getDealerHand().get(0).getValue();
-            dealerHeader = createItem(Material.EMERALD,
+            dealerHeader = createItem(Material.GOLD_INGOT,
                     Component.text("♠ Croupier - Score visible : " + visibleScore + " + ? ♠", NamedTextColor.GOLD, TextDecoration.BOLD),
                     "§7Une carte est encore masquée.",
                     "§7Elle sera révélée lorsque vous ferez §cRester (Stand)§7."
             );
+            dealerHeader.setAmount(Math.max(1, Math.min(64, visibleScore)));
         } else {
             int totalScore = BlackjackGame.calculateScore(game.getDealerHand());
             String scoreText = totalScore > 21 ? "§c" + totalScore + " (BUST)" : "§a" + totalScore;
-            dealerHeader = createItem(Material.GOLD_BLOCK,
+            Material mat = totalScore > 21 ? Material.REDSTONE_BLOCK : Material.GOLD_BLOCK;
+            dealerHeader = createItem(mat,
                     Component.text("♠ Croupier - Score final : ", NamedTextColor.GOLD, TextDecoration.BOLD).append(Component.text(scoreText)),
                     "§7Fin de la manche."
             );
+            dealerHeader.setAmount(Math.max(1, Math.min(64, totalScore)));
         }
         inv.setItem(4, dealerHeader);
 
@@ -128,10 +146,12 @@ public class BlackjackGui {
         } else {
             int playerScore = BlackjackGame.calculateScore(game.getPlayerHand());
             String scoreColor = playerScore > 21 ? "§c" : (playerScore == 21 ? "§6" : "§a");
-            playerHeader = createItem(Material.NETHER_STAR,
-                    Component.text("✦ Votre Score : " + scoreColor + playerScore + " ✦", NamedTextColor.AQUA, TextDecoration.BOLD),
+            Material mat = playerScore == 21 ? Material.NETHER_STAR : (playerScore > 21 ? Material.REDSTONE_BLOCK : Material.EMERALD);
+            playerHeader = createItem(mat,
+                    Component.text("✦ Score du Joueur : " + scoreColor + playerScore + " / 21 ✦", NamedTextColor.AQUA, TextDecoration.BOLD),
                     playerScore == 21 ? "§6§l✦ BLACKJACK ! ✦" : (playerScore > 21 ? "§c§lVous avez sauté (Bust) !" : "§7Objectif : Se rapprocher de 21 sans dépasser.")
             );
+            playerHeader.setAmount(Math.max(1, Math.min(64, playerScore)));
         }
         inv.setItem(40, playerHeader);
 
@@ -195,12 +215,17 @@ public class BlackjackGui {
             ));
 
         } else if (game.getState() == BlackjackGame.State.PLAYING) {
-            // Bouton Tirer (Hit)
-            inv.setItem(BUTTON_HIT, createItem(Material.LIME_CONCRETE,
-                    Component.text("➤ TIRER (Hit)", NamedTextColor.GREEN, TextDecoration.BOLD),
+            int pScore = BlackjackGame.calculateScore(game.getPlayerHand());
+
+            // Bouton Tirer (Hit) avec score visible en gros
+            ItemStack hitBtn = createItem(Material.LIME_CONCRETE,
+                    Component.text("➤ TIRER (Hit)  §e[" + pScore + "/21]", NamedTextColor.GREEN, TextDecoration.BOLD),
                     "§7Prendre une carte supplémentaire.",
+                    "§7Votre score actuel : §e" + pScore + "§7/21",
                     "§cAttention si votre score dépasse 21 !"
-            ));
+            );
+            hitBtn.setAmount(Math.max(1, Math.min(64, pScore)));
+            inv.setItem(BUTTON_HIT, hitBtn);
 
             // Rappel de la mise
             ItemStack bet = game.getBetItem();
@@ -218,12 +243,14 @@ public class BlackjackGui {
                 inv.setItem(49, betDisplay);
             }
 
-            // Bouton Rester (Stand)
-            inv.setItem(BUTTON_STAND, createItem(Material.RED_CONCRETE,
-                    Component.text("■ RESTER (Stand)", NamedTextColor.RED, TextDecoration.BOLD),
-                    "§7Garder votre score actuel.",
+            // Bouton Rester (Stand) avec score visible en gros
+            ItemStack standBtn = createItem(Material.RED_CONCRETE,
+                    Component.text("■ RESTER (Stand)  §e[Garder " + pScore + "]", NamedTextColor.RED, TextDecoration.BOLD),
+                    "§7Garder votre score actuel de §e" + pScore + "§7.",
                     "§7Le croupier jouera ensuite sa main !"
-            ));
+            );
+            standBtn.setAmount(Math.max(1, Math.min(64, pScore)));
+            inv.setItem(BUTTON_STAND, standBtn);
 
         } else if (game.getState() == BlackjackGame.State.GAME_OVER) {
             // Résultat au centre (Slot 49)
