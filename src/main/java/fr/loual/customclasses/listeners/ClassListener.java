@@ -12,6 +12,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.*;
+import org.bukkit.block.Block;
 import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -26,10 +27,14 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.potion.PotionType;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
+import org.bukkit.FluidCollisionMode;
 
 import org.bukkit.entity.Player;
 import java.util.UUID;
+import java.util.Locale;
 
 import java.util.*;
 
@@ -55,12 +60,21 @@ public class ClassListener implements Listener {
     // Archer : clé pour identifier les flèches tirées par des squelettes/monstres
     private final NamespacedKey skeletonArrowKey;
 
+    // Capacités Spéciales (Touche F)
+    private final Map<UUID, Long> abilityCooldowns = new HashMap<>();
+    private final Map<UUID, Long> assassinBackstabBuff = new HashMap<>();
+    private final Set<UUID> sauterelleSuperDrop = new HashSet<>();
+    private final Set<UUID> sauterelleFallImmunity = new HashSet<>();
+    private final Set<UUID> diablePuddleActive = new HashSet<>();
+    private final NamespacedKey arrowRainKey;
+
     private static final UUID PACK_ID = UUID.nameUUIDFromBytes("mon-pack-unique-v1".getBytes());
 
     public ClassListener(NewAdventurePlugin plugin) {
         this.plugin = plugin;
         this.classManager = plugin.getClassManager();
         this.skeletonArrowKey = new NamespacedKey(plugin, "skeleton_arrow");
+        this.arrowRainKey = new NamespacedKey(plugin, "archer_arrow_rain");
 
         startPeriodicTasks();
     }
@@ -307,12 +321,27 @@ public class ClassListener implements Listener {
         sirenLastShoutTime.remove(uuid);
         hopperShockwaveCooldown.remove(uuid);
         removePlayerMinions(uuid);
+
+        abilityCooldowns.remove(uuid);
+        assassinBackstabBuff.remove(uuid);
+        sauterelleSuperDrop.remove(uuid);
+        sauterelleFallImmunity.remove(uuid);
+        if (diablePuddleActive.remove(uuid)) {
+            player.setInvulnerable(false);
+        }
     }
 
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player player = event.getPlayer();
-        removePlayerMinions(player.getUniqueId());
+        UUID uuid = player.getUniqueId();
+        removePlayerMinions(uuid);
+        assassinBackstabBuff.remove(uuid);
+        sauterelleSuperDrop.remove(uuid);
+        sauterelleFallImmunity.remove(uuid);
+        if (diablePuddleActive.remove(uuid)) {
+            player.setInvulnerable(false);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -404,6 +433,32 @@ public class ClassListener implements Listener {
                         player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 100, 1, false, true, true));
                         player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 60, 0, false, false, true));
                         player.playSound(player.getLocation(), Sound.ENTITY_ILLUSIONER_MIRROR_MOVE, 0.8f, 1.6f);
+                    }
+
+                    // Capacité Pas de l'Ombre : Dégâts doublés dans le dos
+                    if (assassinBackstabBuff.containsKey(player.getUniqueId())) {
+                        long expiry = assassinBackstabBuff.get(player.getUniqueId());
+                        if (System.currentTimeMillis() <= expiry) {
+                            Vector victimDir = victim.getLocation().getDirection().setY(0).normalize();
+                            Vector attackerDir = player.getLocation().getDirection().setY(0).normalize();
+                            Vector toVictim = victim.getLocation().toVector().subtract(player.getLocation().toVector()).setY(0).normalize();
+
+                            boolean isBehind = victimDir.dot(attackerDir) > 0.35 && victimDir.dot(toVictim) > 0.20;
+                            if (isBehind) {
+                                assassinBackstabBuff.remove(player.getUniqueId());
+                                event.setDamage(event.getDamage() * 2.0);
+                                Location vLoc = victim.getLocation().add(0, 1.0, 0);
+                                World w = victim.getWorld();
+                                w.spawnParticle(Particle.CRIT, vLoc, 35, 0.4, 0.4, 0.4, 0.3);
+                                w.spawnParticle(Particle.DAMAGE_INDICATOR, vLoc, 15, 0.3, 0.3, 0.3, 0.1);
+                                w.spawnParticle(Particle.SOUL, vLoc, 20, 0.3, 0.3, 0.3, 0.05);
+                                w.playSound(vLoc, Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.2f, 0.6f);
+                                w.playSound(vLoc, Sound.BLOCK_ANVIL_LAND, 0.7f, 1.9f);
+                                player.sendActionBar(Component.text("☠ COUP CRITIQUE DANS LE DOS (x2 DÉGÂTS) ! ☠", NamedTextColor.DARK_RED, TextDecoration.BOLD));
+                            }
+                        } else {
+                            assassinBackstabBuff.remove(player.getUniqueId());
+                        }
                     }
                 }
 
@@ -533,6 +588,12 @@ public class ClassListener implements Listener {
         if (!(event.getEntity() instanceof Player player)) return;
         PlayerClass pc = classManager.getPlayerClass(player);
 
+        // Diable : Invincibilité totale pendant la liquéfaction en flaque de braises
+        if (diablePuddleActive.contains(player.getUniqueId())) {
+            event.setCancelled(true);
+            return;
+        }
+
         // 6. DIABLE : Immunité totale au feu, à la lave et aux blocs brûlants
         if (pc == PlayerClass.DIABLE) {
             switch (event.getCause()) {
@@ -547,6 +608,16 @@ public class ClassListener implements Listener {
 
         // 4. SAUTERELLE : Dégâts de chute accrus (+50%) & Onde de choc à l'atterrissage
         if (pc == PlayerClass.SAUTERELLE && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
+            // Immunité au saut de la capacité Catapulte Aérienne
+            if (sauterelleFallImmunity.contains(player.getUniqueId())) {
+                event.setCancelled(true);
+                if (sauterelleSuperDrop.contains(player.getUniqueId())) {
+                    sauterelleSuperDrop.remove(player.getUniqueId());
+                    triggerHopperMegaShockwave(player);
+                }
+                return;
+            }
+
             // Malus : +50% de dégâts de chute
             event.setDamage(event.getDamage() * 1.5);
 
@@ -700,25 +771,36 @@ public class ClassListener implements Listener {
         if (world == null) return;
 
         try {
-            world.playSound(loc, Sound.ENTITY_WARDEN_SONIC_BOOM, 1.2f, 1.4f);
+            world.playSound(loc, Sound.ENTITY_WARDEN_SONIC_BOOM, 1.3f, 1.4f);
         } catch (Exception e) {
             world.playSound(loc, Sound.ENTITY_ALLAY_HURT, 1.5f, 0.5f);
         }
+        world.playSound(loc, Sound.ENTITY_ELDER_GUARDIAN_CURSE, 0.8f, 1.8f);
+
         world.spawnParticle(Particle.SONIC_BOOM, loc.clone().add(0, 1.2, 0), 1);
+        world.spawnParticle(Particle.BUBBLE_COLUMN_UP, loc.clone().add(0, 1.0, 0), 40, 1.5, 0.5, 1.5, 0.1);
+        world.spawnParticle(Particle.NAUTILUS, loc.clone().add(0, 1.0, 0), 30, 1.2, 0.5, 1.2, 0.1);
+        world.spawnParticle(Particle.SPLASH, loc.clone().add(0, 1.0, 0), 50, 1.5, 0.5, 1.5, 0.2);
 
         int affected = 0;
-        for (Entity entity : world.getNearbyEntities(loc, 8.0, 8.0, 8.0)) {
+        for (Entity entity : world.getNearbyEntities(loc, 8.0, 5.0, 8.0)) {
             if (entity instanceof LivingEntity target && !target.equals(player)) {
+                if (necroMinions.contains(target.getUniqueId())) continue;
+
                 // Lenteur III (amplifier 2) pendant 5s (100 ticks)
                 target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 100, 2, false, true, true));
                 // Faiblesse II (amplifier 1) pendant 5s (100 ticks)
                 target.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 100, 1, false, true, true));
+
+                // Recul aquatique
+                Vector push = target.getLocation().toVector().subtract(loc.toVector()).normalize().multiply(0.8).setY(0.35);
+                target.setVelocity(push);
                 affected++;
             }
         }
 
-        player.sendActionBar(Component.text("⚡ CRI SONIQUE DÉCLENCHÉ ! (" + affected + " créatures touchées) ⚡", NamedTextColor.DARK_AQUA, TextDecoration.BOLD));
-        player.sendMessage(Component.text("✦ Cri sonique libéré : toutes les créatures dans 8 blocs subissent Lenteur III et Faiblesse II pendant 5s !", NamedTextColor.DARK_AQUA));
+        player.sendActionBar(Component.text("⚡ CRI SONIQUE LIBÉRÉ ! (" + affected + " créatures affaiblies) ⚡", NamedTextColor.DARK_AQUA, TextDecoration.BOLD));
+        player.sendMessage(Component.text("✦ Cri sonique : Toutes les créatures dans 8 blocs subissent Lenteur III et Faiblesse II pendant 5s !", NamedTextColor.DARK_AQUA));
     }
 
     private void focusMinionsOnTarget(UUID masterId, LivingEntity target) {
@@ -873,6 +955,503 @@ public class ClassListener implements Listener {
             if (arrow.getPickupStatus() != AbstractArrow.PickupStatus.ALLOWED) {
                 arrow.setPickupStatus(AbstractArrow.PickupStatus.ALLOWED);
             }
+        }
+    }
+
+    // ==========================================================
+    // CAPACITÉS SPÉCIALES ACTIVES (TOUCHE F)
+    // ==========================================================
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSwapHands(PlayerSwapHandItemsEvent event) {
+        Player player = event.getPlayer();
+        PlayerClass pc = classManager.getPlayerClass(player);
+
+        // Les humains et sans classe gardent l'échange normal d'offhand
+        if (pc == PlayerClass.NONE || pc == PlayerClass.HUMAIN) {
+            return;
+        }
+
+        event.setCancelled(true);
+
+        UUID uuid = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        long cdUntil = abilityCooldowns.getOrDefault(uuid, 0L);
+
+        if (now < cdUntil) {
+            long remainingMs = cdUntil - now;
+            double sec = Math.ceil(remainingMs / 100.0) / 10.0;
+            player.sendActionBar(Component.text("⏳ Capacité en recharge (" + String.format(Locale.US, "%.1f", sec) + "s)", NamedTextColor.RED, TextDecoration.BOLD));
+            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.6f, 0.8f);
+            return;
+        }
+
+        switch (pc) {
+            case ASSASSIN -> {
+                abilityCooldowns.put(uuid, now + 14_000L);
+                triggerAssassinShadowStep(player);
+            }
+            case GUERRIER -> {
+                abilityCooldowns.put(uuid, now + 16_000L);
+                triggerWarriorGroundSlam(player);
+            }
+            case SAUTERELLE -> {
+                abilityCooldowns.put(uuid, now + 14_000L);
+                triggerHopperSuperJump(player);
+            }
+            case SIRENE -> {
+                abilityCooldowns.put(uuid, now + 14_000L);
+                triggerSirenSonicShout(player);
+            }
+            case DIABLE -> {
+                abilityCooldowns.put(uuid, now + 20_000L);
+                triggerDiableLavaPuddle(player);
+            }
+            case NECROMANCIEN -> {
+                triggerNecromancerMinionExplosion(player);
+            }
+            case ARCHER -> {
+                abilityCooldowns.put(uuid, now + 18_000L);
+                triggerArcherArrowRain(player);
+            }
+            default -> {}
+        }
+    }
+
+    // 1. ASSASSIN : Pas de l'Ombre (Téléportation 8 blocs + dégâts x2 dans le dos)
+    private void triggerAssassinShadowStep(Player player) {
+        UUID uuid = player.getUniqueId();
+        Location startLoc = player.getLocation();
+        World world = startLoc.getWorld();
+        if (world == null) return;
+
+        // Effets de fumée et d'ombre au point de départ
+        world.spawnParticle(Particle.LARGE_SMOKE, startLoc.clone().add(0, 1.0, 0), 25, 0.4, 0.5, 0.4, 0.05);
+        world.spawnParticle(Particle.CAMPFIRE_COSY_SMOKE, startLoc.clone().add(0, 0.5, 0), 15, 0.3, 0.3, 0.3, 0.02);
+        world.spawnParticle(Particle.SQUID_INK, startLoc.clone().add(0, 1.0, 0), 20, 0.4, 0.4, 0.4, 0.05);
+        world.spawnParticle(Particle.PORTAL, startLoc.clone().add(0, 1.0, 0), 25, 0.5, 0.5, 0.5, 0.1);
+        world.playSound(startLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.2f, 1.4f);
+        world.playSound(startLoc, Sound.ENTITY_ILLUSIONER_MIRROR_MOVE, 1.0f, 1.2f);
+
+        // Téléportation sécurisée 8 blocs en avant
+        Vector dir = startLoc.getDirection();
+        Location targetLoc = startLoc.clone();
+
+        for (double d = 1.0; d <= 8.0; d += 0.5) {
+            Location test = startLoc.clone().add(dir.clone().multiply(d));
+            Block feetBlock = test.getBlock();
+            Block headBlock = test.clone().add(0, 1, 0).getBlock();
+            if (!feetBlock.isPassable() || !headBlock.isPassable()) {
+                break;
+            }
+            targetLoc = test;
+        }
+        targetLoc.setYaw(startLoc.getYaw());
+        targetLoc.setPitch(startLoc.getPitch());
+
+        player.teleport(targetLoc);
+
+        // Effets à l'arrivée
+        world.spawnParticle(Particle.LARGE_SMOKE, targetLoc.clone().add(0, 1.0, 0), 20, 0.4, 0.5, 0.4, 0.05);
+        world.spawnParticle(Particle.SOUL_FIRE_FLAME, targetLoc.clone().add(0, 1.0, 0), 15, 0.3, 0.4, 0.3, 0.05);
+        world.spawnParticle(Particle.REVERSE_PORTAL, targetLoc.clone().add(0, 1.0, 0), 20, 0.4, 0.5, 0.4, 0.05);
+        world.playSound(targetLoc, Sound.ENTITY_PHANTOM_FLAP, 1.2f, 1.6f);
+        world.playSound(targetLoc, Sound.ITEM_CHORUS_FRUIT_TELEPORT, 1.0f, 1.5f);
+
+        assassinBackstabBuff.put(uuid, System.currentTimeMillis() + 10_000L);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 50, 1, false, false, true));
+
+        player.sendActionBar(Component.text("✦ PAS DE L'OMBRE ! Prochain coup dans le dos x2 DÉGÂTS ! ✦", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
+        player.sendMessage(Component.text("✦ Pas de l'Ombre : Téléporté 8 blocs en avant ! Votre prochaine frappe dans le dos infligera le DOUBLE de dégâts !", NamedTextColor.LIGHT_PURPLE));
+    }
+
+    // 2. GUERRIER : Choc Tellurique (Frappe au sol en cône, étourdit 3s et renverse)
+    private void triggerWarriorGroundSlam(Player player) {
+        Location origin = player.getLocation();
+        World world = origin.getWorld();
+        if (world == null) return;
+
+        Vector forward = origin.getDirection().setY(0).normalize();
+        player.swingMainHand();
+
+        // Onde de choc visuelle au sol le long du cône
+        for (double r = 1.5; r <= 7.5; r += 1.5) {
+            double spread = Math.toRadians(35);
+            for (double a = -spread; a <= spread; a += spread / 3.0) {
+                Vector rot = forward.clone().rotateAroundY(a).multiply(r);
+                Location pLoc = origin.clone().add(rot);
+                Block b = pLoc.getBlock();
+                world.spawnParticle(Particle.BLOCK, pLoc.clone().add(0, 0.2, 0), 12, 0.3, 0.1, 0.3, 0.05,
+                        b.getType().isAir() ? Material.DIRT.createBlockData() : b.getBlockData());
+                world.spawnParticle(Particle.SWEEP_ATTACK, pLoc.clone().add(0, 0.3, 0), 2, 0.1, 0.1, 0.1, 0.02);
+            }
+        }
+        world.spawnParticle(Particle.EXPLOSION, origin.clone().add(forward.clone().multiply(2.0)).add(0, 0.5, 0), 3, 0.5, 0.2, 0.5, 0.05);
+        try {
+            world.playSound(origin, Sound.ITEM_MACE_SMASH_GROUND_HEAVY, 1.3f, 0.8f);
+        } catch (Throwable t) {
+            world.playSound(origin, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.2f);
+        }
+        world.playSound(origin, Sound.ENTITY_ZOMBIE_BREAK_WOODEN_DOOR, 1.0f, 0.6f);
+        world.playSound(origin, Sound.BLOCK_ANVIL_LAND, 0.8f, 0.7f);
+
+        int stunnedCount = 0;
+        for (Entity entity : world.getNearbyEntities(origin, 8.0, 4.0, 8.0)) {
+            if (entity instanceof LivingEntity target && !target.equals(player)) {
+                if (necroMinions.contains(target.getUniqueId())) continue;
+
+                Vector toTarget = target.getLocation().toVector().subtract(origin.toVector());
+                double dist = toTarget.length();
+                if (dist > 7.5 || dist < 0.2) continue;
+
+                Vector hToTarget = toTarget.clone().setY(0).normalize();
+                double dot = forward.dot(hToTarget);
+                // Cône de ~70 degrés (dot >= 0.70)
+                if (dot >= 0.70) {
+                    stunnedCount++;
+                    target.damage(10.0, player);
+
+                    // Renversement & projection
+                    Vector kb = forward.clone().multiply(0.6).setY(0.45);
+                    target.setVelocity(kb);
+
+                    // Étourdissement 3 secondes (60 ticks)
+                    target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, 5, false, true, true));
+                    target.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 60, 4, false, true, true));
+                    target.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE, 60, 4, false, true, true));
+
+                    if (target instanceof Mob mob) {
+                        mob.setAI(false);
+                        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                            if (mob.isValid()) mob.setAI(true);
+                        }, 60L);
+                    }
+
+                    // Étoiles d'étourdissement au-dessus de la tête
+                    new BukkitRunnable() {
+                        int ticks = 0;
+                        @Override
+                        public void run() {
+                            if (!target.isValid() || ticks++ >= 12) {
+                                cancel();
+                                return;
+                            }
+                            Location head = target.getEyeLocation().add(0, 0.4, 0);
+                            double angle = ticks * 0.8;
+                            Location p1 = head.clone().add(Math.cos(angle) * 0.4, 0, Math.sin(angle) * 0.4);
+                            target.getWorld().spawnParticle(Particle.CRIT, p1, 1, 0, 0, 0, 0);
+                            target.getWorld().spawnParticle(Particle.WAX_ON, p1, 1, 0, 0, 0, 0);
+                        }
+                    }.runTaskTimer(plugin, 0L, 5L);
+                }
+            }
+        }
+
+        player.sendActionBar(Component.text("🔨 CHOC TELLURIQUE ! " + stunnedCount + " monstres étourdis (3s) !", NamedTextColor.GOLD, TextDecoration.BOLD));
+        player.sendMessage(Component.text("✦ Choc Tellurique : Sol martelé violemment ! Les ennemis dans le cône sont projetés et étourdis pendant 3s !", NamedTextColor.GOLD));
+    }
+
+    // 3. SAUTERELLE : Catapulte Aérienne (Propulsion 15 blocs + onde de choc à l'impact)
+    private void triggerHopperSuperJump(Player player) {
+        UUID uuid = player.getUniqueId();
+        Location loc = player.getLocation();
+        World world = loc.getWorld();
+        if (world == null) return;
+
+        Vector dir = loc.getDirection().setY(0).normalize().multiply(0.3);
+        dir.setY(1.65); // Catapulte à 15 blocs de haut
+        player.setVelocity(dir);
+
+        sauterelleSuperDrop.add(uuid);
+        sauterelleFallImmunity.add(uuid);
+
+        world.spawnParticle(Particle.EXPLOSION, loc, 3, 0.4, 0.2, 0.4, 0.05);
+        world.spawnParticle(Particle.WIND_BURST, loc, 2, 0.3, 0.2, 0.3, 0.05);
+        world.spawnParticle(Particle.SLIME, loc.clone().add(0, 0.5, 0), 30, 0.6, 0.3, 0.6, 0.1);
+        world.spawnParticle(Particle.CLOUD, loc, 20, 0.5, 0.2, 0.5, 0.1);
+
+        try {
+            world.playSound(loc, Sound.ENTITY_WIND_CHARGE_WIND_BURST, 1.4f, 0.8f);
+        } catch (Throwable t) {
+            world.playSound(loc, Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 1.2f, 0.7f);
+        }
+        world.playSound(loc, Sound.ENTITY_SLIME_JUMP, 1.3f, 0.6f);
+
+        player.sendActionBar(Component.text("🚀 CATAPULTE AÉRIENNE ! Onde de choc prête pour l'impact !", NamedTextColor.GREEN, TextDecoration.BOLD));
+
+        new BukkitRunnable() {
+            int ticks = 0;
+            @Override
+            public void run() {
+                if (!player.isOnline() || !sauterelleSuperDrop.contains(uuid) || ticks++ > 120) {
+                    sauterelleSuperDrop.remove(uuid);
+                    sauterelleFallImmunity.remove(uuid);
+                    cancel();
+                    return;
+                }
+
+                player.getWorld().spawnParticle(Particle.SLIME, player.getLocation().clone().add(0, 0.2, 0), 4, 0.2, 0.2, 0.2, 0.02);
+                player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 2, 0.1, 0.1, 0.1, 0.02);
+
+                if (ticks >= 15 && (player.isOnGround() || player.getLocation().getBlock().getRelative(0, -1, 0).getType().isSolid())) {
+                    triggerHopperMegaShockwave(player);
+                    sauterelleSuperDrop.remove(uuid);
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> sauterelleFallImmunity.remove(uuid), 20L);
+                    cancel();
+                }
+            }
+        }.runTaskTimer(plugin, 2L, 2L);
+    }
+
+    private void triggerHopperMegaShockwave(Player player) {
+        Location loc = player.getLocation();
+        World world = loc.getWorld();
+        if (world == null) return;
+
+        world.spawnParticle(Particle.EXPLOSION_EMITTER, loc.clone().add(0, 0.3, 0), 2);
+        for (int deg = 0; deg < 360; deg += 15) {
+            double rad = Math.toRadians(deg);
+            Location pLoc = loc.clone().add(Math.cos(rad) * 4.5, 0.2, Math.sin(rad) * 4.5);
+            world.spawnParticle(Particle.SLIME, pLoc, 6, 0.2, 0.1, 0.2, 0.05);
+            world.spawnParticle(Particle.SWEEP_ATTACK, pLoc, 1, 0.1, 0.1, 0.1, 0.02);
+        }
+
+        try {
+            world.playSound(loc, Sound.ITEM_MACE_SMASH_GROUND_HEAVY, 1.4f, 0.8f);
+        } catch (Throwable t) {
+            world.playSound(loc, Sound.ENTITY_GENERIC_EXPLODE, 1.2f, 0.8f);
+        }
+        world.playSound(loc, Sound.ENTITY_SLIME_SQUISH, 1.4f, 0.6f);
+
+        int count = 0;
+        for (Entity entity : world.getNearbyEntities(loc, 9.0, 4.0, 9.0)) {
+            if (entity instanceof LivingEntity target && !target.equals(player)) {
+                if (necroMinions.contains(target.getUniqueId())) continue;
+
+                target.damage(14.0, player);
+                Vector kb = target.getLocation().toVector().subtract(loc.toVector()).normalize().multiply(0.9).setY(0.95);
+                target.setVelocity(kb);
+                target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 80, 1, false, true, true));
+                count++;
+            }
+        }
+
+        player.sendActionBar(Component.text("💥 IMPACT DÉVASTATEUR ! (" + count + " ennemis pulvérisés) 💥", NamedTextColor.GREEN, TextDecoration.BOLD));
+        player.sendMessage(Component.text("✦ Cataclysme de la Sauterelle : Atterrissage surpuissant ! Les monstres dans 9 blocs sont propulsés et lourdement blessés !", NamedTextColor.GREEN));
+    }
+
+    // 4. DIABLE : Flaque de Braises (Liquéfaction invincible 3s, brûle les monstres)
+    private void triggerDiableLavaPuddle(Player player) {
+        UUID uuid = player.getUniqueId();
+        diablePuddleActive.add(uuid);
+
+        Location startLoc = player.getLocation();
+        World world = startLoc.getWorld();
+        if (world == null) return;
+
+        player.setInvulnerable(true);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 70, 0, false, false, false));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 65, 1, false, false, false));
+
+        world.spawnParticle(Particle.LAVA, startLoc.clone().add(0, 0.3, 0), 25, 0.4, 0.1, 0.4, 0.05);
+        world.spawnParticle(Particle.SOUL_FIRE_FLAME, startLoc.clone().add(0, 0.3, 0), 20, 0.5, 0.2, 0.5, 0.05);
+        world.spawnParticle(Particle.CAMPFIRE_SIGNAL_SMOKE, startLoc.clone().add(0, 0.2, 0), 15, 0.3, 0.1, 0.3, 0.05);
+        world.playSound(startLoc, Sound.BLOCK_LAVA_EXTINGUISH, 1.2f, 0.6f);
+        world.playSound(startLoc, Sound.ENTITY_BLAZE_SHOOT, 1.0f, 0.7f);
+
+        player.sendActionBar(Component.text("🔥 FLAQUE DE BRAISES ACTIVE (Invincible 3s) ! 🔥", NamedTextColor.RED, TextDecoration.BOLD));
+
+        new BukkitRunnable() {
+            int ticks = 0;
+            @Override
+            public void run() {
+                if (!player.isOnline() || ticks >= 60) {
+                    diablePuddleActive.remove(uuid);
+                    if (player.isOnline()) {
+                        player.setInvulnerable(false);
+                        player.removePotionEffect(PotionEffectType.INVISIBILITY);
+                        Location exitLoc = player.getLocation();
+                        World w = exitLoc.getWorld();
+                        if (w != null) {
+                            w.spawnParticle(Particle.EXPLOSION, exitLoc.clone().add(0, 1.0, 0), 3, 0.4, 0.5, 0.4, 0.05);
+                            w.spawnParticle(Particle.FLAME, exitLoc.clone().add(0, 1.0, 0), 30, 0.5, 0.6, 0.5, 0.08);
+                            w.spawnParticle(Particle.LAVA, exitLoc.clone().add(0, 0.5, 0), 15, 0.4, 0.3, 0.4, 0.05);
+                            w.playSound(exitLoc, Sound.ENTITY_BLAZE_DEATH, 1.0f, 1.4f);
+                            w.playSound(exitLoc, Sound.ENTITY_GENERIC_EXPLODE, 0.9f, 1.6f);
+                        }
+                        player.sendActionBar(Component.text("✦ Vous reprenez forme physique !", NamedTextColor.GOLD, TextDecoration.BOLD));
+                    }
+                    cancel();
+                    return;
+                }
+
+                ticks += 3;
+                Location loc = player.getLocation();
+                World w = loc.getWorld();
+                if (w == null) return;
+
+                for (int deg = 0; deg < 360; deg += 45) {
+                    double rad = Math.toRadians(deg);
+                    double dist = 0.8 + (ticks % 6 == 0 ? 0.4 : 0.0);
+                    Location pLoc = loc.clone().add(Math.cos(rad) * dist, 0.1, Math.sin(rad) * dist);
+                    w.spawnParticle(Particle.FLAME, pLoc, 2, 0.1, 0.05, 0.1, 0.02);
+                    w.spawnParticle(Particle.LAVA, pLoc, 1, 0.05, 0.05, 0.05, 0);
+                }
+                w.spawnParticle(Particle.CAMPFIRE_COSY_SMOKE, loc.clone().add(0, 0.1, 0), 2, 0.3, 0.05, 0.3, 0.02);
+
+                if (ticks % 6 == 0) {
+                    w.playSound(loc, Sound.BLOCK_FIRE_AMBIENT, 0.8f, 1.1f);
+                    w.playSound(loc, Sound.BLOCK_LAVA_POP, 0.7f, 1.3f);
+                }
+
+                for (Entity entity : w.getNearbyEntities(loc, 2.5, 1.5, 2.5)) {
+                    if (entity instanceof LivingEntity target && !target.equals(player)) {
+                        if (necroMinions.contains(target.getUniqueId())) continue;
+
+                        target.setFireTicks(100);
+                        target.damage(4.0, player);
+                        w.spawnParticle(Particle.SMALL_FLAME, target.getLocation().add(0, 0.5, 0), 5, 0.2, 0.2, 0.2, 0.05);
+                    }
+                }
+            }
+        }.runTaskTimer(plugin, 0L, 3L);
+    }
+
+    // 5. NÉCROMANCIEN : Détonation Putride (Fait exploser un serviteur pour turbo dégâts)
+    private void triggerNecromancerMinionExplosion(Player player) {
+        UUID masterId = player.getUniqueId();
+        Location pLoc = player.getLocation();
+
+        Monster targetMinion = null;
+        double closestDistSq = Double.MAX_VALUE;
+
+        for (Map.Entry<UUID, UUID> entry : minionToMaster.entrySet()) {
+            if (entry.getValue().equals(masterId)) {
+                Entity ent = Bukkit.getEntity(entry.getKey());
+                if (ent instanceof Monster minion && minion.isValid()) {
+                    double dSq = minion.getLocation().distanceSquared(pLoc);
+                    if (dSq < closestDistSq) {
+                        closestDistSq = dSq;
+                        targetMinion = minion;
+                    }
+                }
+            }
+        }
+
+        if (targetMinion == null) {
+            player.sendActionBar(Component.text("✖ Aucun serviteur actif à faire exploser !", NamedTextColor.RED, TextDecoration.BOLD));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+            return;
+        }
+
+        abilityCooldowns.put(masterId, System.currentTimeMillis() + 12_000L);
+
+        Location mLoc = targetMinion.getLocation();
+        World world = mLoc.getWorld();
+        UUID minionId = targetMinion.getUniqueId();
+
+        targetMinion.remove();
+        necroMinions.remove(minionId);
+        minionToMaster.remove(minionId);
+
+        if (world == null) return;
+
+        world.spawnParticle(Particle.EXPLOSION_EMITTER, mLoc.clone().add(0, 1.0, 0), 2);
+        world.spawnParticle(Particle.SOUL_FIRE_FLAME, mLoc.clone().add(0, 1.0, 0), 50, 1.0, 1.0, 1.0, 0.1);
+        world.spawnParticle(Particle.SQUID_INK, mLoc.clone().add(0, 1.0, 0), 30, 0.8, 0.8, 0.8, 0.08);
+        world.spawnParticle(Particle.WITCH, mLoc.clone().add(0, 1.0, 0), 30, 0.9, 0.9, 0.9, 0.05);
+
+        world.playSound(mLoc, Sound.ENTITY_GENERIC_EXPLODE, 1.4f, 0.6f);
+        world.playSound(mLoc, Sound.ENTITY_WITHER_DEATH, 0.9f, 1.6f);
+        world.playSound(mLoc, Sound.ENTITY_ZOMBIE_BREAK_WOODEN_DOOR, 1.0f, 0.5f);
+
+        int count = 0;
+        for (Entity entity : world.getNearbyEntities(mLoc, 7.5, 4.0, 7.5)) {
+            if (entity instanceof LivingEntity target && !target.equals(player)) {
+                if (necroMinions.contains(target.getUniqueId())) continue;
+
+                target.damage(25.0, player);
+
+                Vector kb = target.getLocation().toVector().subtract(mLoc.toVector()).normalize().multiply(1.3).setY(0.55);
+                target.setVelocity(kb);
+
+                target.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 100, 1, false, true, true));
+                target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 100, 1, false, true, true));
+                count++;
+            }
+        }
+
+        player.sendActionBar(Component.text("☠ TURBO DÉTONATION : Serviteur sacrifié (" + count + " cibles anéanties) ! ☠", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
+        player.sendMessage(Component.text("✦ Détonation Putride : Votre serviteur a été sacrifié dans une formidable déflagration nécrotique !", NamedTextColor.DARK_PURPLE));
+    }
+
+    // 6. ARCHER : Pluie de Flèches (Déluge de flèches sur la zone ciblée)
+    private void triggerArcherArrowRain(Player player) {
+        Location eye = player.getEyeLocation();
+        World world = eye.getWorld();
+        if (world == null) return;
+
+        RayTraceResult result = world.rayTraceBlocks(eye, eye.getDirection(), 28.0, FluidCollisionMode.NEVER, true);
+        Location targetCenter;
+        if (result != null && result.getHitPosition() != null) {
+            targetCenter = result.getHitPosition().toLocation(world);
+        } else {
+            targetCenter = eye.clone().add(eye.getDirection().multiply(15.0));
+            targetCenter.setY(world.getHighestBlockYAt(targetCenter));
+        }
+
+        world.playSound(eye, Sound.ITEM_CROSSBOW_SHOOT, 1.2f, 0.7f);
+        world.playSound(eye, Sound.ENTITY_ARROW_SHOOT, 1.4f, 0.5f);
+        try {
+            world.playSound(targetCenter, Sound.ITEM_TRIDENT_RIPTIDE_1, 1.2f, 1.5f);
+        } catch (Throwable ignored) {}
+
+        for (int deg = 0; deg < 360; deg += 20) {
+            double rad = Math.toRadians(deg);
+            Location pLoc = targetCenter.clone().add(Math.cos(rad) * 4.0, 0.2, Math.sin(rad) * 4.0);
+            world.spawnParticle(Particle.ENCHANTED_HIT, pLoc, 4, 0.1, 0.1, 0.1, 0.05);
+            world.spawnParticle(Particle.TARGET_HIT, pLoc, 1, 0.05, 0.05, 0.05, 0);
+        }
+
+        player.sendActionBar(Component.text("🏹 PLUIE DE FLÈCHES DÉCLENCHÉE ! 🏹", NamedTextColor.YELLOW, TextDecoration.BOLD));
+        player.sendMessage(Component.text("✦ Pluie de Flèches : Un déluge de flèches s'abat sur la zone ciblée !", NamedTextColor.YELLOW));
+
+        new BukkitRunnable() {
+            int wave = 0;
+            @Override
+            public void run() {
+                if (wave++ >= 6) {
+                    cancel();
+                    return;
+                }
+
+                for (int i = 0; i < 4; i++) {
+                    double offsetX = (Math.random() - 0.5) * 8.0;
+                    double offsetZ = (Math.random() - 0.5) * 8.0;
+                    Location spawnLoc = targetCenter.clone().add(offsetX, 13.0 + Math.random() * 2.0, offsetZ);
+
+                    Arrow arrow = world.spawnArrow(spawnLoc, new Vector((Math.random() - 0.5) * 0.1, -1.8, (Math.random() - 0.5) * 0.1), 1.8f, 12.0f);
+                    arrow.setShooter(player);
+                    arrow.setDamage(8.0);
+                    arrow.setPickupStatus(AbstractArrow.PickupStatus.DISALLOWED);
+                    arrow.getPersistentDataContainer().set(arrowRainKey, PersistentDataType.BYTE, (byte) 1);
+                    arrow.setCritical(true);
+
+                    world.spawnParticle(Particle.CRIT, spawnLoc, 3, 0.1, 0.1, 0.1, 0.05);
+                }
+                world.playSound(targetCenter, Sound.ENTITY_ARROW_SHOOT, 0.8f, 1.2f);
+            }
+        }.runTaskTimer(plugin, 4L, 4L);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onArrowRainHit(ProjectileHitEvent event) {
+        if (event.getEntity() instanceof Arrow arrow && arrow.getPersistentDataContainer().has(arrowRainKey, PersistentDataType.BYTE)) {
+            Location loc = arrow.getLocation();
+            World w = loc.getWorld();
+            if (w != null) {
+                w.spawnParticle(Particle.CRIT, loc, 5, 0.2, 0.2, 0.2, 0.05);
+            }
+            Bukkit.getScheduler().runTaskLater(plugin, arrow::remove, 1L);
         }
     }
 }
