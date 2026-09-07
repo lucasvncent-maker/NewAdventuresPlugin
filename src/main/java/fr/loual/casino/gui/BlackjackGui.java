@@ -69,7 +69,14 @@ public class BlackjackGui {
         renderControls(inv, game);
 
         // Affichage dynamique et permanent de l'ActionBar pour voir le score en direct sans survol de souris
-        if (game.getState() == BlackjackGame.State.PLAYING || game.getState() == BlackjackGame.State.GAME_OVER) {
+        if (game.getState() == BlackjackGame.State.DEALING) {
+            int pScore = BlackjackGame.calculateScore(game.getPlayerHand());
+            game.getPlayer().sendActionBar(Component.text("§e♠ Distribution des cartes en cours... §7[Votre score: §a§l" + pScore + "§7] ♠"));
+        } else if (game.getState() == BlackjackGame.State.DEALER_TURN) {
+            int pScore = BlackjackGame.calculateScore(game.getPlayerHand());
+            int dScore = BlackjackGame.calculateScore(game.getDealerHand());
+            game.getPlayer().sendActionBar(Component.text("§6♠ Le Croupier joue sa main... §7[Votre score: §a§l" + pScore + " §7| Croupier: §e§l" + dScore + "§7] ♠"));
+        } else if (game.getState() == BlackjackGame.State.PLAYING || game.getState() == BlackjackGame.State.GAME_OVER) {
             int pScore = BlackjackGame.calculateScore(game.getPlayerHand());
             String pColor = pScore > 21 ? "§c" : (pScore == 21 ? "§6" : "§a");
             String dText;
@@ -92,6 +99,13 @@ public class BlackjackGui {
                     "§7Le croupier tire jusqu'à §e17§7.",
                     "§7Déposez votre mise pour commencer !"
             );
+        } else if (game.getState() == BlackjackGame.State.DEALING) {
+            dealerHeader = createItem(Material.PLAYER_HEAD,
+                    Component.text("♠ Distribution des Cartes... ♠", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                    "§7Le croupier distribue une à une les cartes.",
+                    "§7Veuillez patienter..."
+            );
+            dealerHeader.setAmount(1);
         } else if (game.getState() == BlackjackGame.State.PLAYING) {
             int visibleScore = game.getDealerHand().isEmpty() ? 0 : game.getDealerHand().get(0).getValue();
             dealerHeader = createItem(Material.GOLD_INGOT,
@@ -100,6 +114,14 @@ public class BlackjackGui {
                     "§7Elle sera révélée lorsque vous ferez §cRester (Stand)§7."
             );
             dealerHeader.setAmount(Math.max(1, Math.min(64, visibleScore)));
+        } else if (game.getState() == BlackjackGame.State.DEALER_TURN) {
+            int currentScore = BlackjackGame.calculateScore(game.getDealerHand());
+            dealerHeader = createItem(Material.GOLD_BLOCK,
+                    Component.text("♠ Croupier en jeu - Score : §e" + currentScore + " ♠", NamedTextColor.GOLD, TextDecoration.BOLD),
+                    "§7Le croupier tire ses cartes une à une...",
+                    "§7Il s'arrête dès qu'il atteint 17 ou plus."
+            );
+            dealerHeader.setAmount(Math.max(1, Math.min(64, currentScore)));
         } else {
             int totalScore = BlackjackGame.calculateScore(game.getDealerHand());
             String scoreText = totalScore > 21 ? "§c" + totalScore + " (BUST)" : "§a" + totalScore;
@@ -123,7 +145,7 @@ public class BlackjackGui {
             for (int i = 0; i < DEALER_CARD_SLOTS.length; i++) {
                 int slot = DEALER_CARD_SLOTS[i];
                 if (i < dealerHand.size()) {
-                    if (i == 1 && game.getState() == BlackjackGame.State.PLAYING) {
+                    if (i == 1 && (game.getState() == BlackjackGame.State.PLAYING || game.getState() == BlackjackGame.State.DEALING)) {
                         inv.setItem(slot, Card.getHiddenCardItem());
                     } else {
                         inv.setItem(slot, dealerHand.get(i).toItemStack());
@@ -212,6 +234,28 @@ public class BlackjackGui {
             inv.setItem(BUTTON_QUIT, createItem(Material.BARRIER,
                     Component.text("Quitter la table", NamedTextColor.RED, TextDecoration.BOLD),
                     "§7Ferme le casino et récupère votre mise."
+            ));
+
+        } else if (game.getState() == BlackjackGame.State.DEALING) {
+            inv.setItem(BUTTON_HIT, createItem(Material.GRAY_CONCRETE,
+                    Component.text("Distribution en cours...", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                    "§7Le croupier distribue les cartes une à une...",
+                    "§7Veuillez patienter."
+            ));
+            inv.setItem(BUTTON_STAND, createItem(Material.GRAY_CONCRETE,
+                    Component.text("Distribution en cours...", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                    "§7Le croupier distribue les cartes une à une...",
+                    "§7Veuillez patienter."
+            ));
+
+        } else if (game.getState() == BlackjackGame.State.DEALER_TURN) {
+            inv.setItem(BUTTON_HIT, createItem(Material.GRAY_CONCRETE,
+                    Component.text("Tour du Croupier...", NamedTextColor.GOLD, TextDecoration.BOLD),
+                    "§7Le croupier tire ses cartes une à une..."
+            ));
+            inv.setItem(BUTTON_STAND, createItem(Material.GRAY_CONCRETE,
+                    Component.text("Tour du Croupier...", NamedTextColor.GOLD, TextDecoration.BOLD),
+                    "§7Le croupier s'arrête à 17 ou plus."
             ));
 
         } else if (game.getState() == BlackjackGame.State.PLAYING) {

@@ -88,8 +88,11 @@ public class BlackjackListener implements Listener {
                     ItemStack bet = topInv.getItem(BlackjackGui.BET_SLOT);
                     if (bet != null && !bet.getType().isAir() && bet.getAmount() > 0) {
                         topInv.setItem(BlackjackGui.BET_SLOT, null);
-                        game.start(bet);
-                        BlackjackGui.render(topInv, game);
+                        game.startAnimated(plugin, bet, () -> {
+                            if (player.getOpenInventory().getTopInventory().getHolder() instanceof BlackjackGuiHolder) {
+                                BlackjackGui.render(topInv, game);
+                            }
+                        });
                         player.playSound(player.getLocation(), Sound.ITEM_ARMOR_EQUIP_GENERIC, 1.0f, 1.2f);
                     }
                 } else if (rawSlot == BlackjackGui.BUTTON_QUIT) {
@@ -100,13 +103,17 @@ public class BlackjackListener implements Listener {
                 event.setCancelled(true);
 
                 if (rawSlot == BlackjackGui.BUTTON_HIT) {
-                    game.hit();
-                    BlackjackGui.render(topInv, game);
-                    player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.2f);
+                    game.hitAnimated(plugin, () -> {
+                        if (player.getOpenInventory().getTopInventory().getHolder() instanceof BlackjackGuiHolder) {
+                            BlackjackGui.render(topInv, game);
+                        }
+                    });
                 } else if (rawSlot == BlackjackGui.BUTTON_STAND) {
-                    game.stand();
-                    BlackjackGui.render(topInv, game);
-                    player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 0.9f);
+                    game.standAnimated(plugin, () -> {
+                        if (player.getOpenInventory().getTopInventory().getHolder() instanceof BlackjackGuiHolder) {
+                            BlackjackGui.render(topInv, game);
+                        }
+                    });
                 }
 
             } else if (game.getState() == BlackjackGame.State.GAME_OVER) {
@@ -180,7 +187,7 @@ public class BlackjackListener implements Listener {
         } else if (game.getState() == BlackjackGame.State.PLAYING) {
             // Anti-triche : si le joueur ferme pendant qu'il joue pour fuir un mauvais tirage,
             // la main est automatiquement résolue avec 'stand' pour ne pas abuser.
-            game.stand();
+            game.standAnimated(plugin, () -> {});
         }
     }
 

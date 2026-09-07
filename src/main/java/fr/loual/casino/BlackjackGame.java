@@ -9,6 +9,11 @@ import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+import org.bukkit.Bukkit;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -17,7 +22,9 @@ public class BlackjackGame {
 
     public enum State {
         BETTING,
+        DEALING,
         PLAYING,
+        DEALER_TURN,
         GAME_OVER
     }
 
@@ -40,6 +47,7 @@ public class BlackjackGame {
     private Result result = Result.NONE;
     private ItemStack betItem = null;
     private boolean paidOut = false;
+    private BukkitTask currentTask = null;
 
     public BlackjackGame(Player player) {
         this.player = player;
@@ -68,42 +76,91 @@ public class BlackjackGame {
         return hand.size() == 2 && calculateScore(hand) == 21;
     }
 
-    public void start(ItemStack bet) {
+    public void cancelCurrentTask() {
+        if (currentTask != null && !currentTask.isCancelled()) {
+            currentTask.cancel();
+            currentTask = null;
+        }
+    }
+
+    public void startAnimated(Plugin plugin, ItemStack bet, Runnable onUpdate) {
         if (bet == null || bet.getType().isAir() || bet.getAmount() <= 0) return;
 
+        cancelCurrentTask();
         this.betItem = bet.clone();
         this.playerHand.clear();
         this.dealerHand.clear();
         this.deck.resetAndShuffle();
-        this.state = State.PLAYING;
+        this.state = State.DEALING;
         this.result = Result.NONE;
         this.paidOut = false;
+        onUpdate.run();
 
-        // Distribution initiale : 2 cartes joueur, 2 cartes croupier (1 visible, 1 cachée)
-        playerHand.add(deck.draw());
-        dealerHand.add(deck.draw());
-        playerHand.add(deck.draw());
-        dealerHand.add(deck.draw());
+        this.currentTask = new BukkitRunnable() {
+            int step = 0;
 
-        // Vérification immédiate du Blackjack naturel
-        boolean pBj = isNaturalBlackjack(playerHand);
-        boolean dBj = isNaturalBlackjack(dealerHand);
+            @Override
+            public void run() {
+                if (state != State.DEALING) {
+                    cancel();
+                    return;
+                }
 
-        if (pBj && dBj) {
-            this.state = State.GAME_OVER;
-            this.result = Result.PUSH;
-            applyPayout(player);
-        } else if (pBj) {
-            this.state = State.GAME_OVER;
-            this.result = Result.PLAYER_BLACKJACK;
-            applyPayout(player);
-        }
+                switch (step) {
+                    case 0 -> {
+                        // Carte 1 Joueur
+                        playerHand.add(deck.draw());
+                        player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.0f);
+                        onUpdate.run();
+                    }
+                    case 1 -> {
+                        // Carte 1 Croupier (visible)
+                        dealerHand.add(deck.draw());
+                        player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.1f);
+                        onUpdate.run();
+                    }
+                    case 2 -> {
+                        // Carte 2 Joueur
+                        playerHand.add(deck.draw());
+                        player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.2f);
+                        onUpdate.run();
+                    }
+                    case 3 -> {
+                        // Carte 2 Croupier (cachée)
+                        dealerHand.add(deck.draw());
+                        player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.3f);
+                        onUpdate.run();
+                    }
+                    case 4 -> {
+                        // Fin de la distribution : Vérification du Blackjack naturel
+                        boolean pBj = isNaturalBlackjack(playerHand);
+                        boolean dBj = isNaturalBlackjack(dealerHand);
+
+                        if (pBj && dBj) {
+                            state = State.GAME_OVER;
+                            result = Result.PUSH;
+                            applyPayout(player);
+                        } else if (pBj) {
+                            state = State.GAME_OVER;
+                            result = Result.PLAYER_BLACKJACK;
+                            applyPayout(player);
+                        } else {
+                            state = State.PLAYING;
+                        }
+                        onUpdate.run();
+                        cancel();
+                    }
+                }
+                step++;
+            }
+        }.runTaskTimer(plugin, 6L, 10L);
     }
 
-    public void hit() {
+    public void hitAnimated(Plugin plugin, Runnable onUpdate) {
         if (state != State.PLAYING) return;
 
         playerHand.add(deck.draw());
+        player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.2f);
         int pScore = calculateScore(playerHand);
 
         if (pScore > 21) {
@@ -111,31 +168,56 @@ public class BlackjackGame {
             result = Result.PLAYER_BUST;
             applyPayout(player);
         }
+        onUpdate.run();
     }
 
-    public void stand() {
+    public void standAnimated(Plugin plugin, Runnable onUpdate) {
         if (state != State.PLAYING) return;
 
-        // Le croupier joue selon la règle casino standard : tire tant qu'il a moins de 17
-        while (calculateScore(dealerHand) < 17) {
-            dealerHand.add(deck.draw());
-        }
+        cancelCurrentTask();
+        this.state = State.DEALER_TURN;
+        player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.0f);
+        onUpdate.run();
 
-        int pScore = calculateScore(playerHand);
-        int dScore = calculateScore(dealerHand);
+        // Le croupier révèle sa carte cachée et tire une par une tant qu'il a moins de 17
+        this.currentTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (state != State.DEALER_TURN) {
+                    cancel();
+                    return;
+                }
 
-        if (dScore > 21) {
-            result = Result.DEALER_BUST;
-        } else if (pScore > dScore) {
-            result = Result.PLAYER_WIN;
-        } else if (pScore == dScore) {
-            result = Result.PUSH;
-        } else {
-            result = Result.DEALER_WIN;
-        }
+                int currentScore = calculateScore(dealerHand);
+                if (currentScore < 17) {
+                    dealerHand.add(deck.draw());
+                    player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.1f);
+                    onUpdate.run();
+                } else {
+                    cancel();
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                        if (state == State.DEALER_TURN) {
+                            int pScore = calculateScore(playerHand);
+                            int dScore = calculateScore(dealerHand);
 
-        state = State.GAME_OVER;
-        applyPayout(player);
+                            if (dScore > 21) {
+                                result = Result.DEALER_BUST;
+                            } else if (pScore > dScore) {
+                                result = Result.PLAYER_WIN;
+                            } else if (pScore == dScore) {
+                                result = Result.PUSH;
+                            } else {
+                                result = Result.DEALER_WIN;
+                            }
+
+                            state = State.GAME_OVER;
+                            applyPayout(player);
+                            onUpdate.run();
+                        }
+                    }, 10L);
+                }
+            }
+        }.runTaskTimer(plugin, 12L, 12L);
     }
 
     public void applyPayout(Player targetPlayer) {
@@ -206,6 +288,7 @@ public class BlackjackGame {
     }
 
     public void resetToBetting() {
+        cancelCurrentTask();
         this.playerHand.clear();
         this.dealerHand.clear();
         this.state = State.BETTING;
