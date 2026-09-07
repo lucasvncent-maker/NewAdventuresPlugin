@@ -73,13 +73,23 @@ public class ChlorineCommand implements CommandExecutor, TabCompleter, Listener 
             return true;
         }
 
+        boolean studioOnly = false;
+        boolean noteblockOnly = false;
+        if (args.length > 0) {
+            if (args[0].equalsIgnoreCase("studio") || args[0].equalsIgnoreCase("real") || args[0].equalsIgnoreCase("original")) {
+                studioOnly = true;
+            } else if (args[0].equalsIgnoreCase("noteblock") || args[0].equalsIgnoreCase("nb")) {
+                noteblockOnly = true;
+            }
+        }
+
         // Si déjà en train de jouer, relance depuis le début
         stopMusic(player);
-        startMusic(player);
+        startMusic(player, !studioOnly, !noteblockOnly);
         return true;
     }
 
-    private void startMusic(Player player) {
+    private void startMusic(Player player, boolean playNoteBlocks, boolean playStudioAudio) {
         player.showTitle(Title.title(
                 Component.text("CHLORINE", NamedTextColor.AQUA, TextDecoration.BOLD),
                 Component.text("Twenty One Pilots ♫", NamedTextColor.GRAY),
@@ -94,21 +104,34 @@ public class ChlorineCommand implements CommandExecutor, TabCompleter, Listener 
                         .append(Component.newline())
                         .append(Component.text(" Tapez ", NamedTextColor.GRAY))
                         .append(Component.text("/chlorine stop", NamedTextColor.YELLOW, TextDecoration.UNDERLINED))
-                        .append(Component.text(" pour arrêter la musique à tout moment.", NamedTextColor.GRAY))
+                        .append(Component.text(" pour arrêter | ", NamedTextColor.GRAY))
+                        .append(Component.text("/chlorine studio", NamedTextColor.AQUA))
+                        .append(Component.text(" pour la version studio .ogg.", NamedTextColor.GRAY))
                         .append(Component.newline())
                         .append(Component.text("------------------------------------------------", NamedTextColor.DARK_AQUA))
         );
 
-        // Déclencher le son audio studio si présent dans le resource pack
-        try {
-            player.playSound(player.getLocation(), "music.chlorine", SoundCategory.RECORDS, 1.0f, 1.0f);
-            player.playSound(player.getLocation(), "custom.chlorine", SoundCategory.RECORDS, 1.0f, 1.0f);
-        } catch (Exception ignored) {}
+        // Déclencher le son audio studio sous toutes ses déclinaisons
+        if (playStudioAudio) {
+            Location loc = player.getLocation();
+            String[] soundKeys = {
+                    "music.chlorine", "minecraft:music.chlorine",
+                    "custom.chlorine", "minecraft:custom.chlorine",
+                    "chlorine", "minecraft:chlorine"
+            };
+            for (String key : soundKeys) {
+                try {
+                    player.playSound(loc, key, SoundCategory.RECORDS, 1.0f, 1.0f);
+                } catch (Exception ignored) {}
+            }
+        }
 
         // Indexation par step pour accès O(1)
         Map<Integer, List<NoteEvent>> noteMap = new HashMap<>();
-        for (NoteEvent ne : songNotes) {
-            noteMap.computeIfAbsent(ne.step(), k -> new ArrayList<>()).add(ne);
+        if (playNoteBlocks) {
+            for (NoteEvent ne : songNotes) {
+                noteMap.computeIfAbsent(ne.step(), k -> new ArrayList<>()).add(ne);
+            }
         }
 
         BukkitTask task = new BukkitRunnable() {
@@ -134,12 +157,14 @@ public class ChlorineCommand implements CommandExecutor, TabCompleter, Listener 
                     return;
                 }
 
-                // Jouer les notes de cet instant
-                List<NoteEvent> stepNotes = noteMap.get(currentStep);
-                if (stepNotes != null) {
-                    Location loc = player.getLocation();
-                    for (NoteEvent note : stepNotes) {
-                        player.playSound(loc, note.sound(), SoundCategory.RECORDS, note.volume(), note.pitch());
+                // Jouer les notes de cet instant si noteblocks activés
+                if (playNoteBlocks) {
+                    List<NoteEvent> stepNotes = noteMap.get(currentStep);
+                    if (stepNotes != null) {
+                        Location loc = player.getLocation();
+                        for (NoteEvent note : stepNotes) {
+                            player.playSound(loc, note.sound(), SoundCategory.RECORDS, note.volume(), note.pitch());
+                        }
                     }
                 }
 
@@ -170,10 +195,16 @@ public class ChlorineCommand implements CommandExecutor, TabCompleter, Listener 
             task.cancel();
             stopped = true;
         }
-        try {
-            player.stopSound("music.chlorine", SoundCategory.RECORDS);
-            player.stopSound("custom.chlorine", SoundCategory.RECORDS);
-        } catch (Exception ignored) {}
+        String[] soundKeys = {
+                "music.chlorine", "minecraft:music.chlorine",
+                "custom.chlorine", "minecraft:custom.chlorine",
+                "chlorine", "minecraft:chlorine"
+        };
+        for (String key : soundKeys) {
+            try {
+                player.stopSound(key, SoundCategory.RECORDS);
+            } catch (Exception ignored) {}
+        }
         return stopped;
     }
 
@@ -185,7 +216,7 @@ public class ChlorineCommand implements CommandExecutor, TabCompleter, Listener 
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         if (args.length == 1) {
-            List<String> sub = List.of("play", "stop");
+            List<String> sub = List.of("play", "studio", "noteblock", "stop");
             List<String> res = new ArrayList<>();
             for (String s : sub) {
                 if (s.startsWith(args[0].toLowerCase())) {

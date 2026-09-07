@@ -5,6 +5,14 @@
       {
         "name": "music/chlorine",
         "stream": true
+      },
+      {
+        "name": "chlorine",
+        "stream": true
+      },
+      {
+        "name": "records/chlorine",
+        "stream": true
       }
     ]
   },
@@ -13,6 +21,31 @@
     "sounds": [
       {
         "name": "music/chlorine",
+        "stream": true
+      },
+      {
+        "name": "chlorine",
+        "stream": true
+      },
+      {
+        "name": "records/chlorine",
+        "stream": true
+      }
+    ]
+  },
+  "chlorine": {
+    "category": "record",
+    "sounds": [
+      {
+        "name": "music/chlorine",
+        "stream": true
+      },
+      {
+        "name": "chlorine",
+        "stream": true
+      },
+      {
+        "name": "records/chlorine",
         "stream": true
       }
     ]
