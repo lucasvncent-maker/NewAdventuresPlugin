@@ -45,6 +45,7 @@ import org.bukkit.potion.PotionEffectType;
 
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import fr.loual.customminerals.items.Cuprite;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
