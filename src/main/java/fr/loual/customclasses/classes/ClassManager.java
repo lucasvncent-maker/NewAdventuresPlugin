@@ -135,8 +135,7 @@ public class ClassManager {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, PotionEffect.INFINITE_DURATION, 1, false, false, true));
             }
             case SIRENE -> {
-                // Respiration aquatique permanente et minage sans difficulté dans l'eau (Grâce du dauphin gérée dans l'eau)
-                player.addPotionEffect(new PotionEffect(PotionEffectType.WATER_BREATHING, PotionEffect.INFINITE_DURATION, 0, false, false, true));
+                // Minage sans difficulté dans l'eau (Respiration et Grâce du dauphin gérées dynamiquement dans l'eau)
                 if (subMiningAttr != null) {
                     subMiningAttr.setBaseValue(5.0); // Élimine tout malus sous-marin et de flottaison en nageant
                 }
