@@ -1,4 +1,4 @@
-﻿package fr.loual.customclasses.jobs;
+package fr.loual.customclasses.jobs;
 
 import org.bukkit.Material;
 

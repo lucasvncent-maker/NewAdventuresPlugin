@@ -1,4 +1,4 @@
-﻿package fr.loual.customclasses.jobs.commands;
+package fr.loual.customclasses.jobs.commands;
 
 import fr.loual.customclasses.jobs.JobManager;
 import fr.loual.customclasses.jobs.PlayerJob;

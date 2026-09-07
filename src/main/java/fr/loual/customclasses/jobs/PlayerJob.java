@@ -54,7 +54,7 @@ public enum PlayerJob {
             Component.text("  • M3 : Chemise de l'Architecte (Célérité II)", NamedTextColor.DARK_AQUA),
             Component.text("  • M4 : Pantalon de l'Architecte (Vision Nocturne activable avec /nv)", NamedTextColor.DARK_AQUA),
             Component.text("  • M5 : Chaussures de l'Architecte (Saut II avec /jb) + Plume de l'Architecte (Vol 30s)", NamedTextColor.DARK_AQUA)
-    ),
+    )),
 
     AVENTURIER("Aventurier", "aventurier", Material.COMPASS, List.of(
             Component.text("L'Explorateur Légendaire", NamedTextColor.GOLD, TextDecoration.ITALIC),
