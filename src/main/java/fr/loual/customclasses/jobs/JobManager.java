@@ -187,9 +187,10 @@ public class JobManager {
         // 3. Vision Nocturne (Mineur M1+ ou Pantalon de l'Architecte)
         boolean hasLeggings = CustomJobItems.isJobItem(inv.getLeggings(), CustomJobItems.ID_ARCHITECT_LEGGINGS);
         boolean canHaveNv = (job == PlayerJob.MINEUR && level >= 1) || hasLeggings;
+        boolean isSireneInWater = isSirene && (player.isInWater() || player.getEyeLocation().getBlock().getType() == Material.WATER);
         if (canHaveNv && isNightVisionEnabled(player)) {
             player.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, PotionEffect.INFINITE_DURATION, 0, false, false, true));
-        } else if (!isSirene) {
+        } else if (!isSireneInWater) {
             player.removePotionEffect(PotionEffectType.NIGHT_VISION);
         }
 

@@ -66,7 +66,9 @@ public class ClassListener implements Listener {
     private final Set<UUID> sauterelleSuperDrop = new HashSet<>();
     private final Set<UUID> sauterelleFallImmunity = new HashSet<>();
     private final Set<UUID> diablePuddleActive = new HashSet<>();
-    private final NamespacedKey arrowRainKey;
+    private final Map<UUID, ItemStack[]> diableStoredArmor = new HashMap<>();
+    private final Set<UUID> archerExplosiveArrowReady = new HashSet<>();
+    private final NamespacedKey explosiveArrowKey;
 
     private static final UUID PACK_ID = UUID.nameUUIDFromBytes("mon-pack-unique-v1".getBytes());
 
@@ -74,7 +76,7 @@ public class ClassListener implements Listener {
         this.plugin = plugin;
         this.classManager = plugin.getClassManager();
         this.skeletonArrowKey = new NamespacedKey(plugin, "skeleton_arrow");
-        this.arrowRainKey = new NamespacedKey(plugin, "archer_arrow_rain");
+        this.explosiveArrowKey = new NamespacedKey(plugin, "archer_explosive_arrow");
 
         startPeriodicTasks();
     }
@@ -116,7 +118,20 @@ public class ClassListener implements Listener {
                     // Maintenir les effets permanents de la sirène
                     ensurePermanentEffect(player, PotionEffectType.WATER_BREATHING, 0);
                     ensurePermanentEffect(player, PotionEffectType.DOLPHINS_GRACE, 0);
-                    ensurePermanentEffect(player, PotionEffectType.NIGHT_VISION, 0);
+
+                    // Vision nocturne : UNIQUEMENT dans l'eau
+                    boolean waterVision = player.isInWater() || player.getEyeLocation().getBlock().getType() == Material.WATER || player.getLocation().getBlock().getType() == Material.WATER;
+                    if (waterVision) {
+                        ensurePermanentEffect(player, PotionEffectType.NIGHT_VISION, 0);
+                    } else {
+                        boolean hasJobNv = false;
+                        try {
+                            hasJobNv = plugin.getJobManager().isNightVisionEnabled(player);
+                        } catch (Exception ignored) {}
+                        if (!hasJobNv) {
+                            player.removePotionEffect(PotionEffectType.NIGHT_VISION);
+                        }
+                    }
                 }
 
                 // --- 2. DIABLE : Dégâts directs sous la pluie ---
@@ -326,8 +341,13 @@ public class ClassListener implements Listener {
         assassinBackstabBuff.remove(uuid);
         sauterelleSuperDrop.remove(uuid);
         sauterelleFallImmunity.remove(uuid);
+        archerExplosiveArrowReady.remove(uuid);
         if (diablePuddleActive.remove(uuid)) {
             player.setInvulnerable(false);
+        }
+        ItemStack[] saved = diableStoredArmor.remove(uuid);
+        if (saved != null) {
+            player.getInventory().setArmorContents(saved);
         }
     }
 
@@ -339,13 +359,29 @@ public class ClassListener implements Listener {
         assassinBackstabBuff.remove(uuid);
         sauterelleSuperDrop.remove(uuid);
         sauterelleFallImmunity.remove(uuid);
+        archerExplosiveArrowReady.remove(uuid);
         if (diablePuddleActive.remove(uuid)) {
             player.setInvulnerable(false);
+        }
+        ItemStack[] saved = diableStoredArmor.remove(uuid);
+        if (saved != null) {
+            for (ItemStack item : saved) {
+                if (item != null && item.getType() != Material.AIR) {
+                    event.getDrops().add(item);
+                }
+            }
         }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryClick(InventoryClickEvent event) {
+        if (event.getWhoClicked() instanceof Player player && diablePuddleActive.contains(player.getUniqueId())) {
+            if (event.getSlotType() == org.bukkit.event.inventory.InventoryType.SlotType.ARMOR) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+
         if (!(event.getInventory().getHolder() instanceof ClassGuiHolder)) {
             return;
         }
@@ -490,14 +526,17 @@ public class ClassListener implements Listener {
                         event.setDamage(event.getDamage() * 0.20);
                     }
 
-                    // Bonus houe : Poison II (6s = 120t), Wither II (3s = 60t), Lenteur (4s = 80t)
+                    // Bonus houe : Dégâts accrus (+10), Poison IV surpuissant (8s = 160t), Wither III (6s = 120t), Lenteur II (5s = 100t)
                     if (isHoe(hand) && victim instanceof LivingEntity livingVictim) {
-                        livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.POISON, 120, 1));
-                        livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 60, 1));
-                        livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 80, 1));
-                        livingVictim.getWorld().spawnParticle(Particle.WITCH, livingVictim.getLocation().clone().add(0, 1, 0), 12, 0.3, 0.3, 0.3, 0.05);
+                        event.setDamage(event.getDamage() + 10.0);
+                        livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.POISON, 160, 3));
+                        livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 120, 2));
+                        livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 100, 1));
+                        livingVictim.getWorld().spawnParticle(Particle.WITCH, livingVictim.getLocation().clone().add(0, 1, 0), 20, 0.4, 0.4, 0.4, 0.05);
+                        livingVictim.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME, livingVictim.getLocation().clone().add(0, 0.8, 0), 15, 0.3, 0.3, 0.3, 0.05);
                         try {
-                            player.playSound(player.getLocation(), Sound.ENTITY_EVOKER_CAST_SPELL, 0.7f, 1.8f);
+                            player.playSound(player.getLocation(), Sound.ENTITY_EVOKER_CAST_SPELL, 0.8f, 1.6f);
+                            player.playSound(player.getLocation(), Sound.ENTITY_WITHER_SHOOT, 0.6f, 1.8f);
                         } catch (Exception ignored) {}
                     }
                 }
@@ -927,8 +966,36 @@ public class ClassListener implements Listener {
             return;
         }
 
-        // 8. ARCHER : 35% de chance de préserver la munition
+        // 8. ARCHER : Gestion flèche explosive & 35% de chance d'économie
         if (shooter instanceof Player player && classManager.getPlayerClass(player) == PlayerClass.ARCHER) {
+            // Capacité F : Flèche explosive armée
+            if (archerExplosiveArrowReady.remove(player.getUniqueId())) {
+                if (event.getProjectile() instanceof AbstractArrow arrow) {
+                    arrow.getPersistentDataContainer().set(explosiveArrowKey, PersistentDataType.BYTE, (byte) 1);
+                    arrow.setCritical(true);
+
+                    // Traînée de particules incendiaires pendant le vol
+                    new BukkitRunnable() {
+                        @Override
+                        public void run() {
+                            if (!arrow.isValid() || arrow.isInBlock() || arrow.isDead()) {
+                                cancel();
+                                return;
+                            }
+                            Location aLoc = arrow.getLocation();
+                            World w = aLoc.getWorld();
+                            if (w != null) {
+                                w.spawnParticle(Particle.FLAME, aLoc, 3, 0.05, 0.05, 0.05, 0.02);
+                                w.spawnParticle(Particle.SMOKE, aLoc, 2, 0.05, 0.05, 0.05, 0.02);
+                                w.spawnParticle(Particle.LAVA, aLoc, 1, 0, 0, 0, 0);
+                            }
+                        }
+                    }.runTaskTimer(plugin, 1L, 1L);
+
+                    player.playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 1.2f, 0.9f);
+                }
+            }
+
             if (Math.random() <= 0.35) {
                 event.setConsumeItem(false);
                 try {
@@ -1010,14 +1077,14 @@ public class ClassListener implements Listener {
                 triggerNecromancerMinionExplosion(player);
             }
             case ARCHER -> {
-                abilityCooldowns.put(uuid, now + 18_000L);
-                triggerArcherArrowRain(player);
+                abilityCooldowns.put(uuid, now + 14_000L);
+                triggerArcherExplosiveArrow(player);
             }
             default -> {}
         }
     }
 
-    // 1. ASSASSIN : Pas de l'Ombre (Téléportation 8 blocs + dégâts x2 dans le dos)
+    // 1. ASSASSIN : Pas de l'Ombre (Téléportation 15 blocs + dégâts x2 dans le dos)
     private void triggerAssassinShadowStep(Player player) {
         UUID uuid = player.getUniqueId();
         Location startLoc = player.getLocation();
@@ -1032,11 +1099,11 @@ public class ClassListener implements Listener {
         world.playSound(startLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.2f, 1.4f);
         world.playSound(startLoc, Sound.ENTITY_ILLUSIONER_MIRROR_MOVE, 1.0f, 1.2f);
 
-        // Téléportation sécurisée 8 blocs en avant
+        // Téléportation sécurisée 15 blocs en avant
         Vector dir = startLoc.getDirection();
         Location targetLoc = startLoc.clone();
 
-        for (double d = 1.0; d <= 8.0; d += 0.5) {
+        for (double d = 1.0; d <= 15.0; d += 0.5) {
             Location test = startLoc.clone().add(dir.clone().multiply(d));
             Block feetBlock = test.getBlock();
             Block headBlock = test.clone().add(0, 1, 0).getBlock();
@@ -1061,10 +1128,10 @@ public class ClassListener implements Listener {
         player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 50, 1, false, false, true));
 
         player.sendActionBar(Component.text("✦ PAS DE L'OMBRE ! Prochain coup dans le dos x2 DÉGÂTS ! ✦", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
-        player.sendMessage(Component.text("✦ Pas de l'Ombre : Téléporté 8 blocs en avant ! Votre prochaine frappe dans le dos infligera le DOUBLE de dégâts !", NamedTextColor.LIGHT_PURPLE));
+        player.sendMessage(Component.text("✦ Pas de l'Ombre : Téléporté jusqu'à 15 blocs en avant ! Votre prochaine frappe dans le dos infligera le DOUBLE de dégâts !", NamedTextColor.LIGHT_PURPLE));
     }
 
-    // 2. GUERRIER : Choc Tellurique (Frappe au sol en cône, étourdit 3s et renverse)
+    // 2. GUERRIER : Choc Tellurique (Frappe au sol en cône, projette puis étourdit 3s)
     private void triggerWarriorGroundSlam(Player player) {
         Location origin = player.getLocation();
         World world = origin.getWorld();
@@ -1110,44 +1177,48 @@ public class ClassListener implements Listener {
                     stunnedCount++;
                     target.damage(10.0, player);
 
-                    // Renversement & projection
-                    Vector kb = forward.clone().multiply(0.6).setY(0.45);
+                    // 1) Renversement & projection d'abord
+                    Vector kb = forward.clone().multiply(0.85).setY(0.55);
                     target.setVelocity(kb);
 
-                    // Étourdissement 3 secondes (60 ticks)
-                    target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, 5, false, true, true));
-                    target.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 60, 4, false, true, true));
-                    target.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE, 60, 4, false, true, true));
+                    // 2) Étourdissement 10 ticks plus tard une fois projeté
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                        if (!target.isValid() || target.isDead()) return;
 
-                    if (target instanceof Mob mob) {
-                        mob.setAI(false);
-                        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                            if (mob.isValid()) mob.setAI(true);
-                        }, 60L);
-                    }
+                        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, 5, false, true, true));
+                        target.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 60, 4, false, true, true));
+                        target.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE, 60, 4, false, true, true));
 
-                    // Étoiles d'étourdissement au-dessus de la tête
-                    new BukkitRunnable() {
-                        int ticks = 0;
-                        @Override
-                        public void run() {
-                            if (!target.isValid() || ticks++ >= 12) {
-                                cancel();
-                                return;
-                            }
-                            Location head = target.getEyeLocation().add(0, 0.4, 0);
-                            double angle = ticks * 0.8;
-                            Location p1 = head.clone().add(Math.cos(angle) * 0.4, 0, Math.sin(angle) * 0.4);
-                            target.getWorld().spawnParticle(Particle.CRIT, p1, 1, 0, 0, 0, 0);
-                            target.getWorld().spawnParticle(Particle.WAX_ON, p1, 1, 0, 0, 0, 0);
+                        if (target instanceof Mob mob) {
+                            mob.setAI(false);
+                            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                                if (mob.isValid()) mob.setAI(true);
+                            }, 60L);
                         }
-                    }.runTaskTimer(plugin, 0L, 5L);
+
+                        // Étoiles d'étourdissement au-dessus de la tête
+                        new BukkitRunnable() {
+                            int ticks = 0;
+                            @Override
+                            public void run() {
+                                if (!target.isValid() || ticks++ >= 12) {
+                                    cancel();
+                                    return;
+                                }
+                                Location head = target.getEyeLocation().add(0, 0.4, 0);
+                                double angle = ticks * 0.8;
+                                Location p1 = head.clone().add(Math.cos(angle) * 0.4, 0, Math.sin(angle) * 0.4);
+                                target.getWorld().spawnParticle(Particle.CRIT, p1, 1, 0, 0, 0, 0);
+                                target.getWorld().spawnParticle(Particle.WAX_ON, p1, 1, 0, 0, 0, 0);
+                            }
+                        }.runTaskTimer(plugin, 0L, 5L);
+                    }, 10L);
                 }
             }
         }
 
-        player.sendActionBar(Component.text("🔨 CHOC TELLURIQUE ! " + stunnedCount + " monstres étourdis (3s) !", NamedTextColor.GOLD, TextDecoration.BOLD));
-        player.sendMessage(Component.text("✦ Choc Tellurique : Sol martelé violemment ! Les ennemis dans le cône sont projetés et étourdis pendant 3s !", NamedTextColor.GOLD));
+        player.sendActionBar(Component.text("🔨 CHOC TELLURIQUE ! " + stunnedCount + " monstres projetés et étourdis (3s) !", NamedTextColor.GOLD, TextDecoration.BOLD));
+        player.sendMessage(Component.text("✦ Choc Tellurique : Sol martelé violemment ! Les ennemis dans le cône sont projetés puis étourdis pendant 3s !", NamedTextColor.GOLD));
     }
 
     // 3. SAUTERELLE : Catapulte Aérienne (Propulsion 15 blocs + onde de choc à l'impact)
@@ -1239,7 +1310,7 @@ public class ClassListener implements Listener {
         player.sendMessage(Component.text("✦ Cataclysme de la Sauterelle : Atterrissage surpuissant ! Les monstres dans 9 blocs sont propulsés et lourdement blessés !", NamedTextColor.GREEN));
     }
 
-    // 4. DIABLE : Flaque de Braises (Liquéfaction invincible 3s, brûle les monstres)
+    // 4. DIABLE : Flaque de Braises (Liquéfaction invincible 10s, armure invisible, brûle les monstres)
     private void triggerDiableLavaPuddle(Player player) {
         UUID uuid = player.getUniqueId();
         diablePuddleActive.add(uuid);
@@ -1248,9 +1319,18 @@ public class ClassListener implements Listener {
         World world = startLoc.getWorld();
         if (world == null) return;
 
+        // Sauvegarder et retirer temporairement l'armure pour masquer complètement l'armure flottante
+        ItemStack[] armor = player.getInventory().getArmorContents();
+        ItemStack[] savedArmor = new ItemStack[armor.length];
+        for (int i = 0; i < armor.length; i++) {
+            savedArmor[i] = armor[i] != null ? armor[i].clone() : null;
+        }
+        diableStoredArmor.put(uuid, savedArmor);
+        player.getInventory().setArmorContents(new ItemStack[4]);
+
         player.setInvulnerable(true);
-        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 70, 0, false, false, false));
-        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 65, 1, false, false, false));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 210, 0, false, false, false));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 205, 1, false, false, false));
 
         world.spawnParticle(Particle.LAVA, startLoc.clone().add(0, 0.3, 0), 25, 0.4, 0.1, 0.4, 0.05);
         world.spawnParticle(Particle.SOUL_FIRE_FLAME, startLoc.clone().add(0, 0.3, 0), 20, 0.5, 0.2, 0.5, 0.05);
@@ -1258,15 +1338,19 @@ public class ClassListener implements Listener {
         world.playSound(startLoc, Sound.BLOCK_LAVA_EXTINGUISH, 1.2f, 0.6f);
         world.playSound(startLoc, Sound.ENTITY_BLAZE_SHOOT, 1.0f, 0.7f);
 
-        player.sendActionBar(Component.text("🔥 FLAQUE DE BRAISES ACTIVE (Invincible 3s) ! 🔥", NamedTextColor.RED, TextDecoration.BOLD));
+        player.sendActionBar(Component.text("🔥 FLAQUE DE BRAISES ACTIVE (Invincible 10s) ! 🔥", NamedTextColor.RED, TextDecoration.BOLD));
 
         new BukkitRunnable() {
             int ticks = 0;
             @Override
             public void run() {
-                if (!player.isOnline() || ticks >= 60) {
+                if (!player.isOnline() || ticks >= 200) {
                     diablePuddleActive.remove(uuid);
+                    ItemStack[] saved = diableStoredArmor.remove(uuid);
                     if (player.isOnline()) {
+                        if (saved != null) {
+                            player.getInventory().setArmorContents(saved);
+                        }
                         player.setInvulnerable(false);
                         player.removePotionEffect(PotionEffectType.INVISIBILITY);
                         Location exitLoc = player.getLocation();
@@ -1369,7 +1453,7 @@ public class ClassListener implements Listener {
             if (entity instanceof LivingEntity target && !target.equals(player)) {
                 if (necroMinions.contains(target.getUniqueId())) continue;
 
-                target.damage(25.0, player);
+                target.damage(35.0, player);
 
                 Vector kb = target.getLocation().toVector().subtract(mLoc.toVector()).normalize().multiply(1.3).setY(0.55);
                 target.setVelocity(kb);
@@ -1384,73 +1468,68 @@ public class ClassListener implements Listener {
         player.sendMessage(Component.text("✦ Détonation Putride : Votre serviteur a été sacrifié dans une formidable déflagration nécrotique !", NamedTextColor.DARK_PURPLE));
     }
 
-    // 6. ARCHER : Pluie de Flèches (Déluge de flèches sur la zone ciblée)
-    private void triggerArcherArrowRain(Player player) {
-        Location eye = player.getEyeLocation();
-        World world = eye.getWorld();
-        if (world == null) return;
+    // 6. ARCHER : Flèche Explosive (Le prochain tir produit une colossale déflagration de 30 dégâts)
+    private void triggerArcherExplosiveArrow(Player player) {
+        UUID uuid = player.getUniqueId();
+        archerExplosiveArrowReady.add(uuid);
 
-        RayTraceResult result = world.rayTraceBlocks(eye, eye.getDirection(), 28.0, FluidCollisionMode.NEVER, true);
-        Location targetCenter;
-        if (result != null && result.getHitPosition() != null) {
-            targetCenter = result.getHitPosition().toLocation(world);
-        } else {
-            targetCenter = eye.clone().add(eye.getDirection().multiply(15.0));
-            targetCenter.setY(world.getHighestBlockYAt(targetCenter));
+        Location loc = player.getLocation();
+        World world = loc.getWorld();
+        if (world != null) {
+            world.spawnParticle(Particle.FLAME, loc.clone().add(0, 1.0, 0), 25, 0.3, 0.4, 0.3, 0.05);
+            world.spawnParticle(Particle.SMOKE, loc.clone().add(0, 1.0, 0), 15, 0.3, 0.3, 0.3, 0.05);
+            world.playSound(loc, Sound.ENTITY_TNT_PRIMED, 1.0f, 1.2f);
+            world.playSound(loc, Sound.ENTITY_FIREWORK_ROCKET_BLAST, 1.0f, 1.5f);
         }
 
-        world.playSound(eye, Sound.ITEM_CROSSBOW_SHOOT, 1.2f, 0.7f);
-        world.playSound(eye, Sound.ENTITY_ARROW_SHOOT, 1.4f, 0.5f);
-        try {
-            world.playSound(targetCenter, Sound.ITEM_TRIDENT_RIPTIDE_1, 1.2f, 1.5f);
-        } catch (Throwable ignored) {}
-
-        for (int deg = 0; deg < 360; deg += 20) {
-            double rad = Math.toRadians(deg);
-            Location pLoc = targetCenter.clone().add(Math.cos(rad) * 4.0, 0.2, Math.sin(rad) * 4.0);
-            world.spawnParticle(Particle.ENCHANTED_HIT, pLoc, 4, 0.1, 0.1, 0.1, 0.05);
-            world.spawnParticle(Particle.CRIT, pLoc, 2, 0.05, 0.05, 0.05, 0.02);
-        }
-
-        player.sendActionBar(Component.text("🏹 PLUIE DE FLÈCHES DÉCLENCHÉE ! 🏹", NamedTextColor.YELLOW, TextDecoration.BOLD));
-        player.sendMessage(Component.text("✦ Pluie de Flèches : Un déluge de flèches s'abat sur la zone ciblée !", NamedTextColor.YELLOW));
-
-        new BukkitRunnable() {
-            int wave = 0;
-            @Override
-            public void run() {
-                if (wave++ >= 6) {
-                    cancel();
-                    return;
-                }
-
-                for (int i = 0; i < 4; i++) {
-                    double offsetX = (Math.random() - 0.5) * 8.0;
-                    double offsetZ = (Math.random() - 0.5) * 8.0;
-                    Location spawnLoc = targetCenter.clone().add(offsetX, 13.0 + Math.random() * 2.0, offsetZ);
-
-                    Arrow arrow = world.spawnArrow(spawnLoc, new Vector((Math.random() - 0.5) * 0.1, -1.8, (Math.random() - 0.5) * 0.1), 1.8f, 12.0f);
-                    arrow.setShooter(player);
-                    arrow.setDamage(8.0);
-                    arrow.setPickupStatus(AbstractArrow.PickupStatus.DISALLOWED);
-                    arrow.getPersistentDataContainer().set(arrowRainKey, PersistentDataType.BYTE, (byte) 1);
-                    arrow.setCritical(true);
-
-                    world.spawnParticle(Particle.CRIT, spawnLoc, 3, 0.1, 0.1, 0.1, 0.05);
-                }
-                world.playSound(targetCenter, Sound.ENTITY_ARROW_SHOOT, 0.8f, 1.2f);
-            }
-        }.runTaskTimer(plugin, 4L, 4L);
+        player.sendActionBar(Component.text("💥 FLÈCHE EXPLOSIVE ARMÉE ! Tirez pour tout faire exploser ! 💥", NamedTextColor.GOLD, TextDecoration.BOLD));
+        player.sendMessage(Component.text("✦ Flèche Explosive : Votre prochain tir déclenchera une gigantesque déflagration destructrice à l'impact (30 dégâts) !", NamedTextColor.GOLD));
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onArrowRainHit(ProjectileHitEvent event) {
-        if (event.getEntity() instanceof Arrow arrow && arrow.getPersistentDataContainer().has(arrowRainKey, PersistentDataType.BYTE)) {
-            Location loc = arrow.getLocation();
-            World w = loc.getWorld();
-            if (w != null) {
-                w.spawnParticle(Particle.CRIT, loc, 5, 0.2, 0.2, 0.2, 0.05);
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onExplosiveArrowHit(ProjectileHitEvent event) {
+        if (event.getEntity() instanceof AbstractArrow arrow && arrow.getPersistentDataContainer().has(explosiveArrowKey, PersistentDataType.BYTE)) {
+            Location hitLoc = arrow.getLocation();
+            if (event.getHitBlock() != null) {
+                hitLoc = event.getHitBlock().getLocation().add(0.5, 0.5, 0.5);
+            } else if (event.getHitEntity() != null) {
+                hitLoc = event.getHitEntity().getLocation().add(0, 0.5, 0);
             }
+
+            World world = hitLoc.getWorld();
+            Player shooter = (arrow.getShooter() instanceof Player p) ? p : null;
+
+            if (world != null) {
+                // Effets d'explosion spectaculaires
+                world.spawnParticle(Particle.EXPLOSION_EMITTER, hitLoc, 3, 0.5, 0.5, 0.5, 0.0);
+                world.spawnParticle(Particle.FLAME, hitLoc, 60, 1.2, 1.2, 1.2, 0.15);
+                world.spawnParticle(Particle.LAVA, hitLoc, 25, 1.0, 0.8, 1.0, 0.05);
+                world.spawnParticle(Particle.CAMPFIRE_COSY_SMOKE, hitLoc, 30, 0.8, 0.8, 0.8, 0.08);
+
+                world.playSound(hitLoc, Sound.ENTITY_GENERIC_EXPLODE, 1.5f, 0.8f);
+                world.playSound(hitLoc, Sound.ENTITY_DRAGON_FIREBALL_EXPLODE, 1.2f, 1.1f);
+
+                int hitCount = 0;
+                for (Entity entity : world.getNearbyEntities(hitLoc, 6.5, 4.0, 6.5)) {
+                    if (entity instanceof LivingEntity target && !target.equals(shooter)) {
+                        if (shooter != null && necroMinions.contains(target.getUniqueId()) && shooter.getUniqueId().equals(minionToMaster.get(target.getUniqueId()))) {
+                            continue;
+                        }
+
+                        hitCount++;
+                        target.damage(30.0, shooter);
+                        target.setFireTicks(80); // 4 secondes de feu
+
+                        Vector kb = target.getLocation().toVector().subtract(hitLoc.toVector()).normalize().multiply(1.2).setY(0.6);
+                        target.setVelocity(kb);
+                    }
+                }
+
+                if (shooter != null && shooter.isOnline()) {
+                    shooter.sendActionBar(Component.text("💥 EXPLOSION DÉVASTATRICE (" + hitCount + " cibles pulvérisées, 30 dégâts) ! 💥", NamedTextColor.GOLD, TextDecoration.BOLD));
+                }
+            }
+
             Bukkit.getScheduler().runTaskLater(plugin, arrow::remove, 1L);
         }
     }

@@ -129,10 +129,9 @@ public class ClassManager {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, PotionEffect.INFINITE_DURATION, 1, false, false, true));
             }
             case SIRENE -> {
-                // Respiration aquatique, Grâce du dauphin et Vision nocturne permanentes
+                // Respiration aquatique et Grâce du dauphin permanentes (Vision nocturne uniquement dans l'eau)
                 player.addPotionEffect(new PotionEffect(PotionEffectType.WATER_BREATHING, PotionEffect.INFINITE_DURATION, 0, false, false, true));
                 player.addPotionEffect(new PotionEffect(PotionEffectType.DOLPHINS_GRACE, PotionEffect.INFINITE_DURATION, 0, false, false, true));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, PotionEffect.INFINITE_DURATION, 0, false, false, true));
             }
             case DIABLE -> {
                 // Immunité au feu et à la lave
