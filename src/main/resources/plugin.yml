@@ -2,7 +2,7 @@ name: newAdventurePlugin
 version: 1.0.0
 main: fr.loual.newadventure.NewAdventurePlugin
 api-version: '1.21.6'
-description: Plugin d'aventure global combinant Classes, Métiers et Minéraux (Cuprite).
+description: Plugin d'aventure global combinant Classes, Metiers et Mineraux (Cuprite).
 author: Loual
 
 commands:
@@ -11,7 +11,7 @@ commands:
     usage: /class [choose|reset|get|set|info|help]
     aliases: [classes]
   job:
-    description: Commandes de gestion des métiers et missions
+    description: Commandes de gestion des metiers et missions
     usage: /job [choose|reset|info|set]
     aliases: [jobs, metier, metiers]
   cuprite:
@@ -41,14 +41,14 @@ commands:
     aliases: [blackjack]
     permission: casino.admin
   croupier:
-    description: Raccourci pour faire apparaître un Croupier de Blackjack
+    description: Raccourci pour faire apparaitre un Croupier de Blackjack
     usage: /croupier
     permission: casino.admin
 
 permissions:
   customminerals.admin:
-    description: Permet d'administrer les minéraux personnalisés (Cuprite)
+    description: Permet d'administrer les mineraux personnalises (Cuprite)
     default: op
   casino.admin:
-    description: Permet de faire apparaître ou supprimer des croupiers de casino
+    description: Permet de faire apparaitre ou supprimer des croupiers de casino
     default: op
