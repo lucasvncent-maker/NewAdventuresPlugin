@@ -78,6 +78,7 @@ public class ClassListener implements Listener {
     // Capacités Spéciales (Touche F)
     private final Map<UUID, Long> abilityCooldowns = new HashMap<>();
     private final Map<UUID, Long> assassinBackstabBuff = new HashMap<>();
+    private final Map<UUID, ItemStack[]> assassinStoredArmor = new HashMap<>();
     private final Set<UUID> sauterelleSuperDrop = new HashSet<>();
     private final Set<UUID> sauterelleFallImmunity = new HashSet<>();
     private final Set<UUID> diablePuddleActive = new HashSet<>();
@@ -423,6 +424,10 @@ public class ClassListener implements Listener {
         if (saved != null) {
             player.getInventory().setArmorContents(saved);
         }
+        ItemStack[] savedAssassin = assassinStoredArmor.remove(uuid);
+        if (savedAssassin != null) {
+            player.getInventory().setArmorContents(savedAssassin);
+        }
     }
 
     @EventHandler
@@ -445,11 +450,19 @@ public class ClassListener implements Listener {
                 }
             }
         }
+        ItemStack[] savedAssassin = assassinStoredArmor.remove(uuid);
+        if (savedAssassin != null) {
+            for (ItemStack item : savedAssassin) {
+                if (item != null && item.getType() != Material.AIR) {
+                    event.getDrops().add(item);
+                }
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryClick(InventoryClickEvent event) {
-        if (event.getWhoClicked() instanceof Player player && diablePuddleActive.contains(player.getUniqueId())) {
+        if (event.getWhoClicked() instanceof Player player && (diablePuddleActive.contains(player.getUniqueId()) || assassinStoredArmor.containsKey(player.getUniqueId()))) {
             if (event.getSlotType() == org.bukkit.event.inventory.InventoryType.SlotType.ARMOR) {
                 event.setCancelled(true);
                 return;
@@ -1299,6 +1312,38 @@ public class ClassListener implements Listener {
 
         player.teleport(targetLoc);
 
+        // Dégâts et traînée tranchante aux ennemis traversés par le Dash
+        Set<UUID> hitTargets = new HashSet<>();
+        Vector dashVec = targetLoc.toVector().subtract(startLoc.toVector());
+        double dashDist = dashVec.length();
+
+        if (dashDist > 0.4) {
+            Vector step = dashVec.clone().normalize().multiply(0.75);
+            Location current = startLoc.clone();
+            int numSteps = (int) (dashDist / 0.75);
+
+            for (int i = 0; i <= numSteps; i++) {
+                world.spawnParticle(Particle.SWEEP_ATTACK, current.clone().add(0, 1.0, 0), 1, 0.1, 0.1, 0.1, 0);
+                world.spawnParticle(Particle.SQUID_INK, current.clone().add(0, 0.9, 0), 3, 0.15, 0.15, 0.15, 0.02);
+                world.spawnParticle(Particle.LARGE_SMOKE, current.clone().add(0, 0.6, 0), 2, 0.1, 0.1, 0.1, 0.02);
+
+                for (Entity ent : world.getNearbyEntities(current.clone().add(0, 0.9, 0), 1.25, 1.25, 1.25)) {
+                    if (ent instanceof LivingEntity target && !target.equals(player) && !target.isDead() && target.isValid()) {
+                        if (!necroMinions.contains(target.getUniqueId()) && hitTargets.add(target.getUniqueId())) {
+                            // Dégâts tranchants de l'ombre
+                            target.damage(9.0, player);
+                            target.setVelocity(target.getVelocity().add(dashVec.clone().normalize().multiply(0.35).setY(0.18)));
+                            world.spawnParticle(Particle.CRIT, target.getEyeLocation(), 12, 0.2, 0.2, 0.2, 0.1);
+                            world.spawnParticle(Particle.SOUL_FIRE_FLAME, target.getLocation().add(0, 0.8, 0), 8, 0.2, 0.2, 0.2, 0.05);
+                            world.playSound(target.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1.2f, 1.1f);
+                            world.playSound(target.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.0f, 1.3f);
+                        }
+                    }
+                }
+                current.add(step);
+            }
+        }
+
         // Effets à l'arrivée
         world.spawnParticle(Particle.LARGE_SMOKE, targetLoc.clone().add(0, 1.0, 0), 20, 0.4, 0.5, 0.4, 0.05);
         world.spawnParticle(Particle.SOUL_FIRE_FLAME, targetLoc.clone().add(0, 1.0, 0), 15, 0.3, 0.4, 0.3, 0.05);
@@ -1306,11 +1351,46 @@ public class ClassListener implements Listener {
         world.playSound(targetLoc, Sound.ENTITY_PHANTOM_FLAP, 1.2f, 1.6f);
         world.playSound(targetLoc, Sound.ITEM_CHORUS_FRUIT_TELEPORT, 1.0f, 1.5f);
 
-        assassinBackstabBuff.put(uuid, System.currentTimeMillis() + 10_000L);
-        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 50, 1, false, false, true));
+        // Invisibilité totale (armure masquée comme le Diable) pendant 1 seconde (20 ticks)
+        ItemStack[] prevArmor = assassinStoredArmor.remove(uuid);
+        if (prevArmor != null) {
+            player.getInventory().setArmorContents(prevArmor);
+        }
 
-        player.sendActionBar(Component.text("✦ PAS DE L'OMBRE ! Prochain coup dans le dos x2 DÉGÂTS ! ✦", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
-        player.sendMessage(Component.text("✦ Pas de l'Ombre : Téléporté jusqu'à 15 blocs en avant ! Votre prochaine frappe dans le dos infligera le DOUBLE de dégâts !", NamedTextColor.LIGHT_PURPLE));
+        ItemStack[] armor = player.getInventory().getArmorContents();
+        ItemStack[] savedArmor = new ItemStack[armor.length];
+        for (int i = 0; i < armor.length; i++) {
+            savedArmor[i] = armor[i] != null ? armor[i].clone() : null;
+        }
+        assassinStoredArmor.put(uuid, savedArmor);
+        player.getInventory().setArmorContents(new ItemStack[4]);
+
+        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 25, 0, false, false, false));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 45, 1, false, false, true));
+
+        // Rétablissement de l'armure et fin de l'invisibilité après 1 seconde (20 ticks)
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            ItemStack[] saved = assassinStoredArmor.remove(uuid);
+            if (player.isOnline()) {
+                if (saved != null) {
+                    player.getInventory().setArmorContents(saved);
+                }
+                player.removePotionEffect(PotionEffectType.INVISIBILITY);
+                Location exitLoc = player.getLocation();
+                World w = exitLoc.getWorld();
+                if (w != null) {
+                    w.spawnParticle(Particle.LARGE_SMOKE, exitLoc.clone().add(0, 1.0, 0), 15, 0.3, 0.4, 0.3, 0.05);
+                    w.spawnParticle(Particle.SQUID_INK, exitLoc.clone().add(0, 0.8, 0), 10, 0.2, 0.3, 0.2, 0.03);
+                    w.playSound(exitLoc, Sound.ENTITY_ILLUSIONER_MIRROR_MOVE, 0.8f, 1.5f);
+                }
+            }
+        }, 20L);
+
+        assassinBackstabBuff.put(uuid, System.currentTimeMillis() + 10_000L);
+
+        String sliceMsg = hitTargets.isEmpty() ? "" : " (" + hitTargets.size() + " ennemis tranchés !)";
+        player.sendActionBar(Component.text("✦ PAS DE L'OMBRE ! Invisible 1s" + sliceMsg + " - Prochain coup dos x2 ! ✦", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
+        player.sendMessage(Component.text("✦ Pas de l'Ombre : Vous traversez les ombres (invisible 1s avec armure masquée) ! Ennemis tranchés : " + hitTargets.size() + ". Prochain coup dans le dos doublé !", NamedTextColor.LIGHT_PURPLE));
     }
 
     // 2. GUERRIER : Choc Tellurique (Frappe au sol en cône, projette puis étourdit 3s)
