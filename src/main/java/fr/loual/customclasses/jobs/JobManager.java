@@ -25,12 +25,14 @@ public class JobManager {
     private final NewAdventurePlugin plugin;
     private final NamespacedKey jobKey;
     private final NamespacedKey nvKey;
+    private final NamespacedKey jbKey;
     private final Map<UUID, PlayerJob> cache = new HashMap<>();
 
     public JobManager(NewAdventurePlugin plugin) {
         this.plugin = plugin;
         this.jobKey = new NamespacedKey(plugin, "player_job");
         this.nvKey = new NamespacedKey(plugin, "mineur_nv_enabled");
+        this.jbKey = new NamespacedKey(plugin, "architect_jb_enabled");
     }
 
     public PlayerJob getPlayerJob(Player player) {
@@ -63,7 +65,9 @@ public class JobManager {
         setPlayerJob(player, PlayerJob.NONE);
         setJobLevel(player, PlayerJob.AGRICULTEUR, 0);
         setJobLevel(player, PlayerJob.MINEUR, 0);
+        setJobLevel(player, PlayerJob.ARCHITECTE, 0);
         setNightVisionEnabled(player, false);
+        setJumpBoostEnabled(player, false);
         applyJobEffects(player);
         JobRecipes.syncDiscoveredRecipes(plugin, player);
         player.sendMessage(
@@ -90,6 +94,8 @@ public class JobManager {
             return AgriculteurMissions.getMission(level);
         } else if (job == PlayerJob.MINEUR) {
             return MineurMissions.getMission(level);
+        } else if (job == PlayerJob.ARCHITECTE) {
+            return ArchitecteMissions.getMission(level);
         }
         return null;
     }
@@ -110,40 +116,98 @@ public class JobManager {
         return next;
     }
 
+    public boolean isJumpBoostEnabled(Player player) {
+        Byte b = player.getPersistentDataContainer().get(jbKey, PersistentDataType.BYTE);
+        return b != null && b == (byte) 1;
+    }
+
+    public void setJumpBoostEnabled(Player player, boolean enabled) {
+        player.getPersistentDataContainer().set(jbKey, PersistentDataType.BYTE, (byte) (enabled ? 1 : 0));
+        applyJobEffects(player);
+    }
+
+    public boolean toggleJumpBoost(Player player) {
+        boolean next = !isJumpBoostEnabled(player);
+        setJumpBoostEnabled(player, next);
+        return next;
+    }
+
     /**
-     * Applique les effets permanents selon le métier et le palier de mission.
+     * Applique les effets permanents selon le métier, les paliers de mission et les pièces d'armure de l'Architecte.
      */
     public void applyJobEffects(Player player) {
         PlayerJob job = getPlayerJob(player);
         int level = getJobLevel(player, job);
 
         boolean isSirene = false;
+        boolean isSauterelle = false;
         try {
-            isSirene = (plugin.getClassManager().getPlayerClass(player) == PlayerClass.SIRENE);
+            PlayerClass pc = plugin.getClassManager().getPlayerClass(player);
+            isSirene = (pc == PlayerClass.SIRENE);
+            isSauterelle = (pc == PlayerClass.SAUTERELLE);
         } catch (Exception ignored) {}
 
-        if (job == PlayerJob.MINEUR) {
-            // Haste permanent
-            if (level >= 3) {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, PotionEffect.INFINITE_DURATION, 1, false, false, true));
-            } else if (level >= 1) {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, PotionEffect.INFINITE_DURATION, 0, false, false, true));
-            } else {
-                player.removePotionEffect(PotionEffectType.HASTE);
-            }
+        var inv = player.getInventory();
 
-            // Night Vision
-            if (level >= 1 && isNightVisionEnabled(player)) {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, PotionEffect.INFINITE_DURATION, 0, false, false, true));
-            } else if (!isSirene) {
-                player.removePotionEffect(PotionEffectType.NIGHT_VISION);
+        // 1. Célérité (Haste)
+        boolean hasHaste = false;
+        int hasteAmp = 0;
+        if (job == PlayerJob.MINEUR) {
+            if (level >= 3) {
+                hasHaste = true;
+                hasteAmp = 1; // Haste II
+            } else if (level >= 1) {
+                hasHaste = true;
+                hasteAmp = 0; // Haste I
             }
+        }
+        if (CustomJobItems.isJobItem(inv.getChestplate(), CustomJobItems.ID_ARCHITECT_CHESTPLATE)) {
+            hasHaste = true;
+            hasteAmp = Math.max(hasteAmp, 1); // Chemise donne Haste II
+        }
+
+        if (hasHaste) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, PotionEffect.INFINITE_DURATION, hasteAmp, false, false, true));
         } else {
-            // Nettoyage si le joueur n'est pas mineur
             player.removePotionEffect(PotionEffectType.HASTE);
-            if (!isSirene) {
-                player.removePotionEffect(PotionEffectType.NIGHT_VISION);
+        }
+
+        // 2. Vitesse (Speed II avec Chapeau de l'Architecte)
+        if (CustomJobItems.isJobItem(inv.getHelmet(), CustomJobItems.ID_ARCHITECT_HELMET)) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, PotionEffect.INFINITE_DURATION, 1, false, false, true));
+        } else {
+            if (player.hasPotionEffect(PotionEffectType.SPEED)) {
+                PotionEffect pe = player.getPotionEffect(PotionEffectType.SPEED);
+                if (pe != null && pe.getDuration() > 3600 * 20) {
+                    player.removePotionEffect(PotionEffectType.SPEED);
+                }
             }
+        }
+
+        // 3. Vision Nocturne (Mineur M1+ ou Pantalon de l'Architecte)
+        boolean hasLeggings = CustomJobItems.isJobItem(inv.getLeggings(), CustomJobItems.ID_ARCHITECT_LEGGINGS);
+        boolean canHaveNv = (job == PlayerJob.MINEUR && level >= 1) || hasLeggings;
+        if (canHaveNv && isNightVisionEnabled(player)) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, PotionEffect.INFINITE_DURATION, 0, false, false, true));
+        } else if (!isSirene) {
+            player.removePotionEffect(PotionEffectType.NIGHT_VISION);
+        }
+
+        // 4. Saut Amélioré (Jump Boost II avec Chaussures de l'Architecte via /jb)
+        boolean hasBoots = CustomJobItems.isJobItem(inv.getBoots(), CustomJobItems.ID_ARCHITECT_BOOTS);
+        if (hasBoots && isJumpBoostEnabled(player)) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, PotionEffect.INFINITE_DURATION, 1, false, false, true));
+        } else if (!isSauterelle) {
+            player.removePotionEffect(PotionEffectType.JUMP_BOOST);
+        }
+    }
+
+    /**
+     * Tâche périodique (toutes les secondes) pour actualiser les effets de l'armure de l'Architecte.
+     */
+    public void tickArmorEffects() {
+        for (Player player : plugin.getServer().getOnlinePlayers()) {
+            applyJobEffects(player);
         }
     }
 
@@ -167,6 +231,52 @@ public class JobManager {
      */
     public String getRequirementKeyForMaterial(Material mat) {
         if (mat == null) return null;
+        String name = mat.name();
+
+        // --- ARCHITECTE ---
+        if (name.endsWith("_LOG") || name.endsWith("_WOOD") || name.endsWith("_PLANKS")
+                || mat == Material.BAMBOO_BLOCK || mat == Material.STRIPPED_BAMBOO_BLOCK || mat == Material.BAMBOO_PLANKS) {
+            return "WOOD";
+        }
+        if (mat == Material.STONE_BRICKS || mat == Material.MOSSY_STONE_BRICKS
+                || mat == Material.CRACKED_STONE_BRICKS || mat == Material.CHISELED_STONE_BRICKS) {
+            return "STONE_BRICKS";
+        }
+        if (mat == Material.SAND || mat == Material.RED_SAND) {
+            return "SAND";
+        }
+        if (name.endsWith("_WOOL")) {
+            return "WOOL";
+        }
+        if (mat == Material.RED_DYE) return "RED_DYE";
+        if (mat == Material.BLUE_DYE) return "BLUE_DYE";
+        if (mat == Material.YELLOW_DYE) return "YELLOW_DYE";
+        if (mat == Material.GREEN_DYE) return "GREEN_DYE";
+
+        if (mat == Material.CHEST || mat == Material.TRAPPED_CHEST || mat == Material.BARREL) {
+            return "CHEST";
+        }
+        if (mat == Material.ENCHANTING_TABLE) return "ENCHANTING_TABLE";
+        if (mat == Material.BOOKSHELF || mat == Material.CHISELED_BOOKSHELF) return "BOOKSHELF";
+        if (mat == Material.ENDER_CHEST) return "ENDER_CHEST";
+
+        if (mat == Material.GLASS || mat == Material.TINTED_GLASS || name.endsWith("_STAINED_GLASS") || (name.endsWith("_GLASS") && !name.contains("BOTTLE") && !name.contains("SPYGLASS"))) {
+            return "GLASS";
+        }
+        if (mat == Material.LANTERN || mat == Material.SOUL_LANTERN) return "LANTERN";
+        if (name.endsWith("_TRAPDOOR")) return "TRAPDOOR";
+        if (name.endsWith("_LEAVES")) return "LEAVES";
+
+        if (mat == Material.SEA_LANTERN) return "SEA_LANTERN";
+        if (mat == Material.CALCITE) return "CALCITE";
+        if (mat == Material.QUARTZ_BLOCK || mat == Material.SMOOTH_QUARTZ || mat == Material.CHISELED_QUARTZ_BLOCK || mat == Material.QUARTZ_PILLAR || mat == Material.QUARTZ_BRICKS) {
+            return "QUARTZ_BLOCK";
+        }
+        if (mat == Material.END_ROD) return "END_ROD";
+        if (mat == Material.OCHRE_FROGLIGHT || mat == Material.VERDANT_FROGLIGHT || mat == Material.PEARLESCENT_FROGLIGHT) {
+            return "FROGLIGHT";
+        }
+
         return switch (mat) {
             // Agriculteur
             case CARROT -> "CARROT";
@@ -289,6 +399,85 @@ public class JobManager {
                 case "SPAWNER" -> {
                     if (type == Material.SPAWNER) count += item.getAmount();
                 }
+
+                // --- ARCHITECTE ---
+                case "WOOD" -> {
+                    String n = type.name();
+                    if (n.endsWith("_LOG") || n.endsWith("_WOOD") || n.endsWith("_PLANKS")
+                            || type == Material.BAMBOO_BLOCK || type == Material.STRIPPED_BAMBOO_BLOCK || type == Material.BAMBOO_PLANKS) {
+                        count += item.getAmount();
+                    }
+                }
+                case "STONE_BRICKS" -> {
+                    if (type == Material.STONE_BRICKS || type == Material.MOSSY_STONE_BRICKS
+                            || type == Material.CRACKED_STONE_BRICKS || type == Material.CHISELED_STONE_BRICKS) {
+                        count += item.getAmount();
+                    }
+                }
+                case "SAND" -> {
+                    if (type == Material.SAND || type == Material.RED_SAND) count += item.getAmount();
+                }
+                case "WOOL" -> {
+                    if (type.name().endsWith("_WOOL")) count += item.getAmount();
+                }
+                case "RED_DYE" -> {
+                    if (type == Material.RED_DYE) count += item.getAmount();
+                }
+                case "BLUE_DYE" -> {
+                    if (type == Material.BLUE_DYE) count += item.getAmount();
+                }
+                case "YELLOW_DYE" -> {
+                    if (type == Material.YELLOW_DYE) count += item.getAmount();
+                }
+                case "GREEN_DYE" -> {
+                    if (type == Material.GREEN_DYE) count += item.getAmount();
+                }
+                case "CHEST" -> {
+                    if (type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL) count += item.getAmount();
+                }
+                case "ENCHANTING_TABLE" -> {
+                    if (type == Material.ENCHANTING_TABLE) count += item.getAmount();
+                }
+                case "BOOKSHELF" -> {
+                    if (type == Material.BOOKSHELF || type == Material.CHISELED_BOOKSHELF) count += item.getAmount();
+                }
+                case "ENDER_CHEST" -> {
+                    if (type == Material.ENDER_CHEST) count += item.getAmount();
+                }
+                case "GLASS" -> {
+                    String n = type.name();
+                    if (type == Material.GLASS || type == Material.TINTED_GLASS || n.endsWith("_STAINED_GLASS") || (n.endsWith("_GLASS") && !n.contains("BOTTLE") && !n.contains("SPYGLASS"))) {
+                        count += item.getAmount();
+                    }
+                }
+                case "LANTERN" -> {
+                    if (type == Material.LANTERN || type == Material.SOUL_LANTERN) count += item.getAmount();
+                }
+                case "TRAPDOOR" -> {
+                    if (type.name().endsWith("_TRAPDOOR")) count += item.getAmount();
+                }
+                case "LEAVES" -> {
+                    if (type.name().endsWith("_LEAVES")) count += item.getAmount();
+                }
+                case "SEA_LANTERN" -> {
+                    if (type == Material.SEA_LANTERN) count += item.getAmount();
+                }
+                case "CALCITE" -> {
+                    if (type == Material.CALCITE) count += item.getAmount();
+                }
+                case "QUARTZ_BLOCK" -> {
+                    if (type == Material.QUARTZ_BLOCK || type == Material.SMOOTH_QUARTZ || type == Material.CHISELED_QUARTZ_BLOCK || type == Material.QUARTZ_PILLAR || type == Material.QUARTZ_BRICKS) {
+                        count += item.getAmount();
+                    }
+                }
+                case "END_ROD" -> {
+                    if (type == Material.END_ROD) count += item.getAmount();
+                }
+                case "FROGLIGHT" -> {
+                    if (type == Material.OCHRE_FROGLIGHT || type == Material.VERDANT_FROGLIGHT || type == Material.PEARLESCENT_FROGLIGHT) {
+                        count += item.getAmount();
+                    }
+                }
                 default -> {}
             }
         }
@@ -408,6 +597,28 @@ public class JobManager {
                     player.sendMessage(Component.text("✦ Récompenses Mineur M3 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
                             .append(Component.text("Célérité II permanent + Régénération, Résistance & Résistance au Feu sous la couche 30 !", NamedTextColor.YELLOW)));
                 }
+            } else if (job == PlayerJob.ARCHITECTE) {
+                if (missionNumber == 1) {
+                    player.sendMessage(Component.text("✦ Récompense Architecte M1 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("Accès instantané à l'établi via la commande /craft (/wb, /workbench) !", NamedTextColor.YELLOW)));
+                } else if (missionNumber == 2) {
+                    player.sendMessage(Component.text("✦ Récompenses Architecte M2 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("Accès au tailleur de pierre (/sc, /stonecutter) + Chapeau de l'Architecte (Vitesse II) !", NamedTextColor.YELLOW)));
+                    giveOrDropItem(player, CustomJobItems.getArchitectHelmet());
+                } else if (missionNumber == 3) {
+                    player.sendMessage(Component.text("✦ Récompense Architecte M3 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("Chemise de l'Architecte reçue (Célérité II permanent) !", NamedTextColor.YELLOW)));
+                    giveOrDropItem(player, CustomJobItems.getArchitectChestplate());
+                } else if (missionNumber == 4) {
+                    player.sendMessage(Component.text("✦ Récompense Architecte M4 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("Pantalon de l'Architecte reçu (Vision Nocturne avec /nv) !", NamedTextColor.YELLOW)));
+                    giveOrDropItem(player, CustomJobItems.getArchitectLeggings());
+                } else if (missionNumber == 5) {
+                    player.sendMessage(Component.text("✦ Récompenses Suprêmes Architecte M5 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("Chaussures de l'Architecte (Saut II avec /jb) + Plume de l'Architecte (Vol Créatif 30s) !", NamedTextColor.YELLOW)));
+                    giveOrDropItem(player, CustomJobItems.getArchitectBoots());
+                    giveOrDropItem(player, CustomJobItems.getArchitectFeather());
+                }
             }
 
             player.sendMessage(Component.text("★ ========================================= ★", NamedTextColor.GOLD, TextDecoration.BOLD));
@@ -415,6 +626,15 @@ public class JobManager {
         }
 
         return completedAny;
+    }
+
+    public void giveOrDropItem(Player player, org.bukkit.inventory.ItemStack item) {
+        if (player == null || item == null) return;
+        Map<Integer, org.bukkit.inventory.ItemStack> leftover = player.getInventory().addItem(item);
+        if (!leftover.isEmpty()) {
+            leftover.values().forEach(drop -> player.getWorld().dropItemNaturally(player.getLocation(), drop));
+            player.sendMessage(Component.text("Votre inventaire était plein, un objet a été déposé à vos pieds !", NamedTextColor.YELLOW));
+        }
     }
 
     public void unloadPlayer(Player player) {

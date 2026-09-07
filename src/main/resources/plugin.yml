@@ -20,9 +20,21 @@ commands:
     aliases: [customminerals]
     permission: customminerals.admin
   nv:
-    description: Activer ou desactiver la Vision Nocturne (Mineur)
+    description: Activer ou desactiver la Vision Nocturne (Mineur / Architecte)
     usage: /nv
     aliases: [nightvision]
+  craft:
+    description: Ouvrir la table de craft a distance (Architecte M1)
+    usage: /craft
+    aliases: [workbench, wb]
+  stonecutter:
+    description: Ouvrir le tailleur de pierre a distance (Architecte M2)
+    usage: /stonecutter
+    aliases: [sc]
+  jb:
+    description: Activer ou desactiver le Saut Ameliore II (Architecte M5)
+    usage: /jb
+    aliases: [jumpboost]
 
 permissions:
   customminerals.admin:

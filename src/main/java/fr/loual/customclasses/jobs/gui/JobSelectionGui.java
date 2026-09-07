@@ -1,6 +1,7 @@
 package fr.loual.customclasses.jobs.gui;
 
 import fr.loual.customclasses.jobs.AgriculteurMissions;
+import fr.loual.customclasses.jobs.ArchitecteMissions;
 import fr.loual.customclasses.jobs.JobManager;
 import fr.loual.customclasses.jobs.JobMission;
 import fr.loual.customclasses.jobs.MineurMissions;
@@ -52,12 +53,15 @@ public class JobSelectionGui {
         JobManager jobManager = plugin.getJobManager();
         PlayerJob currentJob = jobManager.getPlayerJob(player);
 
-        // 1. Icônes des métiers (Slot 12 : Agriculteur, Slot 14 : Mineur)
+        // 1. Icônes des métiers (Slot 11 : Agriculteur, Slot 13 : Mineur, Slot 15 : Architecte)
         ItemStack agriIcon = createJobIcon(player, PlayerJob.AGRICULTEUR, currentJob, jobManager);
-        inv.setItem(12, agriIcon);
+        inv.setItem(11, agriIcon);
 
         ItemStack mineurIcon = createJobIcon(player, PlayerJob.MINEUR, currentJob, jobManager);
-        inv.setItem(14, mineurIcon);
+        inv.setItem(13, mineurIcon);
+
+        ItemStack archIcon = createJobIcon(player, PlayerJob.ARCHITECTE, currentJob, jobManager);
+        inv.setItem(15, archIcon);
 
         // 2. Affichage des missions selon le métier actif
         if (currentJob == PlayerJob.AGRICULTEUR) {
@@ -115,6 +119,37 @@ public class JobSelectionGui {
             }
             inv.setItem(31, minerInfo);
 
+        } else if (currentJob == PlayerJob.ARCHITECTE) {
+            int completedLevel = jobManager.getJobLevel(player, PlayerJob.ARCHITECTE);
+
+            int[] missionSlots = { 20, 21, 22, 23, 24 };
+            for (int i = 0; i < 5; i++) {
+                JobMission mission = ArchitecteMissions.getMission(i + 1);
+                if (mission != null) {
+                    ItemStack missionItem = createMissionItem(player, jobManager, PlayerJob.ARCHITECTE, mission, completedLevel);
+                    inv.setItem(missionSlots[i], missionItem);
+                }
+            }
+
+            // Guide de l'Architecte au slot 31
+            ItemStack archInfo = new ItemStack(Material.BOOK);
+            ItemMeta infoMeta = archInfo.getItemMeta();
+            if (infoMeta != null) {
+                infoMeta.displayName(Component.text("✦ Guide de l'Architecte ✦", NamedTextColor.GOLD, TextDecoration.BOLD));
+                infoMeta.lore(List.of(
+                        Component.text("Outils nomades : /craft (/wb) et /stonecutter (/sc)", NamedTextColor.YELLOW),
+                        Component.text("M1 : Commande /craft pour ouvrir un établi partout", NamedTextColor.GRAY),
+                        Component.text("M2 : Commande /sc + Chapeau (Vitesse II)", NamedTextColor.GRAY),
+                        Component.text("M3 : Chemise (Célérité II)", NamedTextColor.GRAY),
+                        Component.text("M4 : Pantalon (Vision Nocturne /nv)", NamedTextColor.GRAY),
+                        Component.text("M5 : Chaussures (Saut II /jb) + Plume (Vol 30s) !", NamedTextColor.GRAY),
+                        Component.empty(),
+                        Component.text("✦ L'armure complète de 4 pièces active le vol avec la Plume !", NamedTextColor.AQUA)
+                ));
+                archInfo.setItemMeta(infoMeta);
+            }
+            inv.setItem(31, archInfo);
+
         } else {
             // Indication pour choisir le métier
             ItemStack info = new ItemStack(Material.BOOK);
@@ -146,7 +181,7 @@ public class JobSelectionGui {
             List<Component> lore = new ArrayList<>(job.getDescription());
             lore.add(Component.empty());
 
-            int maxMissions = (job == PlayerJob.AGRICULTEUR) ? 4 : 3;
+            int maxMissions = (job == PlayerJob.AGRICULTEUR) ? 4 : (job == PlayerJob.ARCHITECTE ? 5 : 3);
             if (isCurrent) {
                 int level = jm.getJobLevel(player, job);
                 lore.add(Component.text("✔ Métier actif - Niveau de mission : " + level + " / " + maxMissions, NamedTextColor.GREEN, TextDecoration.BOLD));

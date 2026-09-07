@@ -1,7 +1,6 @@
 package fr.loual.customclasses.jobs.commands;
 
 import fr.loual.newadventure.NewAdventurePlugin;
-import fr.loual.customclasses.jobs.CustomJobItems;
 import fr.loual.customclasses.jobs.JobManager;
 import fr.loual.customclasses.jobs.PlayerJob;
 import net.kyori.adventure.text.Component;
@@ -19,12 +18,12 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Collections;
 import java.util.List;
 
-public class NightVisionCommand implements CommandExecutor, TabCompleter {
+public class CraftCommand implements CommandExecutor, TabCompleter {
 
     private final NewAdventurePlugin plugin;
     private final JobManager jobManager;
 
-    public NightVisionCommand(NewAdventurePlugin plugin) {
+    public CraftCommand(NewAdventurePlugin plugin) {
         this.plugin = plugin;
         this.jobManager = plugin.getJobManager();
     }
@@ -36,35 +35,20 @@ public class NightVisionCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        boolean isMineur = jobManager.getPlayerJob(player) == PlayerJob.MINEUR && jobManager.getJobLevel(player, PlayerJob.MINEUR) >= 1;
-        boolean hasLeggings = CustomJobItems.isJobItem(player.getInventory().getLeggings(), CustomJobItems.ID_ARCHITECT_LEGGINGS);
+        boolean isArchitect = jobManager.getPlayerJob(player) == PlayerJob.ARCHITECTE && jobManager.getJobLevel(player, PlayerJob.ARCHITECTE) >= 1;
         boolean isAdmin = player.hasPermission("customclasses.admin");
 
-        if (!isMineur && !hasLeggings && !isAdmin) {
+        if (!isArchitect && !isAdmin) {
             player.sendMessage(
-                    Component.text("[Vision Nocturne] ", NamedTextColor.GOLD, TextDecoration.BOLD)
-                            .append(Component.text("Vous devez être Mineur de niveau 1 ou équiper le Pantalon de l'Architecte pour utiliser /" + label + " !", NamedTextColor.RED))
+                    Component.text("[Architecte] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("Vous devez être Architecte de niveau 1 minimum pour utiliser /" + label + " !", NamedTextColor.RED))
             );
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
             return true;
         }
 
-        boolean newState = jobManager.toggleNightVision(player);
-        String prefix = isMineur ? "[Mineur] " : "[Architecte] ";
-        if (newState) {
-            player.sendMessage(
-                    Component.text(prefix, NamedTextColor.GOLD, TextDecoration.BOLD)
-                            .append(Component.text("✦ Vision Nocturne activée !", NamedTextColor.GREEN, TextDecoration.BOLD))
-            );
-            player.playSound(player.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.7f, 1.5f);
-        } else {
-            player.sendMessage(
-                    Component.text(prefix, NamedTextColor.GOLD, TextDecoration.BOLD)
-                            .append(Component.text("✦ Vision Nocturne désactivée.", NamedTextColor.GRAY))
-            );
-            player.playSound(player.getLocation(), Sound.BLOCK_BEACON_DEACTIVATE, 0.7f, 1.2f);
-        }
-
+        player.openWorkbench(player.getLocation(), true);
+        player.playSound(player.getLocation(), Sound.BLOCK_WOODEN_BUTTON_CLICK_ON, 0.7f, 1.2f);
         return true;
     }
 

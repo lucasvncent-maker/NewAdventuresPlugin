@@ -37,6 +37,23 @@ public enum PlayerJob {
             Component.text("  • M1 : Célérité I permanent + Vision nocturne activable (/nv)", NamedTextColor.DARK_AQUA),
             Component.text("  • M2 : 5% de chances d'obtenir de la Cuprite + 1 niveau de Fortune supplémentaire", NamedTextColor.DARK_AQUA),
             Component.text("  • M3 : Célérité II permanent + Régénération, Résistance et Résistance au Feu sous la couche Y=30", NamedTextColor.DARK_AQUA)
+    )),
+
+    ARCHITECTE("Architecte", "architecte", Material.SCAFFOLDING, List.of(
+            Component.text("Le Maître Bâtisseur", NamedTextColor.GOLD, TextDecoration.ITALIC),
+            Component.text("Artisan et bâtisseur hors pair capable d'ériger des édifices grandioses et d'accéder à ses ateliers n'importe où.", NamedTextColor.GRAY),
+            Component.empty(),
+            Component.text("✦ Équipements & Pouvoirs :", NamedTextColor.GOLD, TextDecoration.BOLD),
+            Component.text("  • Outils portatifs : Établi (/craft) & Tailleur de pierre (/sc) nomades.", NamedTextColor.YELLOW),
+            Component.text("  • Tenue d'Architecte : Protection V, Incassable avec Vitesse II, Célérité II, /nv et /jb.", NamedTextColor.YELLOW),
+            Component.text("  • Plume de l'Architecte : Vol créatif temporaire (30s) avec l'armure complète !", NamedTextColor.YELLOW),
+            Component.empty(),
+            Component.text("✦ Progression (5 Missions) :", NamedTextColor.AQUA, TextDecoration.BOLD),
+            Component.text("  • M1 : Déblocage de la commande /craft (/wb)", NamedTextColor.DARK_AQUA),
+            Component.text("  • M2 : Déblocage de /stonecutter (/sc) + Chapeau de l'Architecte (Vitesse II)", NamedTextColor.DARK_AQUA),
+            Component.text("  • M3 : Chemise de l'Architecte (Célérité II)", NamedTextColor.DARK_AQUA),
+            Component.text("  • M4 : Pantalon de l'Architecte (Vision Nocturne activable avec /nv)", NamedTextColor.DARK_AQUA),
+            Component.text("  • M5 : Chaussures de l'Architecte (Saut II avec /jb) + Plume de l'Architecte (Vol 30s)", NamedTextColor.DARK_AQUA)
     ));
 
     private final String displayName;

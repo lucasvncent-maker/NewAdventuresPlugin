@@ -2,6 +2,7 @@ package fr.loual.customclasses.jobs.commands;
 
 import fr.loual.newadventure.NewAdventurePlugin;
 import fr.loual.customclasses.jobs.AgriculteurMissions;
+import fr.loual.customclasses.jobs.ArchitecteMissions;
 import fr.loual.customclasses.jobs.JobManager;
 import fr.loual.customclasses.jobs.JobMission;
 import fr.loual.customclasses.jobs.MineurMissions;
@@ -31,6 +32,7 @@ public class JobCommand implements CommandExecutor, TabCompleter {
     private static final List<String> JOB_NAMES = List.of(
             "agriculteur",
             "mineur",
+            "architecte",
             "none"
     );
 
@@ -221,6 +223,44 @@ public class JobCommand implements CommandExecutor, TabCompleter {
                         }
                         if (level >= 3) {
                             sender.sendMessage(Component.text("  • Bénédiction sous la couche Y=30 (Regen, Résistance, Résistance au Feu)", NamedTextColor.YELLOW));
+                        }
+                    }
+                } else if (pj == PlayerJob.ARCHITECTE) {
+                    int level = jobManager.getJobLevel(target, pj);
+                    sender.sendMessage(Component.text("Niveau de mission complété : " + level + " / 5", NamedTextColor.YELLOW));
+
+                    if (level < 5) {
+                        JobMission current = ArchitecteMissions.getMission(level + 1);
+                        if (current != null) {
+                            sender.sendMessage(Component.empty());
+                            sender.sendMessage(Component.text("✦ En cours : " + current.getTitle(), NamedTextColor.GOLD, TextDecoration.BOLD));
+                            for (JobMission.Requirement req : current.getRequirements()) {
+                                int p = jobManager.getRequirementProgress(target, pj, level + 1, req.key());
+                                NamedTextColor col = (p >= req.requiredAmount()) ? NamedTextColor.GREEN : NamedTextColor.WHITE;
+                                sender.sendMessage(Component.text("  • " + req.displayName() + " : " + p + " / " + req.requiredAmount(), col));
+                            }
+                            sender.sendMessage(Component.text("✦ Récompense : ", NamedTextColor.AQUA)
+                                    .append(Component.text(current.getRewardDescription(), NamedTextColor.GRAY)));
+                        }
+                    } else {
+                        sender.sendMessage(Component.text("★ Félicitations ! Toutes les missions de l'Architecte sont accomplies !", NamedTextColor.GREEN, TextDecoration.BOLD));
+                    }
+
+                    if (level >= 1) {
+                        sender.sendMessage(Component.empty());
+                        sender.sendMessage(Component.text("✦ Récompenses débloquées :", NamedTextColor.GOLD, TextDecoration.BOLD));
+                        sender.sendMessage(Component.text("  • Commande /craft (/wb) : Ouvrir un établi partout", NamedTextColor.YELLOW));
+                        if (level >= 2) {
+                            sender.sendMessage(Component.text("  • Commande /stonecutter (/sc) + Chapeau de l'Architecte (Vitesse II)", NamedTextColor.YELLOW));
+                        }
+                        if (level >= 3) {
+                            sender.sendMessage(Component.text("  • Chemise de l'Architecte (Célérité II)", NamedTextColor.YELLOW));
+                        }
+                        if (level >= 4) {
+                            sender.sendMessage(Component.text("  • Pantalon de l'Architecte (Vision Nocturne /nv)", NamedTextColor.YELLOW));
+                        }
+                        if (level >= 5) {
+                            sender.sendMessage(Component.text("  • Chaussures de l'Architecte (Saut II /jb) + Plume de l'Architecte (Vol 30s)", NamedTextColor.YELLOW));
                         }
                     }
                 }

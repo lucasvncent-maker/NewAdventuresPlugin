@@ -23,11 +23,14 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.PlayerHarvestBlockEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -55,6 +58,11 @@ public class JobListener implements Listener {
 
     // Cooldown pour éviter le double clic sur les soupes instantanées
     private final Set<UUID> instantEatCooldown = new HashSet<>();
+
+    // Vol de l'Architecte (Plume)
+    private final Map<UUID, Long> featherCooldowns = new HashMap<>();
+    private final Map<UUID, BukkitTask> activeFlightTasks = new HashMap<>();
+    private final Set<UUID> fallImmunity = new HashSet<>();
 
     public JobListener(NewAdventurePlugin plugin) {
         this.plugin = plugin;
@@ -95,8 +103,15 @@ public class JobListener implements Listener {
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
-        jobManager.unloadPlayer(event.getPlayer());
-        instantEatCooldown.remove(event.getPlayer().getUniqueId());
+        Player player = event.getPlayer();
+        jobManager.unloadPlayer(player);
+        instantEatCooldown.remove(player.getUniqueId());
+
+        BukkitTask ft = activeFlightTasks.remove(player.getUniqueId());
+        if (ft != null) {
+            ft.cancel();
+        }
+        fallImmunity.remove(player.getUniqueId());
     }
 
     // ==========================================================
@@ -104,6 +119,17 @@ public class JobListener implements Listener {
     // ==========================================================
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryClick(InventoryClickEvent event) {
+        if (event.getWhoClicked() instanceof Player p && activeFlightTasks.containsKey(p.getUniqueId())) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (p.isOnline() && activeFlightTasks.containsKey(p.getUniqueId())) {
+                    if (!CustomJobItems.hasFullArchitectSet(p)) {
+                        BukkitTask t = activeFlightTasks.remove(p.getUniqueId());
+                        if (t != null) t.cancel();
+                        endFlight(p, true);
+                    }
+                }
+            });
+        }
         // --- 1.A. VISUALISEUR DE RECETTES (JobRecipeGuiHolder) ---
         if (event.getInventory().getHolder() instanceof JobRecipeGuiHolder) {
             event.setCancelled(true);
@@ -212,6 +238,29 @@ public class JobListener implements Listener {
                     }
                     case 3 -> {
                         player.sendMessage(Component.text("✦ Mission 3 Mineur : Récoltez 64 améthystes, 64 capteurs sculk et 3 spawners pour débloquer Célérité II et la bénédiction sous Y=30 !", NamedTextColor.YELLOW));
+                        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.2f);
+                    }
+                }
+            } else if (pj == PlayerJob.ARCHITECTE) {
+                switch (missionNum) {
+                    case 1 -> {
+                        player.sendMessage(Component.text("✦ Mission 1 Architecte : 64 Bois, 64 Stonebricks, 64 Sable pour débloquer /craft (/wb) !", NamedTextColor.YELLOW));
+                        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.2f);
+                    }
+                    case 2 -> {
+                        player.sendMessage(Component.text("✦ Mission 2 Architecte : 64 Laines, 8 Colorants (Rouge, Bleu, Jaune, Vert) pour débloquer /sc et le Chapeau de l'Architecte !", NamedTextColor.YELLOW));
+                        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.2f);
+                    }
+                    case 3 -> {
+                        player.sendMessage(Component.text("✦ Mission 3 Architecte : 12 Coffres, 1 Table d'enchantement, 15 Bibliothèques, 1 Ender Chest pour la Chemise de l'Architecte !", NamedTextColor.YELLOW));
+                        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.2f);
+                    }
+                    case 4 -> {
+                        player.sendMessage(Component.text("✦ Mission 4 Architecte : 64 Verre, 64 Lanternes, 64 Trappes, 64 Feuilles pour le Pantalon de l'Architecte !", NamedTextColor.YELLOW));
+                        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.2f);
+                    }
+                    case 5 -> {
+                        player.sendMessage(Component.text("✦ Mission 5 Architecte : 64 Sea Lantern, 64 Calcite, 64 Blocs Quartz, 64 End Rod, 64 Grélampe pour les Chaussures et la Plume de l'Architecte !", NamedTextColor.YELLOW));
                         player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.2f);
                     }
                 }
@@ -798,6 +847,13 @@ public class JobListener implements Listener {
             consumeSpaceCookie(player, item);
             return;
         }
+
+        // 4. Plume de l'Architecte (Vol Créatif pendant 30s)
+        if (CustomJobItems.isJobItem(item, CustomJobItems.ID_ARCHITECT_FEATHER)) {
+            event.setCancelled(true);
+            handleArchitectFeather(player);
+            return;
+        }
     }
 
     private void consumeFarmerSoup(Player player, ItemStack item) {
@@ -919,6 +975,135 @@ public class JobListener implements Listener {
 
             if (!allowed) {
                 event.getInventory().setResult(null);
+            }
+        }
+    }
+
+    // ==========================================================
+    // 7. VOL DE L'ARCHITECTE (PLUME) & IMMUNITÉ DE CHUTE
+    // ==========================================================
+    private void handleArchitectFeather(Player player) {
+        UUID uuid = player.getUniqueId();
+
+        // 1. Vérifier l'armure complète de 4 pièces
+        if (!CustomJobItems.hasFullArchitectSet(player)) {
+            player.sendMessage(
+                    Component.text("[Architecte] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("Vous devez équiper la tenue complète de l'Architecte (4 pièces) pour utiliser la Plume !", NamedTextColor.RED))
+            );
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+            return;
+        }
+
+        // 2. Vérifier si un vol est déjà en cours
+        if (activeFlightTasks.containsKey(uuid)) {
+            player.sendMessage(
+                    Component.text("[Architecte] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("Votre vol est déjà actif !", NamedTextColor.YELLOW))
+            );
+            return;
+        }
+
+        // 3. Vérifier le cooldown de 5 minutes (300 secondes)
+        long now = System.currentTimeMillis();
+        Long expireTime = featherCooldowns.get(uuid);
+        if (expireTime != null && now < expireTime) {
+            long remainingSeconds = (expireTime - now + 999) / 1000;
+            long mins = remainingSeconds / 60;
+            long secs = remainingSeconds % 60;
+            player.sendMessage(
+                    Component.text("[Architecte] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("La Plume est en recharge : " + mins + "m " + secs + "s restantes.", NamedTextColor.RED))
+            );
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+            return;
+        }
+
+        // 4. Activer le vol
+        featherCooldowns.put(uuid, now + 300_000L); // 5 minutes
+
+        player.setAllowFlight(true);
+        player.setFlying(true);
+
+        player.playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 1.0f, 1.0f);
+        player.playSound(player.getLocation(), Sound.ITEM_ELYTRA_FLYING, 1.0f, 1.2f);
+        player.getWorld().spawnParticle(Particle.FIREWORK, player.getLocation().clone().add(0, 1, 0), 20, 0.4, 0.4, 0.4, 0.1);
+        player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 25, 0.5, 0.2, 0.5, 0.1);
+
+        player.sendMessage(
+                Component.text("✦ Envol de l'Architecte déclenché ! Vol créatif accordé pendant 30 secondes.", NamedTextColor.GREEN, TextDecoration.BOLD)
+        );
+
+        // 5. Tâche de décompte (30 secondes)
+        BukkitTask task = new BukkitRunnable() {
+            int secondsRemaining = 30;
+
+            @Override
+            public void run() {
+                if (!player.isOnline()) {
+                    cancel();
+                    activeFlightTasks.remove(uuid);
+                    return;
+                }
+
+                // Si une pièce de l'armure est retirée, arrêt immédiat du vol
+                if (!CustomJobItems.hasFullArchitectSet(player)) {
+                    cancel();
+                    activeFlightTasks.remove(uuid);
+                    endFlight(player, true);
+                    return;
+                }
+
+                secondsRemaining--;
+
+                if (secondsRemaining <= 0) {
+                    cancel();
+                    activeFlightTasks.remove(uuid);
+                    endFlight(player, false);
+                    return;
+                }
+
+                NamedTextColor color = (secondsRemaining <= 5) ? NamedTextColor.RED : NamedTextColor.AQUA;
+                player.sendActionBar(Component.text("✦ Vol de l'Architecte : " + secondsRemaining + "s restantes ✦", color, TextDecoration.BOLD));
+                player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 3, 0.2, 0.05, 0.2, 0.01);
+            }
+        }.runTaskTimer(plugin, 20L, 20L);
+
+        activeFlightTasks.put(uuid, task);
+    }
+
+    private void endFlight(Player player, boolean cancelledEarly) {
+        if (player.getGameMode() != GameMode.CREATIVE && player.getGameMode() != GameMode.SPECTATOR) {
+            player.setFlying(false);
+            player.setAllowFlight(false);
+        }
+
+        UUID uuid = player.getUniqueId();
+        // Protection anti-chute pendant 5 secondes
+        fallImmunity.add(uuid);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> fallImmunity.remove(uuid), 100L);
+
+        if (cancelledEarly) {
+            player.sendMessage(
+                    Component.text("✖ Vous avez retiré une pièce d'armure ! Le vol a été interrompu (Protection chute 5s active).", NamedTextColor.RED, TextDecoration.BOLD)
+            );
+            player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_FLAP, 1.0f, 0.8f);
+        } else {
+            player.sendMessage(
+                    Component.text("✦ Le vol de l'Architecte a pris fin ! (Protection anti-chute 5s accordée).", NamedTextColor.YELLOW, TextDecoration.BOLD)
+            );
+            player.playSound(player.getLocation(), Sound.ENTITY_PHANTOM_FLAP, 1.0f, 1.0f);
+        }
+        player.getWorld().spawnParticle(Particle.FEATHER, player.getLocation().clone().add(0, 1, 0), 20, 0.4, 0.5, 0.4, 0.05);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onEntityDamage(EntityDamageEvent event) {
+        if (event.getEntity() instanceof Player player && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
+            if (fallImmunity.contains(player.getUniqueId())) {
+                event.setCancelled(true);
+                player.getWorld().spawnParticle(Particle.FEATHER, player.getLocation(), 15, 0.3, 0.2, 0.3, 0.05);
+                player.playSound(player.getLocation(), Sound.BLOCK_WOOL_FALL, 0.8f, 1.2f);
             }
         }
     }

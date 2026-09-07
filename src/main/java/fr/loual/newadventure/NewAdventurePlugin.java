@@ -4,8 +4,11 @@ import fr.loual.customclasses.classes.ClassManager;
 import fr.loual.customclasses.commands.ClassCommand;
 import fr.loual.customclasses.jobs.JobManager;
 import fr.loual.customclasses.jobs.JobRecipes;
+import fr.loual.customclasses.jobs.commands.CraftCommand;
 import fr.loual.customclasses.jobs.commands.JobCommand;
+import fr.loual.customclasses.jobs.commands.JumpBoostCommand;
 import fr.loual.customclasses.jobs.commands.NightVisionCommand;
+import fr.loual.customclasses.jobs.commands.StonecutterCommand;
 import fr.loual.customclasses.jobs.listeners.JobListener;
 import fr.loual.customclasses.listeners.ClassListener;
 import fr.loual.customminerals.commands.CustomMineralsCommand;
@@ -97,7 +100,7 @@ public final class NewAdventurePlugin extends JavaPlugin {
             customMineralsCmd.setTabCompleter(mineralCommand);
         }
 
-        // 8. Commande /nv (Night Vision pour le Mineur)
+        // 8. Commande /nv (Night Vision pour Mineur & Architecte)
         NightVisionCommand nvCommand = new NightVisionCommand(this);
         PluginCommand cmdNv = getCommand("nv");
         if (cmdNv != null) {
@@ -105,9 +108,32 @@ public final class NewAdventurePlugin extends JavaPlugin {
             cmdNv.setTabCompleter(nvCommand);
         }
 
-        // 9. Tâche périodique pour les auras sous la couche Y=30 (Mineur M3)
+        // 8bis. Commandes de l'Architecte (/craft, /stonecutter, /jb)
+        CraftCommand craftCommand = new CraftCommand(this);
+        PluginCommand cmdCraft = getCommand("craft");
+        if (cmdCraft != null) {
+            cmdCraft.setExecutor(craftCommand);
+            cmdCraft.setTabCompleter(craftCommand);
+        }
+
+        StonecutterCommand scCommand = new StonecutterCommand(this);
+        PluginCommand cmdSc = getCommand("stonecutter");
+        if (cmdSc != null) {
+            cmdSc.setExecutor(scCommand);
+            cmdSc.setTabCompleter(scCommand);
+        }
+
+        JumpBoostCommand jbCommand = new JumpBoostCommand(this);
+        PluginCommand cmdJb = getCommand("jb");
+        if (cmdJb != null) {
+            cmdJb.setExecutor(jbCommand);
+            cmdJb.setTabCompleter(jbCommand);
+        }
+
+        // 9. Tâche périodique pour les auras sous la couche Y=30 (Mineur M3) et l'armure de l'Architecte
         getServer().getScheduler().runTaskTimer(this, () -> {
             jobManager.tickLayerEffects();
+            jobManager.tickArmorEffects();
         }, 20L, 20L);
 
         // 10. Export du resource pack au format .zip
