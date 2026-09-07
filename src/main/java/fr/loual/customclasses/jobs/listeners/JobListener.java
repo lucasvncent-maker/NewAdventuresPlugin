@@ -1383,7 +1383,9 @@ public class JobListener implements Listener {
                     for (GeneratedStructure genStructure : player.getLocation().getChunk().getStructures()) {
                         if (genStructure == null || genStructure.getStructure() == null) continue;
                         if (genStructure.getBoundingBox().contains(player.getLocation().toVector())) {
-                            String rawKey = genStructure.getStructure().key().value().toLowerCase();
+                            org.bukkit.NamespacedKey key = org.bukkit.Registry.STRUCTURE.getKey(genStructure.getStructure());
+                            if (key == null) continue;
+                            String rawKey = key.getKey().toLowerCase();
                             String typeId = normalizeStructureKey(rawKey);
                             String displayName = getStructureDisplayName(typeId);
                             jobManager.addDiscoveredStructure(player, typeId, displayName);

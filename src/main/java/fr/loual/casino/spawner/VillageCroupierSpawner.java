@@ -88,7 +88,10 @@ public class VillageCroupierSpawner implements Listener {
             for (GeneratedStructure genStructure : structures) {
                 if (genStructure == null || genStructure.getStructure() == null) continue;
 
-                String structKey = genStructure.getStructure().key().asString().toLowerCase();
+                org.bukkit.NamespacedKey key = org.bukkit.Registry.STRUCTURE.getKey(genStructure.getStructure());
+                if (key == null) continue;
+
+                String structKey = key.asString().toLowerCase();
                 if (!structKey.contains("village")) continue;
 
                 // Identifiant unique du village basé sur le centre de sa BoundingBox
