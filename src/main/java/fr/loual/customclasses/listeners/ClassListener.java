@@ -513,7 +513,7 @@ public class ClassListener implements Listener {
 
                 case DIABLE -> {
                     // Tous les coups au corps-à-corps enflamment les cibles
-                    victim.setFireTicks(100); // 5 secondes de feu
+                    victim.setFireTicks(80); // 4 secondes de feu
                     victim.getWorld().spawnParticle(Particle.FLAME, victim.getLocation().clone().add(0, 1, 0), 10, 0.25, 0.3, 0.25, 0.05);
                     try {
                         victim.getWorld().playSound(victim.getLocation(), Sound.ITEM_FIRECHARGE_USE, 0.8f, 1.2f);
@@ -526,9 +526,8 @@ public class ClassListener implements Listener {
                         event.setDamage(event.getDamage() * 0.20);
                     }
 
-                    // Bonus houe : Dégâts accrus (+10), Poison IV surpuissant (8s = 160t), Wither III (6s = 120t), Lenteur II (5s = 100t)
+                    // Bonus houe : Dégâts infligés par le poison (Poison IV surpuissant 8s = 160t, Wither III 6s = 120t, Lenteur II 5s = 100t)
                     if (isHoe(hand) && victim instanceof LivingEntity livingVictim) {
-                        event.setDamage(event.getDamage() + 10.0);
                         livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.POISON, 160, 3));
                         livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 120, 2));
                         livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 100, 1));
@@ -1413,8 +1412,8 @@ public class ClassListener implements Listener {
         player.getInventory().setArmorContents(new ItemStack[4]);
 
         player.setInvulnerable(true);
-        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 210, 0, false, false, false));
-        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 205, 1, false, false, false));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 170, 0, false, false, false));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 165, 1, false, false, false));
 
         world.spawnParticle(Particle.LAVA, startLoc.clone().add(0, 0.3, 0), 25, 0.4, 0.1, 0.4, 0.05);
         world.spawnParticle(Particle.SOUL_FIRE_FLAME, startLoc.clone().add(0, 0.3, 0), 20, 0.5, 0.2, 0.5, 0.05);
@@ -1422,13 +1421,13 @@ public class ClassListener implements Listener {
         world.playSound(startLoc, Sound.BLOCK_LAVA_EXTINGUISH, 1.2f, 0.6f);
         world.playSound(startLoc, Sound.ENTITY_BLAZE_SHOOT, 1.0f, 0.7f);
 
-        player.sendActionBar(Component.text("🔥 FLAQUE DE BRAISES ACTIVE (Invincible 10s) ! 🔥", NamedTextColor.RED, TextDecoration.BOLD));
+        player.sendActionBar(Component.text("🔥 FLAQUE DE BRAISES ACTIVE (Invincible 8s) ! 🔥", NamedTextColor.RED, TextDecoration.BOLD));
 
         new BukkitRunnable() {
             int ticks = 0;
             @Override
             public void run() {
-                if (!player.isOnline() || ticks >= 200) {
+                if (!player.isOnline() || ticks >= 160) {
                     diablePuddleActive.remove(uuid);
                     ItemStack[] saved = diableStoredArmor.remove(uuid);
                     if (player.isOnline()) {
@@ -1475,8 +1474,8 @@ public class ClassListener implements Listener {
                     if (entity instanceof LivingEntity target && !target.equals(player)) {
                         if (necroMinions.contains(target.getUniqueId())) continue;
 
-                        target.setFireTicks(100);
-                        target.damage(4.0, player);
+                        target.setFireTicks(80);
+                        target.damage(2.5, player);
                         w.spawnParticle(Particle.SMALL_FLAME, target.getLocation().add(0, 0.5, 0), 5, 0.2, 0.2, 0.2, 0.05);
                     }
                 }
@@ -1552,7 +1551,7 @@ public class ClassListener implements Listener {
         player.sendMessage(Component.text("✦ Détonation Putride : Votre serviteur a été sacrifié dans une formidable déflagration nécrotique !", NamedTextColor.DARK_PURPLE));
     }
 
-    // 6. ARCHER : Flèche Explosive (Le prochain tir produit une colossale déflagration de 30 dégâts)
+    // 6. ARCHER : Flèche Explosive (Le prochain tir produit une puissante déflagration de 18 dégâts)
     private void triggerArcherExplosiveArrow(Player player) {
         UUID uuid = player.getUniqueId();
         archerExplosiveArrowReady.add(uuid);
@@ -1567,7 +1566,7 @@ public class ClassListener implements Listener {
         }
 
         player.sendActionBar(Component.text("💥 FLÈCHE EXPLOSIVE ARMÉE ! Tirez pour tout faire exploser ! 💥", NamedTextColor.GOLD, TextDecoration.BOLD));
-        player.sendMessage(Component.text("✦ Flèche Explosive : Votre prochain tir déclenchera une gigantesque déflagration destructrice à l'impact (30 dégâts) !", NamedTextColor.GOLD));
+        player.sendMessage(Component.text("✦ Flèche Explosive : Votre prochain tir déclenchera une puissante déflagration à l'impact (18 dégâts) !", NamedTextColor.GOLD));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -1585,32 +1584,32 @@ public class ClassListener implements Listener {
 
             if (world != null) {
                 // Effets d'explosion spectaculaires
-                world.spawnParticle(Particle.EXPLOSION_EMITTER, hitLoc, 3, 0.5, 0.5, 0.5, 0.0);
-                world.spawnParticle(Particle.FLAME, hitLoc, 60, 1.2, 1.2, 1.2, 0.15);
-                world.spawnParticle(Particle.LAVA, hitLoc, 25, 1.0, 0.8, 1.0, 0.05);
-                world.spawnParticle(Particle.CAMPFIRE_COSY_SMOKE, hitLoc, 30, 0.8, 0.8, 0.8, 0.08);
+                world.spawnParticle(Particle.EXPLOSION_EMITTER, hitLoc, 2, 0.3, 0.3, 0.3, 0.0);
+                world.spawnParticle(Particle.FLAME, hitLoc, 40, 0.8, 0.8, 0.8, 0.12);
+                world.spawnParticle(Particle.LAVA, hitLoc, 15, 0.6, 0.6, 0.6, 0.05);
+                world.spawnParticle(Particle.CAMPFIRE_COSY_SMOKE, hitLoc, 20, 0.5, 0.5, 0.5, 0.06);
 
-                world.playSound(hitLoc, Sound.ENTITY_GENERIC_EXPLODE, 1.5f, 0.8f);
-                world.playSound(hitLoc, Sound.ENTITY_DRAGON_FIREBALL_EXPLODE, 1.2f, 1.1f);
+                world.playSound(hitLoc, Sound.ENTITY_GENERIC_EXPLODE, 1.3f, 0.9f);
+                world.playSound(hitLoc, Sound.ENTITY_DRAGON_FIREBALL_EXPLODE, 1.0f, 1.2f);
 
                 int hitCount = 0;
-                for (Entity entity : world.getNearbyEntities(hitLoc, 6.5, 4.0, 6.5)) {
+                for (Entity entity : world.getNearbyEntities(hitLoc, 5.0, 3.5, 5.0)) {
                     if (entity instanceof LivingEntity target && !target.equals(shooter)) {
                         if (shooter != null && necroMinions.contains(target.getUniqueId()) && shooter.getUniqueId().equals(minionToMaster.get(target.getUniqueId()))) {
                             continue;
                         }
 
                         hitCount++;
-                        target.damage(30.0, shooter);
+                        target.damage(18.0, shooter);
                         target.setFireTicks(80); // 4 secondes de feu
 
-                        Vector kb = target.getLocation().toVector().subtract(hitLoc.toVector()).normalize().multiply(1.2).setY(0.6);
+                        Vector kb = target.getLocation().toVector().subtract(hitLoc.toVector()).normalize().multiply(1.0).setY(0.5);
                         target.setVelocity(kb);
                     }
                 }
 
                 if (shooter != null && shooter.isOnline()) {
-                    shooter.sendActionBar(Component.text("💥 EXPLOSION DÉVASTATRICE (" + hitCount + " cibles pulvérisées, 30 dégâts) ! 💥", NamedTextColor.GOLD, TextDecoration.BOLD));
+                    shooter.sendActionBar(Component.text("💥 EXPLOSION DE ZONE (" + hitCount + " cibles touchées, 18 dégâts) ! 💥", NamedTextColor.GOLD, TextDecoration.BOLD));
                 }
             }
 
