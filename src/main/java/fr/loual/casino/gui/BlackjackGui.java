@@ -1,0 +1,284 @@
+package fr.loual.casino.gui;
+
+import fr.loual.casino.BlackjackGame;
+import fr.loual.casino.Card;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.Sound;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class BlackjackGui {
+
+    public static final int BET_SLOT = 22;
+    public static final int BUTTON_START_BET = 49;
+    public static final int BUTTON_HIT = 47;
+    public static final int BUTTON_STAND = 51;
+    public static final int BUTTON_REPLAY = 48;
+    public static final int BUTTON_QUIT = 50;
+
+    private static final int[] DEALER_CARD_SLOTS = { 10, 11, 12, 13, 14, 15, 16 };
+    private static final int[] PLAYER_CARD_SLOTS = { 28, 29, 30, 31, 32, 33, 34 };
+
+    public static void open(Player player, BlackjackGame game) {
+        BlackjackGuiHolder holder = new BlackjackGuiHolder(game);
+        Inventory inv = Bukkit.createInventory(
+                holder,
+                54,
+                Component.text("♠ Casino - Blackjack ♠", NamedTextColor.DARK_GREEN, TextDecoration.BOLD)
+        );
+        holder.setInventory(inv);
+        render(inv, game);
+        player.openInventory(inv);
+        player.playSound(player.getLocation(), Sound.BLOCK_CHEST_OPEN, 0.7f, 1.2f);
+    }
+
+    public static void render(Inventory inv, BlackjackGame game) {
+        // Fond tapis vert feutré
+        ItemStack greenFelt = createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" "));
+        ItemStack darkFelt = createItem(Material.BLACK_STAINED_GLASS_PANE, Component.text(" "));
+
+        for (int i = 0; i < 54; i++) {
+            if (game.getState() == BlackjackGame.State.BETTING && i == BET_SLOT) {
+                // Laisser le slot de mise intact si le joueur y a déjà déposé un item
+                continue;
+            }
+            inv.setItem(i, greenFelt);
+        }
+
+        // Bords sombres
+        for (int i : new int[]{ 0, 8, 45, 53 }) {
+            inv.setItem(i, darkFelt);
+        }
+
+        // Section CROUPIER (Lignes 0 et 1)
+        renderDealerSection(inv, game);
+
+        // Section JOUEUR (Lignes 3 et 4)
+        renderPlayerSection(inv, game);
+
+        // Section COMMANDES & ÉTATS (Ligne 5)
+        renderControls(inv, game);
+    }
+
+    private static void renderDealerSection(Inventory inv, BlackjackGame game) {
+        ItemStack dealerHeader;
+        if (game.getState() == BlackjackGame.State.BETTING) {
+            dealerHeader = createItem(Material.PLAYER_HEAD,
+                    Component.text("♠ Croupier du Casino ♠", NamedTextColor.GOLD, TextDecoration.BOLD),
+                    "§7Le croupier tire jusqu'à §e17§7.",
+                    "§7Déposez votre mise pour commencer !"
+            );
+        } else if (game.getState() == BlackjackGame.State.PLAYING) {
+            int visibleScore = game.getDealerHand().isEmpty() ? 0 : game.getDealerHand().get(0).getValue();
+            dealerHeader = createItem(Material.EMERALD,
+                    Component.text("♠ Croupier - Score visible : " + visibleScore + " + ? ♠", NamedTextColor.GOLD, TextDecoration.BOLD),
+                    "§7Une carte est encore masquée.",
+                    "§7Elle sera révélée lorsque vous ferez §cRester (Stand)§7."
+            );
+        } else {
+            int totalScore = BlackjackGame.calculateScore(game.getDealerHand());
+            String scoreText = totalScore > 21 ? "§c" + totalScore + " (BUST)" : "§a" + totalScore;
+            dealerHeader = createItem(Material.GOLD_BLOCK,
+                    Component.text("♠ Croupier - Score final : ", NamedTextColor.GOLD, TextDecoration.BOLD).append(Component.text(scoreText)),
+                    "§7Fin de la manche."
+            );
+        }
+        inv.setItem(4, dealerHeader);
+
+        // Affichage des cartes du croupier
+        if (game.getState() == BlackjackGame.State.BETTING) {
+            // Emplacements vides
+            for (int slot : DEALER_CARD_SLOTS) {
+                inv.setItem(slot, createItem(Material.GRAY_STAINED_GLASS_PANE, Component.text("§8[ Emplacement Croupier ]")));
+            }
+        } else {
+            List<Card> dealerHand = game.getDealerHand();
+            for (int i = 0; i < DEALER_CARD_SLOTS.length; i++) {
+                int slot = DEALER_CARD_SLOTS[i];
+                if (i < dealerHand.size()) {
+                    if (i == 1 && game.getState() == BlackjackGame.State.PLAYING) {
+                        inv.setItem(slot, Card.getHiddenCardItem());
+                    } else {
+                        inv.setItem(slot, dealerHand.get(i).toItemStack());
+                    }
+                } else {
+                    inv.setItem(slot, createItem(Material.GRAY_STAINED_GLASS_PANE, Component.text(" ")));
+                }
+            }
+        }
+    }
+
+    private static void renderPlayerSection(Inventory inv, BlackjackGame game) {
+        ItemStack playerHeader;
+        if (game.getState() == BlackjackGame.State.BETTING) {
+            playerHeader = createItem(Material.NETHER_STAR,
+                    Component.text("✦ Votre Main ✦", NamedTextColor.AQUA, TextDecoration.BOLD),
+                    "§7Placez l'item que vous souhaitez parier",
+                    "§7dans le slot doré au milieu de la table !"
+            );
+        } else {
+            int playerScore = BlackjackGame.calculateScore(game.getPlayerHand());
+            String scoreColor = playerScore > 21 ? "§c" : (playerScore == 21 ? "§6" : "§a");
+            playerHeader = createItem(Material.NETHER_STAR,
+                    Component.text("✦ Votre Score : " + scoreColor + playerScore + " ✦", NamedTextColor.AQUA, TextDecoration.BOLD),
+                    playerScore == 21 ? "§6§l✦ BLACKJACK ! ✦" : (playerScore > 21 ? "§c§lVous avez sauté (Bust) !" : "§7Objectif : Se rapprocher de 21 sans dépasser.")
+            );
+        }
+        inv.setItem(40, playerHeader);
+
+        // Affichage des cartes du joueur
+        if (game.getState() == BlackjackGame.State.BETTING) {
+            for (int slot : PLAYER_CARD_SLOTS) {
+                inv.setItem(slot, createItem(Material.GRAY_STAINED_GLASS_PANE, Component.text("§8[ Emplacement Joueur ]")));
+            }
+
+            // Cadre doré autour du slot de mise (Slot 22)
+            for (int slot : new int[]{ 13, 21, 23, 31 }) {
+                inv.setItem(slot, createItem(Material.YELLOW_STAINED_GLASS_PANE, Component.text("§e↓ DÉPOSEZ VOTRE MISE ICI ↓", NamedTextColor.YELLOW, TextDecoration.BOLD)));
+            }
+
+            ItemStack currentBetInSlot = inv.getItem(BET_SLOT);
+            if (currentBetInSlot == null || currentBetInSlot.getType().isAir()) {
+                // Laisser vide pour que le joueur puisse y cliquer librement
+            }
+        } else {
+            List<Card> pHand = game.getPlayerHand();
+            for (int i = 0; i < PLAYER_CARD_SLOTS.length; i++) {
+                int slot = PLAYER_CARD_SLOTS[i];
+                if (i < pHand.size()) {
+                    inv.setItem(slot, pHand.get(i).toItemStack());
+                } else {
+                    inv.setItem(slot, createItem(Material.GRAY_STAINED_GLASS_PANE, Component.text(" ")));
+                }
+            }
+        }
+    }
+
+    private static void renderControls(Inventory inv, BlackjackGame game) {
+        if (game.getState() == BlackjackGame.State.BETTING) {
+            ItemStack betInSlot = inv.getItem(BET_SLOT);
+            boolean hasBet = betInSlot != null && !betInSlot.getType().isAir() && betInSlot.getAmount() > 0;
+
+            if (hasBet) {
+                String itemName = betInSlot.getItemMeta() != null && betInSlot.getItemMeta().hasDisplayName()
+                        ? betInSlot.getItemMeta().getDisplayName()
+                        : betInSlot.getType().name().toLowerCase().replace('_', ' ');
+
+                inv.setItem(BUTTON_START_BET, createItem(Material.LIME_CONCRETE,
+                        Component.text("✔ Valider la mise & Distribuer", NamedTextColor.GREEN, TextDecoration.BOLD),
+                        "§eMise : §f" + betInSlot.getAmount() + "x " + itemName,
+                        "§7Victoire : §aVous remportez le double (x2) !",
+                        "§7Défaite : §cVotre mise est perdue.",
+                        "",
+                        "§a➤ Cliquez pour lancer la partie !"
+                ));
+            } else {
+                inv.setItem(BUTTON_START_BET, createItem(Material.GRAY_CONCRETE,
+                        Component.text("En attente de mise...", NamedTextColor.GRAY, TextDecoration.BOLD),
+                        "§7Déposez un item de votre inventaire",
+                        "§7dans le slot central pour activer ce bouton."
+                ));
+            }
+
+            inv.setItem(BUTTON_QUIT, createItem(Material.BARRIER,
+                    Component.text("Quitter la table", NamedTextColor.RED, TextDecoration.BOLD),
+                    "§7Ferme le casino et récupère votre mise."
+            ));
+
+        } else if (game.getState() == BlackjackGame.State.PLAYING) {
+            // Bouton Tirer (Hit)
+            inv.setItem(BUTTON_HIT, createItem(Material.LIME_CONCRETE,
+                    Component.text("➤ TIRER (Hit)", NamedTextColor.GREEN, TextDecoration.BOLD),
+                    "§7Prendre une carte supplémentaire.",
+                    "§cAttention si votre score dépasse 21 !"
+            ));
+
+            // Rappel de la mise
+            ItemStack bet = game.getBetItem();
+            if (bet != null) {
+                ItemStack betDisplay = bet.clone();
+                ItemMeta meta = betDisplay.getItemMeta();
+                if (meta != null) {
+                    List<Component> lore = new ArrayList<>();
+                    lore.add(Component.text("§6Mise actuelle en jeu : §e" + bet.getAmount() + "x"));
+                    lore.add(Component.text("§aVictoire = Vous remportez le double !"));
+                    lore.add(Component.text("§cDéfaite = Mise perdue"));
+                    meta.lore(lore);
+                    betDisplay.setItemMeta(meta);
+                }
+                inv.setItem(49, betDisplay);
+            }
+
+            // Bouton Rester (Stand)
+            inv.setItem(BUTTON_STAND, createItem(Material.RED_CONCRETE,
+                    Component.text("■ RESTER (Stand)", NamedTextColor.RED, TextDecoration.BOLD),
+                    "§7Garder votre score actuel.",
+                    "§7Le croupier jouera ensuite sa main !"
+            ));
+
+        } else if (game.getState() == BlackjackGame.State.GAME_OVER) {
+            // Résultat au centre (Slot 49)
+            switch (game.getResult()) {
+                case PLAYER_BLACKJACK -> inv.setItem(49, createItem(Material.TOTEM_OF_UNDYING,
+                        Component.text("✦ BLACKJACK NATUREL ! ✦", NamedTextColor.GOLD, TextDecoration.BOLD),
+                        "§aFélicitations ! Vous avez fait 21.",
+                        "§6Vous avez reçu le double de votre mise !"
+                ));
+                case PLAYER_WIN, DEALER_BUST -> inv.setItem(49, createItem(Material.EMERALD_BLOCK,
+                        Component.text("✔ VICTOIRE ! ✔", NamedTextColor.GREEN, TextDecoration.BOLD),
+                        "§aVous remportez la manche !",
+                        "§6Votre mise a été doublée et versée dans votre inventaire !"
+                ));
+                case PUSH -> inv.setItem(49, createItem(Material.GOLD_BLOCK,
+                        Component.text("═ ÉGALITÉ (PUSH) ═", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                        "§eMême score que le croupier.",
+                        "§fVotre mise initiale vous a été restituée."
+                ));
+                case PLAYER_BUST, DEALER_WIN -> inv.setItem(49, createItem(Material.REDSTONE_BLOCK,
+                        Component.text("✘ DÉFAITE ! ✘", NamedTextColor.RED, TextDecoration.BOLD),
+                        "§cLe casino a remporté la manche.",
+                        "§7Votre mise a été conservée par la maison."
+                ));
+                default -> {}
+            }
+
+            // Bouton Rejouer
+            inv.setItem(BUTTON_REPLAY, createItem(Material.GOLD_INGOT,
+                    Component.text("♠ Rejouer une partie ♠", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                    "§7Remiser un item pour une nouvelle manche !"
+            ));
+
+            // Bouton Quitter
+            inv.setItem(BUTTON_QUIT, createItem(Material.BARRIER,
+                    Component.text("Fermer la table", NamedTextColor.RED, TextDecoration.BOLD),
+                    "§7Quitter le casino."
+            ));
+        }
+    }
+
+    private static ItemStack createItem(Material mat, Component name, String... loreLines) {
+        ItemStack item = new ItemStack(mat);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(name);
+            if (loreLines.length > 0) {
+                List<Component> lore = new ArrayList<>();
+                for (String line : loreLines) {
+                    lore.add(Component.text(line));
+                }
+                meta.lore(lore);
+            }
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+}

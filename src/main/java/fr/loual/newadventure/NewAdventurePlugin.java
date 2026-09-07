@@ -19,6 +19,9 @@ import fr.loual.customminerals.listeners.HammerMiningListener;
 import fr.loual.customminerals.listeners.SmithingListener;
 import fr.loual.customminerals.listeners.SpawnerMiningListener;
 import fr.loual.customminerals.listeners.TreeMiningListener;
+import fr.loual.casino.commands.CasinoCommand;
+import fr.loual.casino.listeners.BlackjackListener;
+import fr.loual.casino.spawner.VillageCroupierSpawner;
 import fr.loual.customminerals.recipes.RecipeManager;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
@@ -135,6 +138,23 @@ public final class NewAdventurePlugin extends JavaPlugin {
             jobManager.tickLayerEffects();
             jobManager.tickArmorEffects();
         }, 20L, 20L);
+
+        // 9bis. Module Casino & Blackjack dans les villages
+        VillageCroupierSpawner croupierSpawner = new VillageCroupierSpawner(this);
+        pm.registerEvents(croupierSpawner, this);
+        pm.registerEvents(new BlackjackListener(this), this);
+
+        CasinoCommand casinoCommand = new CasinoCommand(this, croupierSpawner);
+        PluginCommand cmdCasino = getCommand("casino");
+        if (cmdCasino != null) {
+            cmdCasino.setExecutor(casinoCommand);
+            cmdCasino.setTabCompleter(casinoCommand);
+        }
+        PluginCommand cmdCroupier = getCommand("croupier");
+        if (cmdCroupier != null) {
+            cmdCroupier.setExecutor(casinoCommand);
+            cmdCroupier.setTabCompleter(casinoCommand);
+        }
 
         // 10. Export du resource pack au format .zip
         exportResourcePackZip();
