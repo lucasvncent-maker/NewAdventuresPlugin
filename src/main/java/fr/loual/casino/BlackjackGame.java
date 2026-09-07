@@ -228,9 +228,9 @@ public class BlackjackGame {
 
         switch (result) {
             case PLAYER_BLACKJACK -> {
-                // Victoire Blackjack naturel : Doubler la mise !
-                giveReward(targetPlayer, 2);
-                targetPlayer.sendMessage(Component.text("✦ BLACKJACK ! ✦ Vous réalisez un 21 naturel et doublez votre mise !", NamedTextColor.GOLD, TextDecoration.BOLD));
+                // Victoire Blackjack naturel : Payé 3 pour 1 (Triple la mise !)
+                giveReward(targetPlayer, 3);
+                targetPlayer.sendMessage(Component.text("✦ BLACKJACK NATUREL ! ✦ Payé 3 pour 1 ! Vous recevez le triple de votre mise !", NamedTextColor.GOLD, TextDecoration.BOLD));
                 targetPlayer.playSound(loc, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.1f);
                 targetPlayer.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.3f);
                 targetPlayer.spawnParticle(Particle.TOTEM_OF_UNDYING, loc.clone().add(0, 1, 0), 35, 0.5, 0.5, 0.5, 0.2);

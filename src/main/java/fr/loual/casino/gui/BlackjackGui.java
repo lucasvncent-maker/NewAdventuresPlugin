@@ -228,7 +228,8 @@ public class BlackjackGui {
                 inv.setItem(BUTTON_START_BET, createItem(Material.LIME_CONCRETE,
                         Component.text("✔ Valider la mise & Distribuer", NamedTextColor.GREEN, TextDecoration.BOLD),
                         "§eMise : §f" + betInSlot.getAmount() + "x " + itemName,
-                        "§7Victoire : §aVous remportez le double (x2) !",
+                        "§7Victoire standard : §aLe double (x2) !",
+                        "§6Blackjack (21 naturel) : §ePayé 3 pour 1 (x3) !",
                         "§7Défaite : §cVotre mise est perdue.",
                         "",
                         "§a➤ Cliquez pour lancer la partie !"
@@ -289,7 +290,8 @@ public class BlackjackGui {
                 if (meta != null) {
                     List<Component> lore = new ArrayList<>();
                     lore.add(Component.text("§6Mise actuelle en jeu : §e" + bet.getAmount() + "x"));
-                    lore.add(Component.text("§aVictoire = Vous remportez le double !"));
+                    lore.add(Component.text("§aVictoire standard = Double (x2)"));
+                    lore.add(Component.text("§6Blackjack (21 naturel) = Triple (3:1 / x3)"));
                     lore.add(Component.text("§cDéfaite = Mise perdue"));
                     meta.lore(lore);
                     betDisplay.setItemMeta(meta);
@@ -311,8 +313,8 @@ public class BlackjackGui {
             switch (game.getResult()) {
                 case PLAYER_BLACKJACK -> inv.setItem(49, createItem(Material.TOTEM_OF_UNDYING,
                         Component.text("✦ BLACKJACK NATUREL ! ✦", NamedTextColor.GOLD, TextDecoration.BOLD),
-                        "§aFélicitations ! Vous avez fait 21.",
-                        "§6Vous avez reçu le double de votre mise !"
+                        "§aFélicitations ! Vous avez fait 21 dès la distribution.",
+                        "§6Payé 3 pour 1 : Votre mise a été triplée (x3) !"
                 ));
                 case PLAYER_WIN, DEALER_BUST -> inv.setItem(49, createItem(Material.EMERALD_BLOCK,
                         Component.text("✔ VICTOIRE ! ✔", NamedTextColor.GREEN, TextDecoration.BOLD),
