@@ -79,6 +79,7 @@ public class ClassListener implements Listener {
     private final Map<UUID, Long> abilityCooldowns = new HashMap<>();
     private final Map<UUID, Long> assassinBackstabBuff = new HashMap<>();
     private final Map<UUID, ItemStack[]> assassinStoredArmor = new HashMap<>();
+    private final Map<UUID, Long> assassinStealthUntil = new HashMap<>();
     private final Set<UUID> sauterelleSuperDrop = new HashSet<>();
     private final Set<UUID> sauterelleFallImmunity = new HashSet<>();
     private final Set<UUID> diablePuddleActive = new HashSet<>();
@@ -428,7 +429,9 @@ public class ClassListener implements Listener {
         if (savedAssassin != null) {
             player.getInventory().setArmorContents(savedAssassin);
             player.setCollidable(true);
+            player.setInvisible(false);
         }
+        assassinStealthUntil.remove(uuid);
     }
 
     @EventHandler
@@ -437,6 +440,8 @@ public class ClassListener implements Listener {
         UUID uuid = player.getUniqueId();
         removePlayerMinions(uuid);
         assassinBackstabBuff.remove(uuid);
+        assassinStealthUntil.remove(uuid);
+        player.setInvisible(false);
         sauterelleSuperDrop.remove(uuid);
         sauterelleFallImmunity.remove(uuid);
         archerExplosiveArrowReady.remove(uuid);
@@ -538,6 +543,21 @@ public class ClassListener implements Listener {
         // Ne pas déclencher les effets de frappe du joueur lors des dégâts périodiques internes de la Peste
         if (plagueDamageInProgress.contains(victim.getUniqueId())) {
             return;
+        }
+
+        // Assassin invisible ou Diable en flaque : immunité et oubli immédiat des mobs
+        if (victim instanceof Player victimPlayer) {
+            UUID vUuid = victimPlayer.getUniqueId();
+            long now = System.currentTimeMillis();
+            if (assassinStealthUntil.getOrDefault(vUuid, 0L) > now || diablePuddleActive.contains(vUuid)) {
+                if (damager instanceof Mob mob) {
+                    mob.setTarget(null);
+                } else if (damager instanceof Projectile proj && proj.getShooter() instanceof Mob mob) {
+                    mob.setTarget(null);
+                }
+                event.setCancelled(true);
+                return;
+            }
         }
 
         // Cas 1 : Le joueur attaque directement au corps-à-corps
@@ -762,8 +782,8 @@ public class ClassListener implements Listener {
         if (!(event.getEntity() instanceof Player player)) return;
         PlayerClass pc = classManager.getPlayerClass(player);
 
-        // Diable : Invincibilité totale pendant la liquéfaction en flaque de braises
-        if (diablePuddleActive.contains(player.getUniqueId())) {
+        // Diable & Assassin : Invincibilité totale pendant la liquéfaction ou le Pas de l'Ombre
+        if (diablePuddleActive.contains(player.getUniqueId()) || assassinStealthUntil.getOrDefault(player.getUniqueId(), 0L) > System.currentTimeMillis()) {
             event.setCancelled(true);
             return;
         }
@@ -1348,6 +1368,13 @@ public class ClassListener implements Listener {
                             // Dégâts tranchants de l'ombre
                             target.damage(9.0, player);
                             target.setVelocity(target.getVelocity().add(dashVec.clone().normalize().multiply(0.35).setY(0.18)));
+                            if (target instanceof Mob mob) {
+                                mob.setTarget(null);
+                                if (mob instanceof PigZombie pz) {
+                                    pz.setAngry(false);
+                                    pz.setAnger(0);
+                                }
+                            }
                             world.spawnParticle(Particle.CRIT, target.getEyeLocation(), 12, 0.2, 0.2, 0.2, 0.1);
                             world.spawnParticle(Particle.SOUL_FIRE_FLAME, target.getLocation().add(0, 0.8, 0), 8, 0.2, 0.2, 0.2, 0.05);
                             world.playSound(target.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1.2f, 1.1f);
@@ -1359,6 +1386,17 @@ public class ClassListener implements Listener {
             }
         }
 
+        // Forcer l'oubli immédiat de la cible pour tous les monstres/mobs aux alentours (rayon 40 blocs)
+        for (Entity ent : world.getNearbyEntities(targetLoc, 40, 40, 40)) {
+            if (ent instanceof Mob mob && player.equals(mob.getTarget())) {
+                mob.setTarget(null);
+                if (mob instanceof PigZombie pz) {
+                    pz.setAngry(false);
+                    pz.setAnger(0);
+                }
+            }
+        }
+
         // Effets à l'arrivée
         world.spawnParticle(Particle.LARGE_SMOKE, targetLoc.clone().add(0, 1.0, 0), 20, 0.4, 0.5, 0.4, 0.05);
         world.spawnParticle(Particle.SOUL_FIRE_FLAME, targetLoc.clone().add(0, 1.0, 0), 15, 0.3, 0.4, 0.3, 0.05);
@@ -1367,6 +1405,9 @@ public class ClassListener implements Listener {
         world.playSound(targetLoc, Sound.ITEM_CHORUS_FRUIT_TELEPORT, 1.0f, 1.5f);
 
         // Invisibilité totale (armure masquée comme le Diable) pendant 3 secondes (60 ticks)
+        long stealthExpiry = System.currentTimeMillis() + 3000L;
+        assassinStealthUntil.put(uuid, stealthExpiry);
+
         ItemStack[] prevArmor = assassinStoredArmor.remove(uuid);
         if (prevArmor != null) {
             player.getInventory().setArmorContents(prevArmor);
@@ -1380,14 +1421,42 @@ public class ClassListener implements Listener {
         assassinStoredArmor.put(uuid, savedArmor);
         player.getInventory().setArmorContents(new ItemStack[4]);
 
+        player.setInvisible(true);
+        player.setCollidable(false);
         player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 65, 0, false, false, false));
         player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 70, 1, false, false, true));
 
+        // Tâche périodique pour empêcher les mobs de cibler l'assassin invisible toutes les 2 ticks
+        new BukkitRunnable() {
+            int ticks = 0;
+            @Override
+            public void run() {
+                ticks += 2;
+                if (!player.isOnline() || ticks >= 60 || assassinStealthUntil.getOrDefault(uuid, 0L) <= System.currentTimeMillis()) {
+                    cancel();
+                    return;
+                }
+                for (Entity ent : player.getNearbyEntities(35, 35, 35)) {
+                    if (ent instanceof Mob mob) {
+                        if (player.equals(mob.getTarget())) {
+                            mob.setTarget(null);
+                        }
+                        if (mob instanceof PigZombie pz && pz.isAngry()) {
+                            pz.setAngry(false);
+                            pz.setAnger(0);
+                        }
+                    }
+                }
+            }
+        }.runTaskTimer(plugin, 1L, 2L);
+
         // Rétablissement de l'armure, des collisions et fin de l'invisibilité après 3 secondes (60 ticks)
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            assassinStealthUntil.remove(uuid);
             ItemStack[] saved = assassinStoredArmor.remove(uuid);
             if (player.isOnline()) {
                 player.setCollidable(true);
+                player.setInvisible(false);
                 if (saved != null) {
                     player.getInventory().setArmorContents(saved);
                 }
@@ -1809,6 +1878,21 @@ public class ClassListener implements Listener {
             }
 
             Bukkit.getScheduler().runTaskLater(plugin, arrow::remove, 1L);
+        }
+    }
+
+    /**
+     * Empêche tous les monstres/mobs de cibler un joueur invisible (Assassin sous Pas de l'Ombre ou Diable liquéfié).
+     */
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onEntityTarget(EntityTargetLivingEntityEvent event) {
+        if (event.getTarget() instanceof Player player) {
+            UUID uuid = player.getUniqueId();
+            long now = System.currentTimeMillis();
+            if (assassinStealthUntil.getOrDefault(uuid, 0L) > now || diablePuddleActive.contains(uuid)) {
+                event.setCancelled(true);
+                event.setTarget(null);
+            }
         }
     }
 }
