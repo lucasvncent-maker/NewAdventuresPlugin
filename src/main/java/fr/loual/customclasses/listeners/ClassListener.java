@@ -136,11 +136,13 @@ public class ClassListener implements Listener {
                     ensurePermanentEffect(player, PotionEffectType.WATER_BREATHING, 0);
                     ensurePermanentEffect(player, PotionEffectType.DOLPHINS_GRACE, 0);
 
-                    // Vision nocturne : UNIQUEMENT dans l'eau
+                    // Minage & Vision dans l'eau : Force de Conduit et Vision Nocturne
                     boolean waterVision = player.isInWater() || player.getEyeLocation().getBlock().getType() == Material.WATER || player.getLocation().getBlock().getType() == Material.WATER;
                     if (waterVision) {
                         ensurePermanentEffect(player, PotionEffectType.NIGHT_VISION, 0);
+                        ensurePermanentEffect(player, PotionEffectType.CONDUIT_POWER, 0);
                     } else {
+                        player.removePotionEffect(PotionEffectType.CONDUIT_POWER);
                         boolean hasJobNv = false;
                         try {
                             hasJobNv = plugin.getJobManager().isNightVisionEnabled(player);
@@ -148,6 +150,18 @@ public class ClassListener implements Listener {
                         if (!hasJobNv) {
                             player.removePotionEffect(PotionEffectType.NIGHT_VISION);
                         }
+                    }
+
+                    // Vitesse de minage aquatique maintenue à 5.0 (neutralise le malus sous l'eau et le malus de nage/flottaison)
+                    org.bukkit.attribute.AttributeInstance subAttr = player.getAttribute(org.bukkit.attribute.Attribute.SUBMERGED_MINING_SPEED);
+                    if (subAttr != null && subAttr.getBaseValue() < 5.0) {
+                        subAttr.setBaseValue(5.0);
+                    }
+                } else {
+                    // Si le joueur n'est pas sirène, s'assurer que sa vitesse de minage immergée est la valeur normale
+                    org.bukkit.attribute.AttributeInstance subAttr = player.getAttribute(org.bukkit.attribute.Attribute.SUBMERGED_MINING_SPEED);
+                    if (subAttr != null && subAttr.getBaseValue() > 0.2) {
+                        subAttr.setBaseValue(0.2);
                     }
                 }
 

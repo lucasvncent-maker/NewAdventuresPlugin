@@ -86,6 +86,7 @@ public enum PlayerClass {
             Component.text("✦ Bonus :", NamedTextColor.GREEN, TextDecoration.BOLD),
             Component.text("  • Respiration aquatique & Grâce du dauphin permanentes.", NamedTextColor.AQUA),
             Component.text("  • Vision nocturne active uniquement dans l'eau.", NamedTextColor.AQUA),
+            Component.text("  • Minage aquatique sans pénalité (Force de Conduit et vitesse sous-marine maximale).", NamedTextColor.AQUA),
             Component.empty(),
             Component.text("✖ Malus :", NamedTextColor.RED, TextDecoration.BOLD),
             Component.text("  • Après 15 min hors de l'eau : Faim I et Lenteur I (réinitialisable avec de l'eau).", NamedTextColor.RED)
