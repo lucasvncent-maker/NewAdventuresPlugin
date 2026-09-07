@@ -901,6 +901,16 @@ public class JobListener implements Listener {
         if (CustomJobItems.isJobItem(item, CustomJobItems.ID_AVENTURIER_INFINITE_FIREWORK)) {
             event.setCancelled(true);
             handleAventurierFirework(player);
+            ItemStack fwBackup = item.clone();
+            fwBackup.setAmount(1);
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (player.isOnline()) {
+                    if (!player.getInventory().containsAtLeast(fwBackup, 1)) {
+                        player.getInventory().addItem(fwBackup);
+                    }
+                    player.updateInventory();
+                }
+            });
             return;
         }
     }
@@ -1215,14 +1225,20 @@ public class JobListener implements Listener {
                 fwm.setPower(2);
                 fwItem.setItemMeta(fwm);
             }
-            player.boostElytra(fwItem);
-            player.getWorld().playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 1.0f, 1.2f);
+            Firework fw = player.boostElytra(fwItem);
+            if (fw != null) {
+                fw.setSilent(true);
+            }
+            player.stopSound(Sound.ENTITY_FIREWORK_ROCKET_LAUNCH);
+            player.stopSound(Sound.ENTITY_FIREWORK_ROCKET_BLAST);
         } else {
             Firework fw = player.getWorld().spawn(player.getLocation().add(0, 1, 0), Firework.class);
             FireworkMeta fwm = fw.getFireworkMeta();
             fwm.setPower(1);
             fw.setFireworkMeta(fwm);
-            player.getWorld().playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 1.0f, 1.0f);
+            fw.setSilent(true);
+            player.stopSound(Sound.ENTITY_FIREWORK_ROCKET_LAUNCH);
+            player.stopSound(Sound.ENTITY_FIREWORK_ROCKET_BLAST);
         }
     }
 
