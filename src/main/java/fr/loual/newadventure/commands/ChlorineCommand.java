@@ -25,18 +25,20 @@ import java.util.*;
 
 /**
  * Commande /chlorine pour jouer "Chlorine" de Twenty One Pilots en jeu.
- * - Séquenceur NoteBlock polyphonique fidèle (intro, basse, couplet, pré-refrain, refrain, pont synthé, outro).
- * - Déclenchement simultané de la source sonore personnalisée "music.chlorine" / "custom.chlorine" si pack de texture.
- * - Paroles synchronisées dans l'ActionBar.
- * - Particules de notes de musique autour du joueur.
- * - Gestion du /chlorine stop et nettoyage à la déconnexion.
+ * - Séquenceur NoteBlock polyphonique ultra-réaliste :
+ *     * Voix de chant réaliste (FLUTE + PLING + GUITAR) reproduisant les intonations de Tyler Joseph.
+ *     * Vraie walking bassline de basse électrique (BASS).
+ *     * Guitare funk en contre-temps (GUITAR + HARP).
+ *     * Batterie complète de Josh Dun (BASEDRUM, SNARE avec ghost notes, HAT accentués, rimshots IRON_XYLOPHONE).
+ *     * Synthétiseur vintage (BIT + CHIME).
+ * - Support direct du fichier studio "music.chlorine" (ogg streamé) via le pack de ressources.
+ * - Paroles synchronisées dans l'ActionBar et particules de musique.
  */
 public class ChlorineCommand implements CommandExecutor, TabCompleter, Listener {
 
     private final NewAdventurePlugin plugin;
     private final Map<UUID, BukkitTask> activeTasks = new HashMap<>();
 
-    // Événements de notes et paroles pré-calculés
     private final List<NoteEvent> songNotes = new ArrayList<>();
     private final Map<Integer, Component> lyrics = new HashMap<>();
     private static final int TOTAL_STEPS = 480; // 480 steps * 3 ticks = 1440 ticks (~72s)
@@ -91,13 +93,13 @@ public class ChlorineCommand implements CommandExecutor, TabCompleter, Listener 
                         .append(Component.text("------------------------------------------------", NamedTextColor.DARK_AQUA))
         );
 
-        // Déclencher le son ressource pack au cas où un ogg est configuré
+        // Déclencher le son audio studio si présent dans le resource pack
         try {
             player.playSound(player.getLocation(), "music.chlorine", SoundCategory.RECORDS, 1.0f, 1.0f);
             player.playSound(player.getLocation(), "custom.chlorine", SoundCategory.RECORDS, 1.0f, 1.0f);
         } catch (Exception ignored) {}
 
-        // Organiser les notes par step pour un lookup O(1) à chaque tick
+        // Indexation par step pour accès O(1)
         Map<Integer, List<NoteEvent>> noteMap = new HashMap<>();
         for (NoteEvent ne : songNotes) {
             noteMap.computeIfAbsent(ne.step(), k -> new ArrayList<>()).add(ne);
@@ -126,7 +128,7 @@ public class ChlorineCommand implements CommandExecutor, TabCompleter, Listener 
                     return;
                 }
 
-                // Jouer les notes du step
+                // Jouer les notes de cet instant
                 List<NoteEvent> stepNotes = noteMap.get(currentStep);
                 if (stepNotes != null) {
                     Location loc = player.getLocation();
@@ -135,16 +137,15 @@ public class ChlorineCommand implements CommandExecutor, TabCompleter, Listener 
                     }
                 }
 
-                // Afficher les paroles si présentes pour ce step
+                // Paroles synchronisées
                 Component lyric = lyrics.get(currentStep);
                 if (lyric != null) {
                     player.sendActionBar(lyric);
                 }
 
-                // Particules de notes de musique
+                // Particules de notes
                 if (currentStep % 4 == 0) {
                     Location noteLoc = player.getLocation().add(0, 1.8, 0);
-                    // Décalage pour couleur aléatoire de note Minecraft
                     double noteColor = (currentStep % 24) / 24.0;
                     player.getWorld().spawnParticle(Particle.NOTE, noteLoc.getX(), noteLoc.getY(), noteLoc.getZ(), 0, noteColor, 0, 0, 1);
                 }
@@ -191,11 +192,10 @@ public class ChlorineCommand implements CommandExecutor, TabCompleter, Listener 
     }
 
     // ==========================================
-    // Séquençage musical de Chlorine
+    // Orchestration & Séquençage musical
     // ==========================================
 
     private static float pitch(int semitone) {
-        // Formule standard Minecraft NoteBlock : 0 = F#3 (0.5), 12 = F#4 (1.0), 24 = F#5 (2.0)
         int clamped = Math.max(0, Math.min(24, semitone));
         return (float) Math.pow(2.0, (clamped - 12) / 12.0);
     }
@@ -204,191 +204,239 @@ public class ChlorineCommand implements CommandExecutor, TabCompleter, Listener 
         songNotes.add(new NoteEvent(step, sound, pitch(semitone), volume));
     }
 
-    private void addMelody(int step, int semitone) {
-        // Voix principale : Harp + Bit synthétique pour le son électro/pop
-        addNote(step, Sound.BLOCK_NOTE_BLOCK_HARP, semitone, 1.0f);
-        addNote(step, Sound.BLOCK_NOTE_BLOCK_BIT, semitone, 0.6f);
+    /**
+     * Voix de chant réaliste (Mélodie de chant de Tyler Joseph) :
+     * Flûte douce pour le souffle vocal + Pling net pour l'attaque des consonnes + Guitare pour la résonance de poitrine.
+     */
+    private void addVocal(int step, int semitone, float volume) {
+        addNote(step, Sound.BLOCK_NOTE_BLOCK_FLUTE, semitone, volume * 1.0f);
+        addNote(step, Sound.BLOCK_NOTE_BLOCK_PLING, semitone, volume * 0.85f);
+        if (semitone >= 12) {
+            addNote(step, Sound.BLOCK_NOTE_BLOCK_GUITAR, semitone - 12, volume * 0.45f);
+        } else {
+            addNote(step, Sound.BLOCK_NOTE_BLOCK_GUITAR, semitone, volume * 0.4f);
+        }
     }
 
-    private void addRhythmBar(int barIndex, int root, int third, int fifth, boolean drums, boolean bass, boolean chords) {
-        int start = barIndex * 16;
+    /**
+     * Basse ambulante (Walking Bass) réaliste et syncopée de Chlorine.
+     */
+    private void addWalkingBass(int start, int root, int third, int fifth, int octave) {
+        addNote(start + 0, Sound.BLOCK_NOTE_BLOCK_BASS, root, 1.0f);
+        addNote(start + 4, Sound.BLOCK_NOTE_BLOCK_BASS, third, 0.85f);
+        addNote(start + 6, Sound.BLOCK_NOTE_BLOCK_BASS, fifth, 0.8f);
+        addNote(start + 8, Sound.BLOCK_NOTE_BLOCK_BASS, (octave <= 24 ? octave : root), 0.95f);
+        addNote(start + 12, Sound.BLOCK_NOTE_BLOCK_BASS, fifth, 0.8f);
+        addNote(start + 14, Sound.BLOCK_NOTE_BLOCK_BASS, third, 0.75f);
+    }
 
-        // Basse rythmée caractéristique de Chlorine
-        if (bass) {
-            addNote(start + 0, Sound.BLOCK_NOTE_BLOCK_BASS, root, 1.0f);
-            addNote(start + 4, Sound.BLOCK_NOTE_BLOCK_BASS, root, 0.8f);
-            addNote(start + 6, Sound.BLOCK_NOTE_BLOCK_BASS, (root + 12 <= 24 ? root + 12 : root), 0.7f);
-            addNote(start + 8, Sound.BLOCK_NOTE_BLOCK_BASS, root, 0.9f);
-            addNote(start + 12, Sound.BLOCK_NOTE_BLOCK_BASS, third, 0.8f);
-            addNote(start + 14, Sound.BLOCK_NOTE_BLOCK_BASS, fifth, 0.7f);
+    /**
+     * Batterie complète (Kick, Snare, Hi-hats avec variations d'ouverture, Rimshot).
+     */
+    private void addDrums(int start, boolean fill) {
+        // Kick punchy (Grosse caisse)
+        addNote(start + 0, Sound.BLOCK_NOTE_BLOCK_BASEDRUM, 6, 1.0f);
+        addNote(start + 6, Sound.BLOCK_NOTE_BLOCK_BASEDRUM, 6, 0.75f);
+        addNote(start + 8, Sound.BLOCK_NOTE_BLOCK_BASEDRUM, 6, 0.95f);
+        addNote(start + 10, Sound.BLOCK_NOTE_BLOCK_BASEDRUM, 6, 0.6f);
+
+        // Caisse claire (Snare) + Rimshot (Iron Xylophone) sur 2 et 4
+        addNote(start + 4, Sound.BLOCK_NOTE_BLOCK_SNARE, 12, 1.0f);
+        addNote(start + 4, Sound.BLOCK_NOTE_BLOCK_IRON_XYLOPHONE, 18, 0.5f);
+        addNote(start + 12, Sound.BLOCK_NOTE_BLOCK_SNARE, 12, 1.0f);
+        addNote(start + 12, Sound.BLOCK_NOTE_BLOCK_IRON_XYLOPHONE, 18, 0.5f);
+
+        // Ghost note caisse claire
+        addNote(start + 10, Sound.BLOCK_NOTE_BLOCK_SNARE, 10, 0.35f);
+
+        // Hi-hats (Charleston) avec accents en contre-temps
+        for (int s = 0; s < 16; s += 2) {
+            int p = (s == 2 || s == 6 || s == 10 || s == 14) ? 20 : 16;
+            float vol = (s == 2 || s == 6 || s == 10 || s == 14) ? 0.65f : 0.4f;
+            addNote(start + s, Sound.BLOCK_NOTE_BLOCK_HAT, p, vol);
         }
 
-        // Batterie : Kick, Snare, Hi-hats
-        if (drums) {
-            // Kick sur 1, 2.5 et 3
-            addNote(start + 0, Sound.BLOCK_NOTE_BLOCK_BASEDRUM, 6, 1.0f);
-            addNote(start + 6, Sound.BLOCK_NOTE_BLOCK_BASEDRUM, 6, 0.7f);
-            addNote(start + 8, Sound.BLOCK_NOTE_BLOCK_BASEDRUM, 6, 0.9f);
-            addNote(start + 10, Sound.BLOCK_NOTE_BLOCK_BASEDRUM, 6, 0.5f);
-
-            // Snare sur 2 et 4
-            addNote(start + 4, Sound.BLOCK_NOTE_BLOCK_SNARE, 12, 1.0f);
-            addNote(start + 12, Sound.BLOCK_NOTE_BLOCK_SNARE, 12, 1.0f);
-
-            // Hi-hats (croches)
-            for (int s = 0; s < 16; s += 2) {
-                addNote(start + s, Sound.BLOCK_NOTE_BLOCK_HAT, 18, (s % 4 == 0) ? 0.6f : 0.4f);
-            }
+        if (fill) {
+            addNote(start + 13, Sound.BLOCK_NOTE_BLOCK_SNARE, 14, 0.75f);
+            addNote(start + 14, Sound.BLOCK_NOTE_BLOCK_SNARE, 16, 0.9f);
+            addNote(start + 15, Sound.BLOCK_NOTE_BLOCK_SNARE, 18, 1.0f);
         }
+    }
 
-        // Accords synthé doux
-        if (chords) {
-            addNote(start + 0, Sound.BLOCK_NOTE_BLOCK_HARP, root, 0.5f);
-            addNote(start + 0, Sound.BLOCK_NOTE_BLOCK_HARP, third, 0.5f);
-            addNote(start + 0, Sound.BLOCK_NOTE_BLOCK_HARP, fifth, 0.5f);
-
-            addNote(start + 8, Sound.BLOCK_NOTE_BLOCK_HARP, root, 0.4f);
-            addNote(start + 8, Sound.BLOCK_NOTE_BLOCK_HARP, third, 0.4f);
-            addNote(start + 8, Sound.BLOCK_NOTE_BLOCK_HARP, fifth, 0.4f);
-
-            // Nappe Flute pour enrichir l'harmonie
-            addNote(start + 0, Sound.BLOCK_NOTE_BLOCK_FLUTE, root, 0.35f);
-            addNote(start + 0, Sound.BLOCK_NOTE_BLOCK_FLUTE, third, 0.35f);
+    /**
+     * Accords de guitare / Rhodes en contre-temps (chops funk).
+     */
+    private void addGuitarChords(int start, int root, int third, int fifth) {
+        int[] chops = {2, 6, 10, 14};
+        for (int s : chops) {
+            addNote(start + s, Sound.BLOCK_NOTE_BLOCK_GUITAR, root, 0.5f);
+            addNote(start + s, Sound.BLOCK_NOTE_BLOCK_GUITAR, third, 0.5f);
+            addNote(start + s, Sound.BLOCK_NOTE_BLOCK_HARP, fifth, 0.4f);
         }
+        // Nappes douces sur les temps
+        addNote(start + 0, Sound.BLOCK_NOTE_BLOCK_HARP, root, 0.45f);
+        addNote(start + 0, Sound.BLOCK_NOTE_BLOCK_HARP, third, 0.45f);
+        addNote(start + 0, Sound.BLOCK_NOTE_BLOCK_HARP, fifth, 0.45f);
+        addNote(start + 8, Sound.BLOCK_NOTE_BLOCK_HARP, root, 0.4f);
+        addNote(start + 8, Sound.BLOCK_NOTE_BLOCK_HARP, third, 0.4f);
     }
 
     private void initSongData() {
-        // Gamme B-flat minor (Bb minor) / Db major :
-        // Bb3 = 4, C4 = 6, Db4 = 7, Eb4 = 9, F4 = 11, Gb4 = 12, Ab4 = 14
-        // Bb4 = 16, C5 = 18, Db5 = 19, Eb5 = 21, F5 = 23, Gb5 = 24
+        // Tonalité : Si bémol mineur (Bb minor) / Ré bémol majeur (Db major)
+        // Gamme : Bb3 = 4, C4 = 6, Db4 = 7, Eb4 = 9, F4 = 11, Gb4 = 12, Ab4 = 14
+        //         Bb4 = 16, C5 = 18, Db5 = 19, Eb5 = 21, F5 = 23, Gb5 = 24
         final int Bb3 = 4, C4 = 6, Db4 = 7, Eb4 = 9, F4 = 11, Gb4 = 12, Ab4 = 14;
         final int Bb4 = 16, C5 = 18, Db5 = 19, Eb5 = 21, F5 = 23;
-
-        // Progression d'accords récurrente par bloc de 4 mesures :
-        // Bar 0 : Bbm (Bb3, Db4, F4)
-        // Bar 1 : Gb  (Gb4/Gb3, Bb4/Bb3, Db4)
-        // Bar 2 : Db  (Db4, F4, Ab4)
-        // Bar 3 : Ab  (Ab3/Ab4, C4/C5, Eb4)
 
         // -------------------------------------------------------------------
         // SECTION 1 : INTRO (Mesures 0 à 3, steps 0 à 63)
         // -------------------------------------------------------------------
-        lyrics.put(0, Component.text("♫ Twenty One Pilots - Chlorine ♫", NamedTextColor.DARK_AQUA, TextDecoration.BOLD));
+        lyrics.put(0, Component.text("♫ Twenty One Pilots - Chlorine (Intro) ♫", NamedTextColor.DARK_AQUA, TextDecoration.BOLD));
 
-        // Mesure 0 : Bbm arpège
-        addRhythmBar(0, Bb3, Db4, F4, false, false, true);
-        addNote(0, Sound.BLOCK_NOTE_BLOCK_HARP, Bb4, 0.7f);
-        addNote(3, Sound.BLOCK_NOTE_BLOCK_HARP, Db5, 0.7f);
-        addNote(6, Sound.BLOCK_NOTE_BLOCK_HARP, F5, 0.8f);
-        addNote(9, Sound.BLOCK_NOTE_BLOCK_HARP, Db5, 0.7f);
-        addNote(12, Sound.BLOCK_NOTE_BLOCK_HARP, C5, 0.6f);
-        addNote(14, Sound.BLOCK_NOTE_BLOCK_HARP, Bb4, 0.6f);
+        // Mesure 0 : Bbm arpège au piano doux
+        addGuitarChords(0, Bb3, Db4, F4);
+        addNote(0, Sound.BLOCK_NOTE_BLOCK_HARP, Bb4, 0.75f);
+        addNote(3, Sound.BLOCK_NOTE_BLOCK_HARP, Db5, 0.75f);
+        addNote(6, Sound.BLOCK_NOTE_BLOCK_HARP, F5, 0.85f);
+        addNote(9, Sound.BLOCK_NOTE_BLOCK_HARP, Db5, 0.75f);
+        addNote(12, Sound.BLOCK_NOTE_BLOCK_HARP, C5, 0.7f);
+        addNote(14, Sound.BLOCK_NOTE_BLOCK_HARP, Bb4, 0.7f);
 
         // Mesure 1 : Gb arpège
-        addRhythmBar(1, Gb4, Bb4, Db5, false, false, true);
-        addNote(16, Sound.BLOCK_NOTE_BLOCK_HARP, Gb4, 0.7f);
-        addNote(19, Sound.BLOCK_NOTE_BLOCK_HARP, Bb4, 0.7f);
-        addNote(22, Sound.BLOCK_NOTE_BLOCK_HARP, Db5, 0.8f);
-        addNote(25, Sound.BLOCK_NOTE_BLOCK_HARP, Bb4, 0.7f);
-        addNote(28, Sound.BLOCK_NOTE_BLOCK_HARP, Ab4, 0.6f);
-        addNote(30, Sound.BLOCK_NOTE_BLOCK_HARP, Gb4, 0.6f);
+        addGuitarChords(16, Gb4, Bb4, Db5);
+        addNote(16, Sound.BLOCK_NOTE_BLOCK_HARP, Gb4, 0.75f);
+        addNote(19, Sound.BLOCK_NOTE_BLOCK_HARP, Bb4, 0.75f);
+        addNote(22, Sound.BLOCK_NOTE_BLOCK_HARP, Db5, 0.85f);
+        addNote(25, Sound.BLOCK_NOTE_BLOCK_HARP, Bb4, 0.75f);
+        addNote(28, Sound.BLOCK_NOTE_BLOCK_HARP, Ab4, 0.7f);
+        addNote(30, Sound.BLOCK_NOTE_BLOCK_HARP, Gb4, 0.7f);
 
-        // Mesure 2 : Db + Entrée de la Basse
-        lyrics.put(32, Component.text("♫ (Bassline) ♫", NamedTextColor.GRAY));
-        addRhythmBar(2, Db4, F4, Ab4, false, true, true);
-        addNote(32, Sound.BLOCK_NOTE_BLOCK_HARP, F4, 0.7f);
-        addNote(35, Sound.BLOCK_NOTE_BLOCK_HARP, Ab4, 0.7f);
-        addNote(38, Sound.BLOCK_NOTE_BLOCK_HARP, Db5, 0.8f);
-        addNote(41, Sound.BLOCK_NOTE_BLOCK_HARP, Ab4, 0.7f);
-        addNote(44, Sound.BLOCK_NOTE_BLOCK_HARP, Gb4, 0.6f);
-        addNote(46, Sound.BLOCK_NOTE_BLOCK_HARP, F4, 0.6f);
+        // Mesure 2 : Db + Entrée de la Walking Bass
+        lyrics.put(32, Component.text("♫ (Groovy Walking Bass) ♫", NamedTextColor.GRAY));
+        addGuitarChords(32, Db4, F4, Ab4);
+        addWalkingBass(32, Db4, F4, Ab4, Db5);
+        addNote(32, Sound.BLOCK_NOTE_BLOCK_HARP, F4, 0.75f);
+        addNote(35, Sound.BLOCK_NOTE_BLOCK_HARP, Ab4, 0.75f);
+        addNote(38, Sound.BLOCK_NOTE_BLOCK_HARP, Db5, 0.85f);
+        addNote(41, Sound.BLOCK_NOTE_BLOCK_HARP, Ab4, 0.75f);
+        addNote(44, Sound.BLOCK_NOTE_BLOCK_HARP, Gb4, 0.7f);
+        addNote(46, Sound.BLOCK_NOTE_BLOCK_HARP, F4, 0.7f);
 
-        // Mesure 3 : Ab + Hi-hats
-        addRhythmBar(3, Ab4, C5, Eb5, false, true, true);
+        // Mesure 3 : Ab + Hi-hats d'ambiance
+        addGuitarChords(48, Ab4, C5, Eb5);
+        addWalkingBass(48, Ab4, C5, Eb5, 24);
         for (int s = 48; s < 64; s += 2) {
-            addNote(s, Sound.BLOCK_NOTE_BLOCK_HAT, 18, 0.5f);
+            addNote(s, Sound.BLOCK_NOTE_BLOCK_HAT, 18, 0.55f);
         }
-        addNote(48, Sound.BLOCK_NOTE_BLOCK_HARP, Eb4, 0.7f);
-        addNote(51, Sound.BLOCK_NOTE_BLOCK_HARP, Ab4, 0.7f);
-        addNote(54, Sound.BLOCK_NOTE_BLOCK_HARP, C5, 0.8f);
-        addNote(57, Sound.BLOCK_NOTE_BLOCK_HARP, Bb4, 0.7f);
-        addNote(60, Sound.BLOCK_NOTE_BLOCK_HARP, Ab4, 0.6f);
-        addNote(62, Sound.BLOCK_NOTE_BLOCK_HARP, F4, 0.6f);
+        addNote(48, Sound.BLOCK_NOTE_BLOCK_HARP, Eb4, 0.75f);
+        addNote(51, Sound.BLOCK_NOTE_BLOCK_HARP, Ab4, 0.75f);
+        addNote(54, Sound.BLOCK_NOTE_BLOCK_HARP, C5, 0.85f);
+        addNote(57, Sound.BLOCK_NOTE_BLOCK_HARP, Bb4, 0.75f);
+        addNote(60, Sound.BLOCK_NOTE_BLOCK_HARP, Ab4, 0.7f);
+        addNote(62, Sound.BLOCK_NOTE_BLOCK_HARP, F4, 0.7f);
 
         // -------------------------------------------------------------------
         // SECTION 2 : COUPLET 1 (Mesures 4 à 7, steps 64 à 127)
         // -------------------------------------------------------------------
-        addRhythmBar(4, Bb3, Db4, F4, true, true, true);
-        addRhythmBar(5, Gb4, Bb4, Db5, true, true, true);
-        addRhythmBar(6, Db4, F4, Ab4, true, true, true);
-        addRhythmBar(7, Ab4, C5, Eb5, true, true, true);
+        // Rythme complet : Walking Bass + Guitare funk + Batterie
+        addWalkingBass(64, Bb3, Db4, F4, Bb4);
+        addGuitarChords(64, Bb3, Db4, F4);
+        addDrums(64, false);
 
+        addWalkingBass(80, Gb4, Bb4, Db5, Gb4);
+        addGuitarChords(80, Gb4, Bb4, Db5);
+        addDrums(80, false);
+
+        addWalkingBass(96, Db4, F4, Ab4, Db5);
+        addGuitarChords(96, Db4, F4, Ab4);
+        addDrums(96, false);
+
+        addWalkingBass(112, Ab4, C5, Eb5, 24);
+        addGuitarChords(112, Ab4, C5, Eb5);
+        addDrums(112, true);
+
+        // Mélodie de chant réaliste (Tyler Joseph)
         lyrics.put(64, Component.text("♫ So where are you? It's been a little while... ♫", NamedTextColor.YELLOW));
-        // "So where are you?"
-        addMelody(64, F4);
-        addMelody(67, F4);
-        addMelody(70, Eb4);
-        addMelody(72, Db4);
+        // "So where are you?" (rythme syncopé)
+        addVocal(64, Bb3, 0.8f);
+        addVocal(66, Db4, 0.85f);
+        addVocal(68, F4, 1.0f);
+        addVocal(72, Eb4, 0.9f);
+        addVocal(74, Db4, 0.85f);
         // "It's been a little while"
-        addMelody(76, Db4);
-        addMelody(78, Eb4);
-        addMelody(80, F4);
-        addMelody(82, Eb4);
-        addMelody(84, Db4);
-        addMelody(86, Bb3);
+        addVocal(78, Db4, 0.85f);
+        addVocal(80, Eb4, 0.9f);
+        addVocal(82, F4, 1.0f);
+        addVocal(84, Eb4, 0.9f);
+        addVocal(86, Db4, 0.85f);
+        addVocal(88, Bb3, 0.8f);
 
         lyrics.put(96, Component.text("♫ That's how it goes, I guess... ♫", NamedTextColor.YELLOW));
         // "That's how it goes, I guess"
-        addMelody(96, F4);
-        addMelody(98, F4);
-        addMelody(100, Eb4);
-        addMelody(102, Db4);
-        addMelody(106, Db4);
-        addMelody(108, C4);
-        addMelody(110, Bb3);
+        addVocal(96, Db4, 0.85f);
+        addVocal(98, Eb4, 0.9f);
+        addVocal(100, F4, 1.0f);
+        addVocal(102, F4, 0.95f);
+        addVocal(104, Eb4, 0.9f);
+        addVocal(106, Db4, 0.85f);
 
-        // Transition
-        addMelody(116, Bb3);
-        addMelody(118, Db4);
-        addMelody(120, Eb4);
-        addMelody(122, F4);
+        // "Fuck it, now you're tripping on my wires"
+        lyrics.put(112, Component.text("♫ Now you're tripping on my wires... ♫", NamedTextColor.YELLOW));
+        addVocal(112, Db4, 0.85f);
+        addVocal(114, F4, 0.95f);
+        addVocal(116, F4, 1.0f);
+        addVocal(118, F4, 0.95f);
+        addVocal(120, Eb4, 0.9f);
+        addVocal(122, Db4, 0.85f);
+        addVocal(124, C4, 0.8f);
+        addVocal(126, Bb3, 0.8f);
 
         // -------------------------------------------------------------------
         // SECTION 3 : PRÉ-REFRAIN (Mesures 8 à 11, steps 128 à 191)
         // -------------------------------------------------------------------
-        addRhythmBar(8, Bb3, Db4, F4, true, true, true);
-        addRhythmBar(9, Gb4, Bb4, Db5, true, true, true);
-        addRhythmBar(10, Db4, F4, Ab4, true, true, true);
-        // Bar 11 : Montée en puissance de batterie
-        addRhythmBar(11, Ab4, C5, Eb5, false, true, true);
+        addWalkingBass(128, Bb3, Db4, F4, Bb4);
+        addGuitarChords(128, Bb3, Db4, F4);
+        addDrums(128, false);
+
+        addWalkingBass(144, Gb4, Bb4, Db5, Gb4);
+        addGuitarChords(144, Gb4, Bb4, Db5);
+        addDrums(144, false);
+
+        addWalkingBass(160, Db4, F4, Ab4, Db5);
+        addGuitarChords(160, Db4, F4, Ab4);
+        addDrums(160, false);
+
+        // Bar 11 : Montée en puissance
+        addWalkingBass(176, Ab4, C5, Eb5, 24);
+        addGuitarChords(176, Ab4, C5, Eb5);
 
         lyrics.put(128, Component.text("♫ Fallin' out of line, oh, trippin' on my wires... ♫", NamedTextColor.GOLD));
         // "Fallin' out of line"
-        addMelody(128, Db5);
-        addMelody(131, C5);
-        addMelody(134, Bb4);
-        addMelody(136, Ab4);
-        addMelody(138, Bb4);
+        addVocal(128, Db5, 1.0f);
+        addVocal(131, C5, 0.95f);
+        addVocal(134, Bb4, 0.9f);
+        addVocal(136, Ab4, 0.85f);
+        addVocal(138, Bb4, 0.9f);
 
         // "Oh, trippin' on my wires"
-        addMelody(144, Db5);
-        addMelody(148, Db5);
-        addMelody(150, C5);
-        addMelody(152, Bb4);
-        addMelody(154, Ab4);
-        addMelody(156, Bb4);
+        addVocal(144, Db5, 1.0f);
+        addVocal(148, Db5, 1.0f);
+        addVocal(150, C5, 0.95f);
+        addVocal(152, Bb4, 0.9f);
+        addVocal(154, Ab4, 0.85f);
+        addVocal(156, Bb4, 0.9f);
 
         lyrics.put(160, Component.text("♫ Now you're runnin' out of time... ♫", NamedTextColor.GOLD));
         // "Now you're runnin' out of time"
-        addMelody(160, Db5);
-        addMelody(162, Db5);
-        addMelody(164, Eb5);
-        addMelody(166, F5);
-        addMelody(168, Eb5);
-        addMelody(170, Db5);
-        addMelody(172, Bb4);
+        addVocal(160, Db5, 1.0f);
+        addVocal(162, Db5, 1.0f);
+        addVocal(164, Eb5, 1.0f);
+        addVocal(166, F5, 1.05f);
+        addVocal(168, Eb5, 1.0f);
+        addVocal(170, Db5, 0.95f);
+        addVocal(172, Bb4, 0.9f);
 
-        // Drum build-up final vers le refrain
+        // Roulement de batterie réaliste vers le refrain
         addNote(180, Sound.BLOCK_NOTE_BLOCK_SNARE, 12, 0.7f);
         addNote(182, Sound.BLOCK_NOTE_BLOCK_SNARE, 12, 0.8f);
         addNote(184, Sound.BLOCK_NOTE_BLOCK_SNARE, 14, 0.85f);
@@ -397,186 +445,200 @@ public class ChlorineCommand implements CommandExecutor, TabCompleter, Listener 
         addNote(189, Sound.BLOCK_NOTE_BLOCK_SNARE, 17, 1.0f);
         addNote(190, Sound.BLOCK_NOTE_BLOCK_SNARE, 18, 1.0f);
         addNote(191, Sound.BLOCK_NOTE_BLOCK_SNARE, 20, 1.0f);
+        addNote(191, Sound.BLOCK_NOTE_BLOCK_IRON_XYLOPHONE, 22, 0.9f);
 
         // -------------------------------------------------------------------
         // SECTION 4 : LE REFRAIN ICONIQUE (Mesures 12 à 19, steps 192 à 319)
         // -------------------------------------------------------------------
         for (int b = 12; b <= 19; b++) {
-            int chordIdx = (b - 12) % 4;
-            int r = chordIdx == 0 ? Bb3 : (chordIdx == 1 ? Gb4 : (chordIdx == 2 ? Db4 : Ab4));
-            int t = chordIdx == 0 ? Db4 : (chordIdx == 1 ? Bb4 : (chordIdx == 2 ? F4 : C5));
-            int f = chordIdx == 0 ? F4 : (chordIdx == 1 ? Db5 : (chordIdx == 2 ? Ab4 : Eb5));
-            addRhythmBar(b, r, t, f, true, true, true);
+            int step = b * 16;
+            int idx = (b - 12) % 4;
+            int r = idx == 0 ? Bb3 : (idx == 1 ? Gb4 : (idx == 2 ? Db4 : Ab4));
+            int t = idx == 0 ? Db4 : (idx == 1 ? Bb4 : (idx == 2 ? F4 : C5));
+            int f = idx == 0 ? F4 : (idx == 1 ? Db5 : (idx == 2 ? Ab4 : Eb5));
+            int o = idx == 0 ? Bb4 : (idx == 1 ? Gb4 : (idx == 2 ? Db5 : 24));
+
+            addWalkingBass(step, r, t, f, o);
+            addGuitarChords(step, r, t, f);
+            addDrums(step, (b == 15 || b == 19));
+
+            // Couche de synthétiseur riche (Bit) sur le refrain
+            addNote(step + 0, Sound.BLOCK_NOTE_BLOCK_BIT, r, 0.45f);
+            addNote(step + 4, Sound.BLOCK_NOTE_BLOCK_BIT, t, 0.45f);
+            addNote(step + 8, Sound.BLOCK_NOTE_BLOCK_BIT, f, 0.45f);
         }
 
         // --- Refrain Partie 1 ---
         lyrics.put(192, Component.text("♫ Sippin' on straight chlorine, let the vibes slide over me ♫", NamedTextColor.AQUA, TextDecoration.BOLD));
-        // "Sippin' on straight chlorine"
-        addMelody(192, Db5);
-        addMelody(194, Db5);
-        addMelody(196, Db5);
-        addMelody(198, C5);
-        addMelody(200, Bb4);
-        addMelody(204, Bb4);
+        // "Sip-pin' on straight chlo-rine"
+        addVocal(192, Db5, 1.05f);
+        addVocal(194, Db5, 1.05f);
+        addVocal(196, Db5, 1.05f);
+        addVocal(198, C5, 1.0f);
+        addVocal(200, Bb4, 1.05f);
+        addVocal(204, F4, 0.85f);
+        addVocal(206, Bb4, 0.95f);
 
         // "Let the vibes slide over me"
-        addMelody(208, Db5);
-        addMelody(210, Db5);
-        addMelody(212, Db5);
-        addMelody(214, Eb5);
-        addMelody(216, F5);
-        addMelody(218, Eb5);
-        addMelody(220, Db5);
+        addVocal(208, Db5, 1.05f);
+        addVocal(210, Db5, 1.05f);
+        addVocal(212, Db5, 1.05f);
+        addVocal(214, Eb5, 1.05f);
+        addVocal(216, F5, 1.1f);
+        addVocal(218, Eb5, 1.05f);
+        addVocal(220, Db5, 1.0f);
+        addVocal(222, Bb4, 0.9f);
 
         lyrics.put(224, Component.text("♫ This beat is a chemical, beat is a chemical ♫", NamedTextColor.DARK_AQUA, TextDecoration.BOLD));
-        // "This beat is a chemical"
-        addMelody(224, F5);
-        addMelody(226, F5);
-        addMelody(228, F5);
-        addMelody(230, Eb5);
-        addMelody(232, Db5);
-        addMelody(234, Bb4);
-        addMelody(236, Bb4);
+        // "This beat is a che-mi-cal"
+        addVocal(224, F5, 1.1f);
+        addVocal(226, F5, 1.1f);
+        addVocal(228, F5, 1.05f);
+        addVocal(230, Eb5, 1.0f);
+        addVocal(232, Db5, 1.0f);
+        addVocal(234, Bb4, 0.95f);
+        addVocal(236, Bb4, 0.95f);
 
-        // "Beat is a chemical"
-        addMelody(240, F5);
-        addMelody(242, F5);
-        addMelody(244, Eb5);
-        addMelody(246, Db5);
-        addMelody(248, Bb4);
-        addMelody(250, Bb4);
+        // "Beat is a che-mi-cal"
+        addVocal(240, F5, 1.1f);
+        addVocal(242, F5, 1.1f);
+        addVocal(244, Eb5, 1.0f);
+        addVocal(246, Db5, 1.0f);
+        addVocal(248, Bb4, 0.95f);
+        addVocal(250, Bb4, 0.95f);
 
         // --- Refrain Partie 2 ---
         lyrics.put(256, Component.text("♫ When I leave don't save my seat, I'll be back when it's all complete ♫", NamedTextColor.AQUA, TextDecoration.BOLD));
         // "When I leave don't save my seat"
-        addMelody(256, Db5);
-        addMelody(258, Db5);
-        addMelody(260, Db5);
-        addMelody(262, C5);
-        addMelody(264, Bb4);
-        addMelody(266, Bb4);
+        addVocal(256, Db5, 1.05f);
+        addVocal(258, Db5, 1.05f);
+        addVocal(260, Db5, 1.05f);
+        addVocal(262, C5, 1.0f);
+        addVocal(264, Bb4, 1.05f);
+        addVocal(268, F4, 0.85f);
+        addVocal(270, Bb4, 0.95f);
 
-        // "I'll be back when it's all complete"
-        addMelody(272, Db5);
-        addMelody(274, Db5);
-        addMelody(276, Db5);
-        addMelody(278, Eb5);
-        addMelody(280, F5);
-        addMelody(282, Eb5);
-        addMelody(284, Db5);
-        addMelody(286, Db5);
+        // "I'll be back when it's all com-plete"
+        addVocal(272, Db5, 1.05f);
+        addVocal(274, Db5, 1.05f);
+        addVocal(276, Db5, 1.05f);
+        addVocal(278, Eb5, 1.05f);
+        addVocal(280, F5, 1.1f);
+        addVocal(282, Eb5, 1.05f);
+        addVocal(284, Db5, 1.0f);
+        addVocal(286, Db5, 1.0f);
 
         lyrics.put(288, Component.text("♫ The moment is medical, moment is medical ♫", NamedTextColor.DARK_AQUA, TextDecoration.BOLD));
-        // "The moment is medical"
-        addMelody(288, F5);
-        addMelody(290, F5);
-        addMelody(292, F5);
-        addMelody(294, Eb5);
-        addMelody(296, Db5);
-        addMelody(298, Bb4);
-        addMelody(300, Bb4);
+        // "The mo-ment is me-di-cal"
+        addVocal(288, F5, 1.1f);
+        addVocal(290, F5, 1.1f);
+        addVocal(292, F5, 1.05f);
+        addVocal(294, Eb5, 1.0f);
+        addVocal(296, Db5, 1.0f);
+        addVocal(298, Bb4, 0.95f);
+        addVocal(300, Bb4, 0.95f);
 
-        // "Moment is medical"
-        addMelody(304, F5);
-        addMelody(306, F5);
-        addMelody(308, Eb5);
-        addMelody(310, Db5);
-        addMelody(312, Bb4);
-        addMelody(314, Bb4);
+        // "Mo-ment is me-di-cal"
+        addVocal(304, F5, 1.1f);
+        addVocal(306, F5, 1.1f);
+        addVocal(308, Eb5, 1.0f);
+        addVocal(310, Db5, 1.0f);
+        addVocal(312, Bb4, 0.95f);
+        addVocal(314, Bb4, 0.95f);
 
-        // "Sippin' on straight chlorine..."
+        // "Sip-pin' on straight chlo-rine..."
         lyrics.put(316, Component.text("♫ Sippin' on straight chlorine... ♫", NamedTextColor.AQUA, TextDecoration.BOLD));
-        addMelody(316, Db5);
-        addMelody(318, C5);
+        addVocal(316, Db5, 1.05f);
+        addVocal(318, C5, 1.0f);
 
         // -------------------------------------------------------------------
-        // SECTION 5 : POST-REFRAIN / SYNTH HOOK (Mesures 20 à 23, steps 320 à 383)
+        // SECTION 5 : POST-REFRAIN / SYNTH RIFF (Mesures 20 à 23, steps 320 à 383)
         // -------------------------------------------------------------------
-        lyrics.put(320, Component.text("♫ (Electro Synth Riff) ♫", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
-        addRhythmBar(20, Bb3, Db4, F4, true, true, true);
-        addRhythmBar(21, Gb4, Bb4, Db5, true, true, true);
-        addRhythmBar(22, Db4, F4, Ab4, true, true, true);
-        addRhythmBar(23, Ab4, C5, Eb5, true, true, true);
+        lyrics.put(320, Component.text("♫ (Electro Synth Solo & Walking Bass) ♫", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
+        addWalkingBass(320, Bb3, Db4, F4, Bb4);
+        addGuitarChords(320, Bb3, Db4, F4);
+        addDrums(320, false);
 
-        // Riff mélodique synthé bondissant
-        addMelody(320, Bb4);
-        addMelody(324, Db5);
-        addMelody(326, F5);
-        addMelody(328, Db5);
-        addMelody(330, Bb4);
-        addMelody(332, Ab4);
-        addMelody(334, Bb4);
+        addWalkingBass(336, Gb4, Bb4, Db5, Gb4);
+        addGuitarChords(336, Gb4, Bb4, Db5);
+        addDrums(336, false);
 
-        addMelody(336, Gb4);
-        addMelody(338, Bb4);
-        addMelody(340, Db5);
-        addMelody(342, Eb5);
-        addMelody(344, F5);
-        addMelody(346, Eb5);
-        addMelody(348, Db5);
-        addMelody(350, Bb4);
+        addWalkingBass(352, Db4, F4, Ab4, Db5);
+        addGuitarChords(352, Db4, F4, Ab4);
+        addDrums(352, false);
 
-        addMelody(352, Db5);
-        addMelody(354, F5);
-        addMelody(356, Ab4);
-        addMelody(358, Db5);
-        addMelody(360, F5);
-        addMelody(362, Eb5);
-        addMelody(364, Db5);
+        addWalkingBass(368, Ab4, C5, Eb5, 24);
+        addGuitarChords(368, Ab4, C5, Eb5);
+        addDrums(368, true);
 
-        addMelody(368, C5);
-        addMelody(370, Eb5);
-        addMelody(372, Db5);
-        addMelody(374, C5);
-        addMelody(376, Bb4);
-        addMelody(380, Ab4);
-        addMelody(382, F4);
+        // Lead synth bondissant (Bit + Chime)
+        int[] riffSteps = {320, 324, 326, 328, 330, 332, 334,
+                           336, 338, 340, 342, 344, 346, 348, 350,
+                           352, 354, 356, 358, 360, 362, 364,
+                           368, 370, 372, 374, 376, 380, 382};
+        int[] riffNotes = {Bb4, Db5, F5,  Db5, Bb4, Ab4, Bb4,
+                           Gb4, Bb4, Db5, Eb5, F5,  Eb5, Db5, Bb4,
+                           Db5, F5,  Ab4, Db5, F5,  Eb5, Db5,
+                           C5,  Eb5, Db5, C5,  Bb4, Ab4, F4};
+
+        for (int i = 0; i < riffSteps.length; i++) {
+            addNote(riffSteps[i], Sound.BLOCK_NOTE_BLOCK_BIT, riffNotes[i], 0.85f);
+            addNote(riffSteps[i], Sound.BLOCK_NOTE_BLOCK_CHIME, riffNotes[i], 0.75f);
+        }
 
         // -------------------------------------------------------------------
-        // SECTION 6 : OUTRO / PARTIE DE NED (Mesures 24 à 29, steps 384 à 479)
+        // SECTION 6 : OUTRO / NED'S BALLAD (Mesures 24 à 29, steps 384 à 479)
         // -------------------------------------------------------------------
-        // Piano doux (Harp & Chime) sans batterie
+        // Ambiance piano mélancolique (Tyler au piano / Ned)
         lyrics.put(384, Component.text("♫ Can you build my heart with pieces? ♫", NamedTextColor.WHITE, TextDecoration.BOLD));
-        addRhythmBar(24, Bb3, Db4, F4, false, false, true);
-        addRhythmBar(25, Gb4, Bb4, Db5, false, false, true);
-        addRhythmBar(26, Db4, F4, Ab4, false, false, true);
-        addRhythmBar(27, Ab4, C5, Eb5, false, false, true);
-        addRhythmBar(28, Bb3, Db4, F4, false, false, true);
+        addGuitarChords(384, Bb3, Db4, F4);
+        addGuitarChords(400, Gb4, Bb4, Db5);
+        addGuitarChords(416, Db4, F4, Ab4);
+        addGuitarChords(432, Ab4, C5, Eb5);
+        addGuitarChords(448, Bb3, Db4, F4);
+
+        // Basse douce
+        addNote(384, Sound.BLOCK_NOTE_BLOCK_BASS, Bb3, 0.8f);
+        addNote(400, Sound.BLOCK_NOTE_BLOCK_BASS, Gb4, 0.8f);
+        addNote(416, Sound.BLOCK_NOTE_BLOCK_BASS, Db4, 0.8f);
+        addNote(432, Sound.BLOCK_NOTE_BLOCK_BASS, Ab4, 0.8f);
+        addNote(448, Sound.BLOCK_NOTE_BLOCK_BASS, Bb3, 0.85f);
 
         // "Can you build my heart with pieces?"
-        addNote(388, Sound.BLOCK_NOTE_BLOCK_HARP, F4, 0.9f);
-        addNote(391, Sound.BLOCK_NOTE_BLOCK_HARP, Eb4, 0.9f);
-        addNote(394, Sound.BLOCK_NOTE_BLOCK_HARP, Db4, 0.9f);
-        addNote(397, Sound.BLOCK_NOTE_BLOCK_HARP, Bb3, 0.8f);
-        addNote(400, Sound.BLOCK_NOTE_BLOCK_HARP, Db4, 0.9f);
-        addNote(403, Sound.BLOCK_NOTE_BLOCK_HARP, F4, 0.9f);
-        addNote(406, Sound.BLOCK_NOTE_BLOCK_HARP, Eb4, 0.85f);
-        addNote(409, Sound.BLOCK_NOTE_BLOCK_HARP, Db4, 0.85f);
+        addVocal(388, F4, 0.95f);
+        addVocal(391, Eb4, 0.95f);
+        addVocal(394, Db4, 0.95f);
+        addVocal(397, Bb3, 0.9f);
+        addVocal(400, Db4, 0.95f);
+        addVocal(403, F4, 1.0f);
+        addVocal(406, Eb4, 0.95f);
+        addVocal(409, Db4, 0.9f);
 
         lyrics.put(416, Component.text("♫ I am just a chemical... ♫", NamedTextColor.GRAY, TextDecoration.BOLD));
         // "I am just a chemical..."
-        addNote(418, Sound.BLOCK_NOTE_BLOCK_HARP, Db4, 0.9f);
-        addNote(421, Sound.BLOCK_NOTE_BLOCK_HARP, C4, 0.85f);
-        addNote(424, Sound.BLOCK_NOTE_BLOCK_HARP, Bb3, 0.8f);
-        addNote(427, Sound.BLOCK_NOTE_BLOCK_HARP, F4, 0.8f);
-        addNote(430, Sound.BLOCK_NOTE_BLOCK_HARP, Bb3, 0.8f);
-        addNote(433, Sound.BLOCK_NOTE_BLOCK_HARP, C4, 0.85f);
-        addNote(436, Sound.BLOCK_NOTE_BLOCK_HARP, Bb3, 0.9f);
+        addVocal(418, Db4, 0.95f);
+        addVocal(421, C4, 0.9f);
+        addVocal(424, Bb3, 0.9f);
+        addVocal(427, F4, 0.85f);
+        addVocal(430, Bb3, 0.9f);
+        addVocal(433, C4, 0.9f);
+        addVocal(436, Bb3, 0.95f);
 
         lyrics.put(448, Component.text("♫ Sippin' on straight chlorine... ♫", NamedTextColor.DARK_AQUA, TextDecoration.BOLD));
         // "Sippin' on straight chlorine..."
-        addNote(448, Sound.BLOCK_NOTE_BLOCK_HARP, Db4, 0.85f);
-        addNote(451, Sound.BLOCK_NOTE_BLOCK_HARP, C4, 0.8f);
-        addNote(454, Sound.BLOCK_NOTE_BLOCK_HARP, Bb3, 0.85f);
-        addNote(458, Sound.BLOCK_NOTE_BLOCK_HARP, F4, 0.75f);
-        addNote(462, Sound.BLOCK_NOTE_BLOCK_HARP, Bb3, 0.9f);
+        addVocal(448, Db4, 0.9f);
+        addVocal(451, C4, 0.85f);
+        addVocal(454, Bb3, 0.9f);
+        addVocal(458, F4, 0.8f);
+        addVocal(462, Bb3, 0.95f);
 
-        // Accord final apaisant Bbm + Bell Chime
-        addNote(470, Sound.BLOCK_NOTE_BLOCK_HARP, Bb3, 0.9f);
-        addNote(470, Sound.BLOCK_NOTE_BLOCK_HARP, Db4, 0.9f);
-        addNote(470, Sound.BLOCK_NOTE_BLOCK_HARP, F4, 0.9f);
-        addNote(470, Sound.BLOCK_NOTE_BLOCK_HARP, Bb4, 0.9f);
-        addNote(470, Sound.BLOCK_NOTE_BLOCK_BELL, Bb4, 0.8f);
-        addNote(470, Sound.BLOCK_NOTE_BLOCK_CHIME, F4, 0.7f);
+        // Accord final Bbm majestueux avec carillon
+        addNote(470, Sound.BLOCK_NOTE_BLOCK_HARP, Bb3, 1.0f);
+        addNote(470, Sound.BLOCK_NOTE_BLOCK_HARP, Db4, 1.0f);
+        addNote(470, Sound.BLOCK_NOTE_BLOCK_HARP, F4, 1.0f);
+        addNote(470, Sound.BLOCK_NOTE_BLOCK_HARP, Bb4, 1.0f);
+        addNote(470, Sound.BLOCK_NOTE_BLOCK_BELL, Bb4, 0.85f);
+        addNote(470, Sound.BLOCK_NOTE_BLOCK_CHIME, F4, 0.8f);
+        addNote(470, Sound.BLOCK_NOTE_BLOCK_GUITAR, Bb3, 0.7f);
     }
 }

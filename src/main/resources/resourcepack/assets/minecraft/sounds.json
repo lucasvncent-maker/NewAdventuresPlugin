@@ -1,0 +1,20 @@
+{
+  "music.chlorine": {
+    "category": "record",
+    "sounds": [
+      {
+        "name": "music/chlorine",
+        "stream": true
+      }
+    ]
+  },
+  "custom.chlorine": {
+    "category": "record",
+    "sounds": [
+      {
+        "name": "music/chlorine",
+        "stream": true
+      }
+    ]
+  }
+}
