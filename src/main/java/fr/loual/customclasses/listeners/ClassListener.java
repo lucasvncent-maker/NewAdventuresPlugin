@@ -565,9 +565,13 @@ public class ClassListener implements Listener {
                     livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 100, 0, false, false, true));
                 }
 
+                // Calcul de la distance du tir
+                Location originLoc = arrow.getOrigin() != null ? arrow.getOrigin() : shooter.getLocation();
+                double distance = originLoc.distance(victim.getLocation());
+                String distFormatted = String.format(Locale.US, "%.1f", distance);
+
                 // Tir à plus de 20 blocs : Critique garanti + Fort recul (Knockback II)
-                Location shootLoc = arrow.getOrigin();
-                if (shootLoc != null && shootLoc.distance(victim.getLocation()) >= 20.0) {
+                if (distance >= 20.0) {
                     arrow.setCritical(true);
                     event.setDamage(event.getDamage() * 1.25); // Bonus critique garanti
 
@@ -578,8 +582,15 @@ public class ClassListener implements Listener {
                         shooter.playSound(shooter.getLocation(), Sound.ENTITY_ARROW_HIT_PLAYER, 1.0f, 1.5f);
                         shooter.playSound(shooter.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.0f, 1.2f);
                     } catch (Exception ignored) {}
-                    shooter.sendActionBar(Component.text("✦ Tir d'élite longue distance (+20 blocs) ! Coup Critique + Fort Recul !", NamedTextColor.GOLD, TextDecoration.BOLD));
-                    victim.getWorld().spawnParticle(Particle.CRIT, victim.getLocation().clone().add(0, 1, 0), 12, 0.3, 0.3, 0.3, 0.2);
+                    shooter.sendActionBar(Component.text("✦ Tir d'élite longue distance (" + distFormatted + "m) ! Coup Critique + Fort Recul !", NamedTextColor.GOLD, TextDecoration.BOLD));
+                    victim.getWorld().spawnParticle(Particle.CRIT, victim.getLocation().clone().add(0, 1, 0), 14, 0.3, 0.3, 0.3, 0.2);
+                } else if (arrow.isCritical()) {
+                    // Coup critique standard
+                    try {
+                        shooter.playSound(shooter.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 0.9f, 1.3f);
+                    } catch (Exception ignored) {}
+                    shooter.sendActionBar(Component.text("✦ Coup Critique (" + distFormatted + "m) ! ✦", NamedTextColor.YELLOW, TextDecoration.BOLD));
+                    victim.getWorld().spawnParticle(Particle.CRIT, victim.getLocation().clone().add(0, 1, 0), 8, 0.25, 0.25, 0.25, 0.15);
                 }
             } else if (pc == PlayerClass.NECROMANCIEN) {
                 // Malus Nécromancien : tir inefficace (-80% dégâts)
@@ -587,15 +598,28 @@ public class ClassListener implements Listener {
             }
         }
 
-        // Cas 3 : Serviteurs du nécromancien (pas d'attaque envers le maître ni entre serviteurs du même maître)
-        if (damager instanceof LivingEntity minion && necroMinions.contains(minion.getUniqueId())) {
+        // Cas 3 : Serviteurs du nécromancien (pas d'attaque envers le maître ni entre serviteurs, au corps-à-corps OU aux projectiles)
+        Entity actualDamager = damager;
+        if (damager instanceof Projectile projectile && projectile.getShooter() instanceof Entity shooterEntity) {
+            actualDamager = shooterEntity;
+        }
+
+        if (actualDamager instanceof LivingEntity minion && necroMinions.contains(minion.getUniqueId())) {
             UUID masterId = minionToMaster.get(minion.getUniqueId());
+            // Protéger le maître : immunité absolue aux coups et flèches de ses serviteurs
             if (victim.getUniqueId().equals(masterId)) {
                 event.setCancelled(true);
+                if (damager instanceof Projectile proj) {
+                    proj.remove();
+                }
                 return;
             }
+            // Protéger les autres serviteurs du même maître
             if (necroMinions.contains(victim.getUniqueId()) && masterId != null && masterId.equals(minionToMaster.get(victim.getUniqueId()))) {
                 event.setCancelled(true);
+                if (damager instanceof Projectile proj) {
+                    proj.remove();
+                }
                 return;
             }
         }
@@ -645,7 +669,7 @@ public class ClassListener implements Listener {
             }
         }
 
-        // 4. SAUTERELLE : Dégâts de chute accrus (+50%) & Onde de choc à l'atterrissage
+        // 4. SAUTERELLE : Résistance aux chutes (-50% de dégâts) & Onde de choc à l'atterrissage
         if (pc == PlayerClass.SAUTERELLE && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
             // Immunité au saut de la capacité Catapulte Aérienne
             if (sauterelleFallImmunity.contains(player.getUniqueId())) {
@@ -657,15 +681,15 @@ public class ClassListener implements Listener {
                 return;
             }
 
-            // Malus : +50% de dégâts de chute
-            event.setDamage(event.getDamage() * 1.5);
-
             // Déclencher une onde de choc si la chute était conséquente
             float fallDistance = player.getFallDistance();
             double effectiveFall = Math.max((double) fallDistance, event.getDamage() + 3.0);
             if (effectiveFall >= 3.5 && !hopperShockwaveCooldown.contains(player.getUniqueId())) {
                 triggerHopperShockwave(player, (float) effectiveFall);
             }
+
+            // Bonus : Moins craindre les chutes (réduction de 50% des dégâts de chute)
+            event.setDamage(event.getDamage() * 0.5);
         }
     }
 
@@ -918,13 +942,33 @@ public class ClassListener implements Listener {
                 }
             }
 
-            // Cibler les monstres ennemis autour
-            for (Entity nearby : world.getNearbyEntities(loc, 14, 6, 14)) {
-                if (nearby instanceof Monster target && !necroMinions.contains(target.getUniqueId()) && !target.equals(minion)) {
-                    minion.setTarget(target);
-                    break;
-                }
+            // Aggro direct immédiat sur le monstre ennemi le plus proche
+            Monster immediateTarget = findNearestEnemyMonster(minion, master.getUniqueId(), 24.0);
+            if (immediateTarget != null) {
+                minion.setTarget(immediateTarget);
             }
+
+            // Boucle d'aggro automatique continue (toutes les 10 ticks = 0.5s)
+            // afin de chercher immédiatement un nouvel ennemi et ne JAMAIS cibler le joueur
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    if (!minion.isValid() || minion.isDead() || !necroMinions.contains(minionId)) {
+                        cancel();
+                        return;
+                    }
+
+                    LivingEntity current = minion.getTarget();
+                    if (current == null || !current.isValid() || current.isDead()
+                            || current.getUniqueId().equals(master.getUniqueId())
+                            || necroMinions.contains(current.getUniqueId())) {
+                        Monster nextTarget = findNearestEnemyMonster(minion, master.getUniqueId(), 24.0);
+                        if (nextTarget != null) {
+                            minion.setTarget(nextTarget);
+                        }
+                    }
+                }
+            }.runTaskTimer(plugin, 5L, 10L);
 
             world.spawnParticle(Particle.SOUL_FIRE_FLAME, loc.clone().add(0, 0.5, 0), 20, 0.5, 0.5, 0.5, 0.05);
             world.spawnParticle(Particle.WITCH, loc.clone().add(0, 0.5, 0), 12, 0.4, 0.4, 0.4, 0.05);
@@ -946,6 +990,47 @@ public class ClassListener implements Listener {
                 necroMinions.remove(minionId);
                 minionToMaster.remove(minionId);
             }, 500L);
+        }
+    }
+
+    private Monster findNearestEnemyMonster(Monster minion, UUID masterId, double radius) {
+        Location loc = minion.getLocation();
+        World world = loc.getWorld();
+        if (world == null) return null;
+
+        Monster best = null;
+        double bestDistSq = radius * radius;
+
+        for (Entity entity : world.getNearbyEntities(loc, radius, 8.0, radius)) {
+            if (entity instanceof Monster enemy && !entity.equals(minion)) {
+                if (necroMinions.contains(enemy.getUniqueId())) continue;
+                if (enemy.isValid() && !enemy.isDead()) {
+                    double dSq = enemy.getLocation().distanceSquared(loc);
+                    if (dSq < bestDistSq) {
+                        bestDistSq = dSq;
+                        best = enemy;
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onMinionTarget(EntityTargetLivingEntityEvent event) {
+        if (!necroMinions.contains(event.getEntity().getUniqueId())) {
+            return;
+        }
+
+        LivingEntity target = event.getTarget();
+        if (target == null) return;
+
+        UUID masterId = minionToMaster.get(event.getEntity().getUniqueId());
+
+        // Interdiction formelle de cibler son maître ou un autre serviteur allié
+        if (target.getUniqueId().equals(masterId) || (necroMinions.contains(target.getUniqueId()) && masterId != null && masterId.equals(minionToMaster.get(target.getUniqueId())))) {
+            event.setCancelled(true);
+            event.setTarget(null);
         }
     }
 
@@ -1001,7 +1086,6 @@ public class ClassListener implements Listener {
                 try {
                     player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 0.6f, 2.0f);
                 } catch (Exception ignored) {}
-                player.sendActionBar(Component.text("✦ Munition préservée (35%) !", NamedTextColor.AQUA, TextDecoration.BOLD));
             }
         }
 

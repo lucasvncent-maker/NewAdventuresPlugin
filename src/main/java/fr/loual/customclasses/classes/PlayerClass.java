@@ -71,10 +71,8 @@ public enum PlayerClass {
             Component.text("✦ Bonus :", NamedTextColor.GREEN, TextDecoration.BOLD),
             Component.text("  • Jump Boost II permanent.", NamedTextColor.AQUA),
             Component.text("  • Coups portés propulsent les monstres dans les airs (Knockback vertical).", NamedTextColor.AQUA),
-            Component.text("  • Onde de choc lors d'une chute élevée infligeant des dégâts de zone.", NamedTextColor.AQUA),
-            Component.empty(),
-            Component.text("✖ Malus :", NamedTextColor.RED, TextDecoration.BOLD),
-            Component.text("  • Dégâts de chute accrus (+50%).", NamedTextColor.RED)
+            Component.text("  • Résistance aux chutes : dégâts de chute réduits de 50%.", NamedTextColor.AQUA),
+            Component.text("  • Onde de choc lors d'une chute élevée infligeant des dégâts de zone.", NamedTextColor.AQUA)
     )),
 
     // 5. Sirène
