@@ -112,7 +112,7 @@ public class ClassListener implements Listener {
                     if (world != null && world.getEnvironment() == World.Environment.NORMAL && world.hasStorm()) {
                         int highestY = world.getHighestBlockYAt(loc);
                         if (loc.getBlockY() >= highestY) {
-                            String biomeName = loc.getBlock().getBiome().name().toLowerCase();
+                            String biomeName = loc.getBlock().getBiome().getKey().getKey().toLowerCase();
                             boolean noRainBiome = biomeName.contains("desert") || biomeName.contains("savanna") || biomeName.contains("badlands");
                             if (!noRainBiome) {
                                 player.damage(1.5); // Dégâts directs sous la pluie
@@ -569,8 +569,8 @@ public class ClassListener implements Listener {
         world.spawnParticle(Particle.SWEEP_ATTACK, loc.clone().add(0, 0.3, 0), 6, 1.0, 0.1, 1.0, 0.1);
 
         try {
-            world.playSound(loc, Sound.valueOf("ITEM_MACE_SMASH_GROUND"), 1.2f, 1.0f);
-        } catch (IllegalArgumentException e) {
+            world.playSound(loc, Sound.ITEM_MACE_SMASH_GROUND, 1.2f, 1.0f);
+        } catch (Throwable e) {
             world.playSound(loc, Sound.ENTITY_GENERIC_EXPLODE, 0.9f, 1.3f);
         }
 

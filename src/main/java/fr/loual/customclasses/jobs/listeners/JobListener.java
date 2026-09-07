@@ -45,7 +45,7 @@ import org.bukkit.potion.PotionEffectType;
 
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.event.player.PlayerRespawnEvent;
-import fr.loual.customminerals.items.Cuprite;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -1094,7 +1094,7 @@ public class JobListener implements Listener {
             );
             player.playSound(player.getLocation(), Sound.ENTITY_PHANTOM_FLAP, 1.0f, 1.0f);
         }
-        player.getWorld().spawnParticle(Particle.FEATHER, player.getLocation().clone().add(0, 1, 0), 20, 0.4, 0.5, 0.4, 0.05);
+        player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation().clone().add(0, 1, 0), 20, 0.4, 0.5, 0.4, 0.05);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -1102,7 +1102,7 @@ public class JobListener implements Listener {
         if (event.getEntity() instanceof Player player && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
             if (fallImmunity.contains(player.getUniqueId())) {
                 event.setCancelled(true);
-                player.getWorld().spawnParticle(Particle.FEATHER, player.getLocation(), 15, 0.3, 0.2, 0.3, 0.05);
+                player.getWorld().spawnParticle(Particle.POOF, player.getLocation(), 15, 0.3, 0.2, 0.3, 0.05);
                 player.playSound(player.getLocation(), Sound.BLOCK_WOOL_FALL, 0.8f, 1.2f);
             }
         }
