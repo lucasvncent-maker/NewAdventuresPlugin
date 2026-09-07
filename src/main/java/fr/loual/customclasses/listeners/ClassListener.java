@@ -57,6 +57,20 @@ public class ClassListener implements Listener {
     private final Set<UUID> necroMinions = new HashSet<>();
     private final Map<UUID, UUID> minionToMaster = new HashMap<>();
 
+    // Nécromancien : Peste Nécrotique / DoT accumulé (UUID victime -> peste)
+    private static class NecroPlague {
+        final UUID masterId;
+        double remainingDamage;
+
+        NecroPlague(UUID masterId, double initialDamage) {
+            this.masterId = masterId;
+            this.remainingDamage = initialDamage;
+        }
+    }
+    private final Map<UUID, NecroPlague> activePlagues = new HashMap<>();
+
+    private record NecroHoeTier(double poisonTotalDamage, int poisonAmp, int witherAmp, int slownessAmp, int durationTicks) {}
+
     // Archer : clé pour identifier les flèches tirées par des squelettes/monstres
     private final NamespacedKey skeletonArrowKey;
 
@@ -253,6 +267,51 @@ public class ClassListener implements Listener {
                 }
             }
         }, 5L, 5L);
+
+        // Tâche 3 : Peste Nécrotique (toutes les 10 ticks = 0.5s) - applique les dégâts indirects du poison
+        Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (activePlagues.isEmpty()) return;
+
+            Iterator<Map.Entry<UUID, NecroPlague>> it = activePlagues.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<UUID, NecroPlague> entry = it.next();
+                UUID victimId = entry.getKey();
+                NecroPlague plague = entry.getValue();
+
+                Entity victimEnt = Bukkit.getEntity(victimId);
+                if (!(victimEnt instanceof LivingEntity victim) || !victim.isValid() || victim.isDead()) {
+                    it.remove();
+                    continue;
+                }
+
+                Player master = Bukkit.getPlayer(plague.masterId);
+                double dmgToApply = Math.min(plague.remainingDamage, 1.0);
+                plague.remainingDamage -= dmgToApply;
+
+                victim.damage(dmgToApply, master);
+
+                Location vLoc = victim.getLocation().add(0, 0.5, 0);
+                victim.getWorld().spawnParticle(Particle.WITCH, vLoc, 5, 0.25, 0.3, 0.25, 0.02);
+                victim.getWorld().spawnParticle(Particle.ITEM_SLIME, vLoc, 3, 0.2, 0.2, 0.2, 0.01);
+
+                if (plague.remainingDamage <= 0.05) {
+                    it.remove();
+                }
+            }
+        }, 10L, 10L);
+    }
+
+    private NecroHoeTier getNecroHoeTier(Material mat) {
+        if (mat == null) return new NecroHoeTier(3.0, 0, -1, 0, 80);
+        return switch (mat) {
+            case WOODEN_HOE -> new NecroHoeTier(2.5, 0, -1, 0, 80);
+            case STONE_HOE -> new NecroHoeTier(4.0, 0, -1, 0, 100);
+            case IRON_HOE -> new NecroHoeTier(5.5, 1, 0, 0, 120);
+            case GOLDEN_HOE -> new NecroHoeTier(6.0, 1, 1, 0, 100);
+            case DIAMOND_HOE -> new NecroHoeTier(7.5, 2, 1, 1, 140);
+            case NETHERITE_HOE -> new NecroHoeTier(10.0, 3, 2, 1, 160);
+            default -> new NecroHoeTier(3.0, 0, -1, 0, 80);
+        };
     }
 
     private void ensurePermanentEffect(Player player, PotionEffectType type, int amplifier) {
@@ -526,11 +585,29 @@ public class ClassListener implements Listener {
                         event.setDamage(event.getDamage() * 0.20);
                     }
 
-                    // Bonus houe : Dégâts infligés par le poison (Poison IV surpuissant 8s = 160t, Wither III 6s = 120t, Lenteur II 5s = 100t)
+                    // Bonus houe : Dégâts indirects progressifs de la Peste Nécrotique selon la houe
                     if (isHoe(hand) && victim instanceof LivingEntity livingVictim) {
-                        livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.POISON, 160, 3));
-                        livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 120, 2));
-                        livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 100, 1));
+                        NecroHoeTier tier = getNecroHoeTier(hand.getType());
+
+                        // Cumul des dégâts indirects de poison / peste nécrotique
+                        NecroPlague existing = activePlagues.get(livingVictim.getUniqueId());
+                        if (existing == null) {
+                            activePlagues.put(livingVictim.getUniqueId(), new NecroPlague(player.getUniqueId(), tier.poisonTotalDamage));
+                        } else {
+                            existing.remainingDamage += tier.poisonTotalDamage;
+                        }
+
+                        // Effets de statut
+                        if (tier.poisonAmp >= 0) {
+                            livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.POISON, tier.durationTicks, tier.poisonAmp));
+                        }
+                        if (tier.witherAmp >= 0) {
+                            livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, Math.max(40, tier.durationTicks - 20), tier.witherAmp));
+                        }
+                        if (tier.slownessAmp >= 0) {
+                            livingVictim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, Math.max(40, tier.durationTicks - 20), tier.slownessAmp));
+                        }
+
                         livingVictim.getWorld().spawnParticle(Particle.WITCH, livingVictim.getLocation().clone().add(0, 1, 0), 20, 0.4, 0.4, 0.4, 0.05);
                         livingVictim.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME, livingVictim.getLocation().clone().add(0, 0.8, 0), 15, 0.3, 0.3, 0.3, 0.05);
                         try {
@@ -899,6 +976,8 @@ public class ClassListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onMonsterDeath(EntityDeathEvent event) {
         LivingEntity entity = event.getEntity();
+        activePlagues.remove(entity.getUniqueId());
+
         Player killer = entity.getKiller();
         if (killer == null) return;
 

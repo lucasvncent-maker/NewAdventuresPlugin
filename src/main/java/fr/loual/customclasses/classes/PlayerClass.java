@@ -118,7 +118,8 @@ public enum PlayerClass {
             Component.empty(),
             Component.text("✦ Bonus :", NamedTextColor.GREEN, TextDecoration.BOLD),
             Component.text("  • 40% de chances de réanimer un Zombie/Squelette serviteur éphémère (25s).", NamedTextColor.AQUA),
-            Component.text("  • Coup à la houe inflige Poison virulent IV (8s), Wither III et Lenteur II.", NamedTextColor.AQUA),
+            Component.text("  • Coup de houe : Peste Nécrotique (dégâts de poison croissants selon la houe).", NamedTextColor.AQUA),
+            Component.text("  • Houe diamant/netherite : anéantit un Wither Squelette en 3 coups sur la durée !", NamedTextColor.AQUA),
             Component.empty(),
             Component.text("✖ Malus :", NamedTextColor.RED, TextDecoration.BOLD),
             Component.text("  • Épées, haches, arcs et arbalètes inefficaces (-80% dégâts, tir bloqué).", NamedTextColor.RED)
