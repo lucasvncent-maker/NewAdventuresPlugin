@@ -5,6 +5,7 @@ import fr.loual.casino.gui.BlackjackGui;
 import fr.loual.casino.gui.BlackjackGuiHolder;
 import fr.loual.newadventure.NewAdventurePlugin;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.entity.Entity;
