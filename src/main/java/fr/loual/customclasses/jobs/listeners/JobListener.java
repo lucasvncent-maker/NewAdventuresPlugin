@@ -1145,6 +1145,27 @@ public class JobListener implements Listener {
                 );
                 player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
             }
+        } else if (cmd.equals("nv") || cmd.equals("nightvision")) {
+            boolean isMineur = jobManager.getPlayerJob(player) == PlayerJob.MINEUR && jobManager.getJobLevel(player, PlayerJob.MINEUR) >= 1;
+            boolean hasLeggings = CustomJobItems.isJobItem(player.getInventory().getLeggings(), CustomJobItems.ID_ARCHITECT_LEGGINGS);
+            if (!isMineur && !hasLeggings) {
+                event.setCancelled(true);
+                player.sendMessage(
+                        Component.text("[Vision Nocturne] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                                .append(Component.text("Vous devez être Mineur de niveau 1 ou équiper le Pantalon de l'Architecte pour utiliser /" + parts[0] + " !", NamedTextColor.RED))
+                );
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+            }
+        } else if (cmd.equals("jb") || cmd.equals("jumpboost")) {
+            boolean hasBoots = CustomJobItems.isJobItem(player.getInventory().getBoots(), CustomJobItems.ID_ARCHITECT_BOOTS);
+            if (!hasBoots) {
+                event.setCancelled(true);
+                player.sendMessage(
+                        Component.text("[Architecte] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                                .append(Component.text("Vous devez équiper les Chaussures de l'Architecte pour utiliser /" + parts[0] + " !", NamedTextColor.RED))
+                );
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+            }
         }
     }
 }
