@@ -51,6 +51,7 @@ import org.bukkit.generator.structure.GeneratedStructure;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.entity.EnderPearl;
+import com.destroystokyo.paper.event.player.PlayerLaunchProjectileEvent;
 import org.bukkit.entity.Firework;
 import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.block.Container;
@@ -77,7 +78,6 @@ public class JobListener implements Listener {
 
     // Aventurier
     private final Map<UUID, Long> pearlCooldowns = new HashMap<>();
-    private final Set<UUID> aventurierPearlImmunity = new HashSet<>();
     private final NamespacedKey chestBoostKey;
     private final NamespacedKey noFallPearlKey;
 
@@ -132,7 +132,6 @@ public class JobListener implements Listener {
         }
         fallImmunity.remove(player.getUniqueId());
         pearlCooldowns.remove(player.getUniqueId());
-        aventurierPearlImmunity.remove(player.getUniqueId());
     }
 
     // ==========================================================
@@ -894,7 +893,7 @@ public class JobListener implements Listener {
         // 5. Perle Infinie de l'Aventurier (quantité infinie, aucun dégât de chute)
         if (CustomJobItems.isJobItem(item, CustomJobItems.ID_AVENTURIER_INFINITE_PEARL)) {
             event.setCancelled(true);
-            handleAventurierPearl(player);
+            handleAventurierPearl(player, item);
             return;
         }
 
@@ -1147,11 +1146,12 @@ public class JobListener implements Listener {
         player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation().clone().add(0, 1, 0), 20, 0.4, 0.5, 0.4, 0.05);
     }
 
-    private void handleAventurierPearl(Player player) {
+    private void handleAventurierPearl(Player player, ItemStack item) {
         UUID uuid = player.getUniqueId();
         long now = System.currentTimeMillis();
         Long last = pearlCooldowns.get(uuid);
         if (last != null && now - last < 1500L) {
+            player.updateInventory();
             return;
         }
         pearlCooldowns.put(uuid, now);
@@ -1160,6 +1160,51 @@ public class JobListener implements Listener {
         pearl.getPersistentDataContainer().set(noFallPearlKey, PersistentDataType.BYTE, (byte) 1);
         player.playSound(player.getLocation(), Sound.ENTITY_ENDER_PEARL_THROW, 1.0f, 1.2f);
         player.setCooldown(Material.ENDER_PEARL, 30);
+
+        // Garantir que la perle infinie ne disparaisse jamais visuellement ni dans l'inventaire
+        ItemStack pearlBackup = item != null ? item.clone() : CustomJobItems.getAventurierInfinitePearl();
+        pearlBackup.setAmount(1);
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (player.isOnline()) {
+                if (!player.getInventory().containsAtLeast(pearlBackup, 1)) {
+                    player.getInventory().addItem(pearlBackup);
+                }
+                player.updateInventory();
+            }
+        });
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPlayerLaunchProjectile(PlayerLaunchProjectileEvent event) {
+        ItemStack item = event.getItemStack();
+        if (CustomJobItems.isJobItem(item, CustomJobItems.ID_AVENTURIER_INFINITE_PEARL)) {
+            Player player = event.getPlayer();
+            UUID uuid = player.getUniqueId();
+            long now = System.currentTimeMillis();
+            Long last = pearlCooldowns.get(uuid);
+            if (last != null && now - last < 1500L) {
+                event.setCancelled(true);
+                player.updateInventory();
+                return;
+            }
+            pearlCooldowns.put(uuid, now);
+            event.setShouldConsume(false);
+            if (event.getProjectile() instanceof EnderPearl pearl) {
+                pearl.getPersistentDataContainer().set(noFallPearlKey, PersistentDataType.BYTE, (byte) 1);
+            }
+            player.setCooldown(Material.ENDER_PEARL, 30);
+
+            ItemStack pearlBackup = item.clone();
+            pearlBackup.setAmount(1);
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (player.isOnline()) {
+                    if (!player.getInventory().containsAtLeast(pearlBackup, 1)) {
+                        player.getInventory().addItem(pearlBackup);
+                    }
+                    player.updateInventory();
+                }
+            });
+        }
     }
 
     private void handleAventurierFirework(Player player) {
@@ -1185,11 +1230,7 @@ public class JobListener implements Listener {
     public void onPearlTeleport(PlayerTeleportEvent event) {
         if (event.getCause() == PlayerTeleportEvent.TeleportCause.ENDER_PEARL) {
             Player player = event.getPlayer();
-            Long lastPearl = pearlCooldowns.get(player.getUniqueId());
-            if (lastPearl != null && System.currentTimeMillis() - lastPearl < 10_000L) {
-                aventurierPearlImmunity.add(player.getUniqueId());
-                player.getWorld().spawnParticle(Particle.PORTAL, event.getTo(), 25, 0.4, 0.5, 0.4, 0.1);
-            }
+            player.getWorld().spawnParticle(Particle.PORTAL, event.getTo(), 25, 0.4, 0.5, 0.4, 0.1);
         }
     }
 
@@ -1399,12 +1440,32 @@ public class JobListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onEntityDamage(EntityDamageEvent event) {
-        if (event.getEntity() instanceof Player player && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
-            if (fallImmunity.contains(player.getUniqueId()) || aventurierPearlImmunity.remove(player.getUniqueId())) {
+        if (!(event.getEntity() instanceof Player player)) return;
+
+        // 1. Dégâts spécifiques causés par l'atterrissage d'une Ender Pearl (DamageType.ENDER_PEARL ou perle avec noFallPearlKey)
+        boolean isEnderPearl = event.getDamageSource().getDamageType() == org.bukkit.damage.DamageType.ENDER_PEARL;
+        if (!isEnderPearl && event.getDamageSource().getDirectEntity() != null) {
+            if (event.getDamageSource().getDirectEntity().getPersistentDataContainer().has(noFallPearlKey, PersistentDataType.BYTE)) {
+                isEnderPearl = true;
+            }
+        }
+
+        if (isEnderPearl) {
+            boolean isAventurierM2 = jobManager.getPlayerJob(player) == PlayerJob.AVENTURIER && jobManager.getJobLevel(player, PlayerJob.AVENTURIER) >= 2;
+            boolean isNoFallPearl = event.getDamageSource().getDirectEntity() != null && event.getDamageSource().getDirectEntity().getPersistentDataContainer().has(noFallPearlKey, PersistentDataType.BYTE);
+            if (isAventurierM2 || isNoFallPearl) {
                 event.setCancelled(true);
                 player.getWorld().spawnParticle(Particle.PORTAL, player.getLocation(), 20, 0.3, 0.2, 0.3, 0.05);
                 player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 0.8f, 1.4f);
+                return;
             }
+        }
+
+        // 2. Fin de vol de l'Architecte : protection anti-chute temporaire (5s)
+        if (event.getCause() == EntityDamageEvent.DamageCause.FALL && fallImmunity.contains(player.getUniqueId())) {
+            event.setCancelled(true);
+            player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 15, 0.3, 0.2, 0.3, 0.05);
+            player.playSound(player.getLocation(), Sound.ENTITY_PHANTOM_FLAP, 0.8f, 1.2f);
         }
     }
 
