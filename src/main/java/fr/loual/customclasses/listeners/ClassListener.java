@@ -128,16 +128,17 @@ public class ClassListener implements Listener {
                         }
                     }
 
-                    // Maintenir les effets permanents de la sirène
+                    // Maintenir la respiration aquatique permanente
                     ensurePermanentEffect(player, PotionEffectType.WATER_BREATHING, 0);
-                    ensurePermanentEffect(player, PotionEffectType.DOLPHINS_GRACE, 0);
 
-                    // Minage & Vision dans l'eau : Force de Conduit et Vision Nocturne
-                    boolean waterVision = player.isInWater() || player.getEyeLocation().getBlock().getType() == Material.WATER || player.getLocation().getBlock().getType() == Material.WATER;
-                    if (waterVision) {
+                    // Grâce du dauphin, Minage & Vision dans l'eau : actifs UNIQUEMENT dans l'eau
+                    boolean waterActive = player.isInWater() || player.getEyeLocation().getBlock().getType() == Material.WATER || player.getLocation().getBlock().getType() == Material.WATER;
+                    if (waterActive) {
+                        ensurePermanentEffect(player, PotionEffectType.DOLPHINS_GRACE, 0);
                         ensurePermanentEffect(player, PotionEffectType.NIGHT_VISION, 0);
                         ensurePermanentEffect(player, PotionEffectType.CONDUIT_POWER, 0);
                     } else {
+                        player.removePotionEffect(PotionEffectType.DOLPHINS_GRACE);
                         player.removePotionEffect(PotionEffectType.CONDUIT_POWER);
                         boolean hasJobNv = false;
                         try {

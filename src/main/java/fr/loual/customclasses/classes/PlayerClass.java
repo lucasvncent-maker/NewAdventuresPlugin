@@ -84,7 +84,7 @@ public enum PlayerClass {
             Component.text("  • Onde de choc sonique : Lenteur III & Faiblesse II (8 blocs, 5s).", NamedTextColor.DARK_AQUA),
             Component.empty(),
             Component.text("✦ Bonus :", NamedTextColor.GREEN, TextDecoration.BOLD),
-            Component.text("  • Respiration aquatique & Grâce du dauphin permanentes.", NamedTextColor.AQUA),
+            Component.text("  • Respiration aquatique permanente & Grâce du dauphin dans l'eau.", NamedTextColor.AQUA),
             Component.text("  • Vision nocturne active uniquement dans l'eau.", NamedTextColor.AQUA),
             Component.text("  • Minage aquatique sans pénalité (Force de Conduit et vitesse sous-marine maximale).", NamedTextColor.AQUA),
             Component.empty(),
