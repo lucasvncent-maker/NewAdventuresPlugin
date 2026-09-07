@@ -290,9 +290,17 @@ public class ClassListener implements Listener {
 
                 victim.damage(dmgToApply, master);
 
-                Location vLoc = victim.getLocation().add(0, 0.5, 0);
-                victim.getWorld().spawnParticle(Particle.WITCH, vLoc, 5, 0.25, 0.3, 0.25, 0.02);
-                victim.getWorld().spawnParticle(Particle.ITEM_SLIME, vLoc, 3, 0.2, 0.2, 0.2, 0.01);
+                World world = victim.getWorld();
+                Location center = victim.getLocation().add(0, victim.getHeight() * 0.55, 0);
+                Location head = victim.getEyeLocation().add(0, 0.25, 0);
+
+                // Nuage visible de poison toxique vert et de magie nécrotique (indique clairement l'empoisonnement)
+                Particle.DustOptions greenDust = new Particle.DustOptions(Color.fromRGB(45, 220, 45), 1.4f);
+                Particle.DustOptions darkPoisonDust = new Particle.DustOptions(Color.fromRGB(20, 140, 30), 1.1f);
+                world.spawnParticle(Particle.DUST, center, 8, 0.35, 0.4, 0.35, 0.02, greenDust);
+                world.spawnParticle(Particle.DUST, head, 5, 0.2, 0.25, 0.2, 0.02, darkPoisonDust);
+                world.spawnParticle(Particle.ITEM_SLIME, center, 4, 0.25, 0.3, 0.25, 0.02);
+                world.spawnParticle(Particle.WITCH, center, 4, 0.3, 0.3, 0.3, 0.02);
 
                 if (plague.remainingDamage <= 0.05) {
                     it.remove();
