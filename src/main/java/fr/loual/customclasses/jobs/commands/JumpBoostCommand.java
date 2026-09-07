@@ -36,9 +36,8 @@ public class JumpBoostCommand implements CommandExecutor, TabCompleter {
         }
 
         boolean hasBoots = CustomJobItems.isJobItem(player.getInventory().getBoots(), CustomJobItems.ID_ARCHITECT_BOOTS);
-        boolean isAdmin = player.hasPermission("customclasses.admin");
 
-        if (!hasBoots && !isAdmin) {
+        if (!hasBoots) {
             player.sendMessage(
                     Component.text("[Architecte] ", NamedTextColor.GOLD, TextDecoration.BOLD)
                             .append(Component.text("Vous devez équiper les Chaussures de l'Architecte pour utiliser /" + label + " !", NamedTextColor.RED))

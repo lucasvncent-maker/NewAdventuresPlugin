@@ -30,7 +30,7 @@ commands:
   stonecutter:
     description: Ouvrir le tailleur de pierre a distance (Architecte M2)
     usage: /stonecutter
-    aliases: [sc]
+    aliases: [sc, nc]
   jb:
     description: Activer ou desactiver le Saut Ameliore II (Architecte M5)
     usage: /jb

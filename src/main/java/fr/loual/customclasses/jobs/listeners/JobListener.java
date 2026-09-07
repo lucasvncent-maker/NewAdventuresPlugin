@@ -32,6 +32,7 @@ import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerHarvestBlockEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
@@ -1105,6 +1106,44 @@ public class JobListener implements Listener {
                 event.setCancelled(true);
                 player.getWorld().spawnParticle(Particle.POOF, player.getLocation(), 15, 0.3, 0.2, 0.3, 0.05);
                 player.playSound(player.getLocation(), Sound.BLOCK_WOOL_FALL, 0.8f, 1.2f);
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onCommandPreprocess(PlayerCommandPreprocessEvent event) {
+        String message = event.getMessage();
+        if (message.length() <= 1) return;
+        String raw = message.substring(1).trim();
+        String[] parts = raw.split("\\s+");
+        if (parts.length == 0) return;
+
+        String cmd = parts[0].toLowerCase();
+        if (cmd.contains(":")) {
+            cmd = cmd.substring(cmd.indexOf(':') + 1);
+        }
+
+        Player player = event.getPlayer();
+
+        if (cmd.equals("craft") || cmd.equals("workbench") || cmd.equals("wb")) {
+            boolean isArchitect = jobManager.getPlayerJob(player) == PlayerJob.ARCHITECTE && jobManager.getJobLevel(player, PlayerJob.ARCHITECTE) >= 1;
+            if (!isArchitect) {
+                event.setCancelled(true);
+                player.sendMessage(
+                        Component.text("[Architecte] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                                .append(Component.text("Vous devez être Architecte de niveau 1 minimum pour utiliser /" + parts[0] + " !", NamedTextColor.RED))
+                );
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+            }
+        } else if (cmd.equals("stonecutter") || cmd.equals("sc") || cmd.equals("nc")) {
+            boolean isArchitect = jobManager.getPlayerJob(player) == PlayerJob.ARCHITECTE && jobManager.getJobLevel(player, PlayerJob.ARCHITECTE) >= 2;
+            if (!isArchitect) {
+                event.setCancelled(true);
+                player.sendMessage(
+                        Component.text("[Architecte] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                                .append(Component.text("Vous devez être Architecte de niveau 2 minimum pour utiliser /" + parts[0] + " !", NamedTextColor.RED))
+                );
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
             }
         }
     }

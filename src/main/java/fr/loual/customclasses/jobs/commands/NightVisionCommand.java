@@ -38,9 +38,8 @@ public class NightVisionCommand implements CommandExecutor, TabCompleter {
 
         boolean isMineur = jobManager.getPlayerJob(player) == PlayerJob.MINEUR && jobManager.getJobLevel(player, PlayerJob.MINEUR) >= 1;
         boolean hasLeggings = CustomJobItems.isJobItem(player.getInventory().getLeggings(), CustomJobItems.ID_ARCHITECT_LEGGINGS);
-        boolean isAdmin = player.hasPermission("customclasses.admin");
 
-        if (!isMineur && !hasLeggings && !isAdmin) {
+        if (!isMineur && !hasLeggings) {
             player.sendMessage(
                     Component.text("[Vision Nocturne] ", NamedTextColor.GOLD, TextDecoration.BOLD)
                             .append(Component.text("Vous devez être Mineur de niveau 1 ou équiper le Pantalon de l'Architecte pour utiliser /" + label + " !", NamedTextColor.RED))

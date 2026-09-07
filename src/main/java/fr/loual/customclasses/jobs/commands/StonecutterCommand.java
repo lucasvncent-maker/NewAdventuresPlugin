@@ -36,9 +36,8 @@ public class StonecutterCommand implements CommandExecutor, TabCompleter {
         }
 
         boolean isArchitect = jobManager.getPlayerJob(player) == PlayerJob.ARCHITECTE && jobManager.getJobLevel(player, PlayerJob.ARCHITECTE) >= 2;
-        boolean isAdmin = player.hasPermission("customclasses.admin");
 
-        if (!isArchitect && !isAdmin) {
+        if (!isArchitect) {
             player.sendMessage(
                     Component.text("[Architecte] ", NamedTextColor.GOLD, TextDecoration.BOLD)
                             .append(Component.text("Vous devez être Architecte de niveau 2 minimum pour utiliser /" + label + " !", NamedTextColor.RED))
