@@ -46,10 +46,6 @@ public class ClassListener implements Listener {
     // Sirène : temps passé hors de l'eau (UUID -> timestamp dernière immersion en ms)
     private final Map<UUID, Long> sirenLastWaterTime = new HashMap<>();
 
-    // Sirène : temps de début de sneak pour le cri sonique (UUID -> timestamp début sneak en ms)
-    private final Map<UUID, Long> sirenSneakStart = new HashMap<>();
-    private final Map<UUID, Long> sirenLastShoutTime = new HashMap<>();
-
     // Sauterelle : gestion onde de choc à la chute
     private final Set<UUID> hopperShockwaveCooldown = new HashSet<>();
 
@@ -216,28 +212,6 @@ public class ClassListener implements Listener {
             for (Player player : Bukkit.getOnlinePlayers()) {
                 PlayerClass pc = classManager.getPlayerClass(player);
                 UUID uuid = player.getUniqueId();
-
-                // Sirène : Préparation et déclenchement Cri Sonique via accroupissement de 2 secondes
-                if (pc == PlayerClass.SIRENE) {
-                    if (player.isSneaking()) {
-                        long start = sirenSneakStart.getOrDefault(uuid, now);
-                        long duration = now - start;
-                        long lastShout = sirenLastShoutTime.getOrDefault(uuid, 0L);
-                        long cooldownRemaining = 10_000L - (now - lastShout);
-
-                        if (cooldownRemaining <= 0) {
-                            if (duration >= 2000L) {
-                                triggerSirenSonicShout(player);
-                                sirenLastShoutTime.put(uuid, now);
-                                sirenSneakStart.put(uuid, now + 10_000L); // Évite de redéclencher immédiatement si on reste accroupi
-                            } else if (duration >= 500L) {
-                                int percent = (int) Math.min(100, (duration * 100) / 2000L);
-                                player.sendActionBar(Component.text("⚡ Chargement Cri Sonique : " + percent + "%", NamedTextColor.DARK_AQUA));
-                                player.getWorld().spawnParticle(Particle.SPLASH, player.getLocation().clone().add(0, 1.2, 0), 2, 0.2, 0.2, 0.2, 0.05);
-                            }
-                        }
-                    }
-                }
 
                 // Diable : Se noyer 3 fois plus vite sous l'eau
                 if (pc == PlayerClass.DIABLE) {
@@ -422,8 +396,6 @@ public class ClassListener implements Listener {
         UUID uuid = player.getUniqueId();
         classManager.unloadPlayer(player);
         sirenLastWaterTime.remove(uuid);
-        sirenSneakStart.remove(uuid);
-        sirenLastShoutTime.remove(uuid);
         hopperShockwaveCooldown.remove(uuid);
         removePlayerMinions(uuid);
 
@@ -901,20 +873,8 @@ public class ClassListener implements Listener {
     }
 
     // ==========================================================
-    // 5. SIRÈNE : Cri Sonique (sneak ou corne) & réinitialisation eau
+    // 5. SIRÈNE : Cri Sonique (corne / [F]) & réinitialisation eau
     // ==========================================================
-    @EventHandler
-    public void onPlayerToggleSneak(PlayerToggleSneakEvent event) {
-        Player player = event.getPlayer();
-        if (classManager.getPlayerClass(player) == PlayerClass.SIRENE) {
-            if (event.isSneaking()) {
-                sirenSneakStart.put(player.getUniqueId(), System.currentTimeMillis());
-            } else {
-                sirenSneakStart.remove(player.getUniqueId());
-            }
-        }
-    }
-
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
@@ -926,14 +886,15 @@ public class ClassListener implements Listener {
 
             // 1. Souffler dans une corne pour déclencher le Cri Sonique
             if (item != null && item.getType() == Material.GOAT_HORN) {
-                long lastShout = sirenLastShoutTime.getOrDefault(player.getUniqueId(), 0L);
-                long cooldownRemaining = 10_000L - (now - lastShout);
-                if (cooldownRemaining <= 0) {
-                    triggerSirenSonicShout(player);
-                    sirenLastShoutTime.put(player.getUniqueId(), now);
+                long cdUntil = abilityCooldowns.getOrDefault(player.getUniqueId(), 0L);
+                if (now < cdUntil) {
+                    long remainingMs = cdUntil - now;
+                    double sec = Math.ceil(remainingMs / 100.0) / 10.0;
+                    player.sendActionBar(Component.text("⏳ Cri sonique en recharge (" + String.format(Locale.US, "%.1f", sec) + "s)", NamedTextColor.RED, TextDecoration.BOLD));
+                    player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.6f, 0.8f);
                 } else {
-                    long remainingSec = (cooldownRemaining / 1000L) + 1;
-                    player.sendActionBar(Component.text("⏳ Cri sonique en recharge (" + remainingSec + "s)...", NamedTextColor.RED));
+                    abilityCooldowns.put(player.getUniqueId(), now + 14_000L);
+                    triggerSirenSonicShout(player);
                 }
             }
 
