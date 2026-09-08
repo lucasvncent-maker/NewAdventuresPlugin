@@ -509,6 +509,18 @@ public class BlackjackGame {
         }
     }
 
+    public static boolean isValidEntryItem(ItemStack item, World.Environment env) {
+        if (item == null || item.getType().isAir()) return false;
+        if (env == World.Environment.THE_END) {
+            return item.getType() == Material.DRAGON_HEAD && item.getAmount() >= 1;
+        } else if (env == World.Environment.NETHER) {
+            return item.getType() == Material.GILDED_BLACKSTONE && item.getAmount() >= GILDED_BLACKSTONE_COST;
+        } else {
+            return (item.getType() == Material.DRAGON_HEAD && item.getAmount() >= 1)
+                    || (item.getType() == Material.GILDED_BLACKSTONE && item.getAmount() >= GILDED_BLACKSTONE_COST);
+        }
+    }
+
     public static boolean hasEntryItems(Player player) {
         World.Environment env = player.getWorld().getEnvironment();
         if (env == World.Environment.THE_END) {

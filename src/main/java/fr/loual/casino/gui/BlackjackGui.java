@@ -58,8 +58,11 @@ public class BlackjackGui {
         ItemStack greenFelt = createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" "));
         ItemStack darkFelt = createItem(Material.BLACK_STAINED_GLASS_PANE, Component.text(" "));
 
+        boolean isDepositSlot = game.getState() == BlackjackGame.State.BETTING 
+                && (game.getMode() == BlackjackGame.Mode.CLASSIC || game.getChallengeChips() <= 0);
+
         for (int i = 0; i < 54; i++) {
-            if (i == BET_SLOT && game.getMode() == BlackjackGame.Mode.CLASSIC && game.getState() == BlackjackGame.State.BETTING) {
+            if (i == BET_SLOT && isDepositSlot) {
                 ItemStack current = inv.getItem(BET_SLOT);
                 if (current != null && (current.getType() == Material.GREEN_STAINED_GLASS_PANE 
                         || current.getType() == Material.BLACK_STAINED_GLASS_PANE 
@@ -131,7 +134,7 @@ public class BlackjackGui {
                     dealerHeader = createItem(Material.PLAYER_HEAD,
                             Component.text("♠ Croupier - Mission Cuprite ♠", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD),
                             "§7\"Relevez le défi du casino !\"",
-                            "§7Payez le droit d'entrée au centre pour débuter."
+                            "§7Déposez le droit d'entrée au centre pour débuter."
                     );
                 } else {
                     dealerHeader = createItem(Material.PLAYER_HEAD,
@@ -212,7 +215,7 @@ public class BlackjackGui {
                     playerHeader = createItem(Material.RAW_COPPER,
                             Component.text("✦ Inscription au Défi Cuprite ✦", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD),
                             "§7Aucune session active.",
-                            "§7Payez l'entrée au centre pour obtenir 100 jetons !"
+                            "§7Déposez votre droit d'entrée au centre !"
                     );
                 } else {
                     playerHeader = createItem(Material.RAW_COPPER,
@@ -246,22 +249,17 @@ public class BlackjackGui {
                 inv.setItem(slot, createItem(Material.GRAY_STAINED_GLASS_PANE, Component.text("§8[ Emplacement Joueur ]")));
             }
 
-            if (game.getMode() == BlackjackGame.Mode.CLASSIC) {
-                // Cadre doré autour du slot de mise (Slot 22)
+            if (game.getMode() == BlackjackGame.Mode.CLASSIC || game.getChallengeChips() <= 0) {
+                // Cadre doré autour du slot de dépôt (Slot 22)
                 for (int slot : new int[]{ 13, 21, 23, 31 }) {
-                    inv.setItem(slot, createItem(Material.YELLOW_STAINED_GLASS_PANE, Component.text("§e↓ DÉPOSEZ VOTRE MISE ICI ↓", NamedTextColor.YELLOW, TextDecoration.BOLD)));
+                    String borderText = (game.getMode() == BlackjackGame.Mode.CLASSIC)
+                            ? "§e↓ DÉPOSEZ VOTRE MISE ICI ↓"
+                            : "§e↓ DÉPOSEZ LE DROIT D'ENTRÉE ICI ↓";
+                    inv.setItem(slot, createItem(Material.YELLOW_STAINED_GLASS_PANE, Component.text(borderText, NamedTextColor.YELLOW, TextDecoration.BOLD)));
                 }
 
-                ItemStack currentBetInSlot = inv.getItem(BET_SLOT);
-                if (currentBetInSlot != null && (currentBetInSlot.getType() == Material.GREEN_STAINED_GLASS_PANE 
-                        || currentBetInSlot.getType() == Material.BLACK_STAINED_GLASS_PANE 
-                        || currentBetInSlot.getType() == Material.YELLOW_STAINED_GLASS_PANE)) {
-                    inv.setItem(BET_SLOT, null);
-                }
-            } else {
-                // Mode CHALLENGE
-                if (game.getChallengeChips() <= 0) {
-                    // Bannière des règles avec Charlie et Doubler
+                if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
+                    // Bannière des règles sur slot 18
                     inv.setItem(SLOT_CHALLENGE_STATUS, createItem(Material.BOOK,
                             Component.text("§6§lRègles du Défi Cuprite"),
                             "§e• Droit d'entrée : §f" + BlackjackGame.getEntryCostDescription(game.getPlayer()),
@@ -272,81 +270,65 @@ public class BlackjackGui {
                             "§b• Five-Card Charlie : §f5 cartes sans sauter = Victoire !",
                             "§c• Faillite (0 jeton) : Mise d'entrée perdue !"
                     ));
-
-                    // Bouton de paiement de l'entrée au centre (Slot 22)
-                    Material entryMat = Material.DRAGON_HEAD;
-                    int entryAmount = 1;
-                    World.Environment env = game.getPlayer().getWorld().getEnvironment();
-                    if (env == World.Environment.THE_END) {
-                        entryMat = Material.DRAGON_HEAD;
-                        entryAmount = 1;
-                    } else if (env == World.Environment.NETHER) {
-                        entryMat = Material.GILDED_BLACKSTONE;
-                        entryAmount = BlackjackGame.GILDED_BLACKSTONE_COST;
+                    for (int s : new int[]{ 19, 20, 24 }) {
+                        inv.setItem(s, createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" ")));
                     }
-
-                    ItemStack entryBtn = createItem(entryMat,
-                            Component.text("✦ Démarrer la Mission Cuprite ✦", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD),
-                            "§7Coût d'entrée : §e" + BlackjackGame.getEntryCostDescription(game.getPlayer()),
-                            "§7Capital de départ : §a100 Jetons",
-                            "",
-                            "§a➤ Cliquer pour payer et démarrer !"
-                    );
-                    entryBtn.setAmount(entryAmount);
-                    inv.setItem(BET_SLOT, entryBtn);
-
-                    for (int slot : new int[]{ 13, 19, 20, 21, 23, 24, 31 }) {
-                        inv.setItem(slot, createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" ")));
-                    }
-                } else {
-                    // Session active : boutons de mise en jetons
-                    inv.setItem(SLOT_CHALLENGE_STATUS, createItem(Material.EXPERIENCE_BOTTLE,
-                            Component.text("✦ Progression Mission ✦", NamedTextColor.YELLOW, TextDecoration.BOLD),
-                            "§7Solde actuel : §a§l" + game.getChallengeChips() + " Jetons",
-                            "§7Palier x4 : §6400 Jetons §7(§61 Cuprite§7)",
-                            "§7Palier x8 : §d800 Jetons §7(§d3 Cuprites§7)"
-                    ));
-
-                    inv.setItem(BUTTON_CHALLENGE_BET_10, createItem(Material.IRON_NUGGET,
-                            Component.text("+10 Jetons", NamedTextColor.WHITE, TextDecoration.BOLD),
-                            "§7Ajouter 10 jetons à la mise."
-                    ));
-
-                    inv.setItem(BUTTON_CHALLENGE_BET_25, createItem(Material.GOLD_NUGGET,
-                            Component.text("+25 Jetons", NamedTextColor.GOLD, TextDecoration.BOLD),
-                            "§7Ajouter 25 jetons à la mise."
-                    ));
-
-                    inv.setItem(BUTTON_CHALLENGE_BET_50, createItem(Material.DIAMOND,
-                            Component.text("+50 Jetons", NamedTextColor.AQUA, TextDecoration.BOLD),
-                            "§7Ajouter 50 jetons à la mise."
-                    ));
-
-                    ItemStack curBet = createItem(Material.SUNFLOWER,
-                            Component.text("Mise sélectionnée : §6§l" + game.getChallengeBet() + " Jetons", NamedTextColor.YELLOW, TextDecoration.BOLD),
-                            "§7Solde restant en cas de défaite : §f" + (game.getChallengeChips() - game.getChallengeBet()) + " Jetons",
-                            "§7Victoire normale : §a+" + (game.getChallengeBet() * 2) + " Jetons (x2)",
-                            "§6Blackjack naturel (x3) : §e+" + (game.getChallengeBet() * 3) + " Jetons",
-                            "",
-                            "§e➤ Cliquer pour réinitialiser au minimum (10)"
-                    );
-                    curBet.setAmount(Math.max(1, Math.min(64, game.getChallengeBet())));
-                    inv.setItem(BET_SLOT, curBet);
-
-                    inv.setItem(BUTTON_CHALLENGE_BET_ALL_IN, createItem(Material.NETHERITE_SCRAP,
-                            Component.text("§c§lALL-IN (" + game.getChallengeChips() + " Jetons)", NamedTextColor.RED, TextDecoration.BOLD),
-                            "§cMiser la totalité de vos jetons restants !",
-                            "§4Quitte ou double !"
-                    ));
-
-                    inv.setItem(BUTTON_CHALLENGE_BET_RESET, createItem(Material.REDSTONE,
-                            Component.text("Mise minimale (10)", NamedTextColor.RED, TextDecoration.BOLD),
-                            "§7Réduire la mise à 10 jetons."
-                    ));
-
-                    inv.setItem(13, createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" ")));
-                    inv.setItem(31, createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" ")));
                 }
+
+                ItemStack currentBetInSlot = inv.getItem(BET_SLOT);
+                if (currentBetInSlot != null && (currentBetInSlot.getType() == Material.GREEN_STAINED_GLASS_PANE 
+                        || currentBetInSlot.getType() == Material.BLACK_STAINED_GLASS_PANE 
+                        || currentBetInSlot.getType() == Material.YELLOW_STAINED_GLASS_PANE)) {
+                    inv.setItem(BET_SLOT, null);
+                }
+            } else {
+                // Mode CHALLENGE avec session active : boutons de mise en jetons
+                inv.setItem(SLOT_CHALLENGE_STATUS, createItem(Material.EXPERIENCE_BOTTLE,
+                        Component.text("✦ Progression Mission ✦", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                        "§7Solde actuel : §a§l" + game.getChallengeChips() + " Jetons",
+                        "§7Palier x4 : §6400 Jetons §7(§61 Cuprite§7)",
+                        "§7Palier x8 : §d800 Jetons §7(§d3 Cuprites§7)"
+                ));
+
+                inv.setItem(BUTTON_CHALLENGE_BET_10, createItem(Material.IRON_NUGGET,
+                        Component.text("+10 Jetons", NamedTextColor.WHITE, TextDecoration.BOLD),
+                        "§7Ajouter 10 jetons à la mise."
+                ));
+
+                inv.setItem(BUTTON_CHALLENGE_BET_25, createItem(Material.GOLD_NUGGET,
+                        Component.text("+25 Jetons", NamedTextColor.GOLD, TextDecoration.BOLD),
+                        "§7Ajouter 25 jetons à la mise."
+                ));
+
+                inv.setItem(BUTTON_CHALLENGE_BET_50, createItem(Material.DIAMOND,
+                        Component.text("+50 Jetons", NamedTextColor.AQUA, TextDecoration.BOLD),
+                        "§7Ajouter 50 jetons à la mise."
+                ));
+
+                ItemStack curBet = createItem(Material.SUNFLOWER,
+                        Component.text("Mise sélectionnée : §6§l" + game.getChallengeBet() + " Jetons", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                        "§7Solde restant en cas de défaite : §f" + (game.getChallengeChips() - game.getChallengeBet()) + " Jetons",
+                        "§7Victoire normale : §a+" + (game.getChallengeBet() * 2) + " Jetons (x2)",
+                        "§6Blackjack naturel (x3) : §e+" + (game.getChallengeBet() * 3) + " Jetons",
+                        "",
+                        "§e➤ Cliquer pour réinitialiser au minimum (10)"
+                );
+                curBet.setAmount(Math.max(1, Math.min(64, game.getChallengeBet())));
+                inv.setItem(BET_SLOT, curBet);
+
+                inv.setItem(BUTTON_CHALLENGE_BET_ALL_IN, createItem(Material.NETHERITE_SCRAP,
+                        Component.text("§c§lALL-IN (" + game.getChallengeChips() + " Jetons)", NamedTextColor.RED, TextDecoration.BOLD),
+                        "§cMiser la totalité de vos jetons restants !",
+                        "§4Quitte ou double !"
+                ));
+
+                inv.setItem(BUTTON_CHALLENGE_BET_RESET, createItem(Material.REDSTONE,
+                        Component.text("Mise minimale (10)", NamedTextColor.RED, TextDecoration.BOLD),
+                        "§7Réduire la mise à 10 jetons."
+                ));
+
+                inv.setItem(13, createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" ")));
+                inv.setItem(31, createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" ")));
             }
         } else {
             List<Card> pHand = game.getPlayerHand();
@@ -423,11 +405,28 @@ public class BlackjackGui {
             } else {
                 // Mode CHALLENGE
                 if (game.getChallengeChips() <= 0) {
-                    inv.setItem(BUTTON_START_BET, createItem(Material.GRAY_CONCRETE,
-                            Component.text("En attente d'inscription...", NamedTextColor.GRAY, TextDecoration.BOLD),
-                            "§7Payez le droit d'entrée au centre (slot 22)",
-                            "§7pour obtenir vos 100 jetons de départ."
-                    ));
+                    ItemStack deposit = inv.getItem(BET_SLOT);
+                    World.Environment env = game.getPlayer().getWorld().getEnvironment();
+                    boolean valid = BlackjackGame.isValidEntryItem(deposit, env);
+
+                    if (valid) {
+                        String costName = (deposit.getType() == Material.DRAGON_HEAD) ? "1x Tête de Dragon" : (BlackjackGame.GILDED_BLACKSTONE_COST + "x Pierres Noires Dorées");
+                        inv.setItem(BUTTON_START_BET, createItem(Material.LIME_CONCRETE,
+                                Component.text("✔ Valider & Démarrer la Mission", NamedTextColor.GREEN, TextDecoration.BOLD),
+                                "§eEntrée : §f" + costName,
+                                "§7Capital initial : §a100 Jetons de défi",
+                                "§7Palier x4 (400 jetons) : §61 Lingot de Cuprite",
+                                "§7Palier x8 (800 jetons) : §d3 Lingots de Cuprite !",
+                                "",
+                                "§a➤ Cliquez pour payer et démarrer la session !"
+                        ));
+                    } else {
+                        inv.setItem(BUTTON_START_BET, createItem(Material.GRAY_CONCRETE,
+                                Component.text("En attente du droit d'entrée...", NamedTextColor.GRAY, TextDecoration.BOLD),
+                                "§7Déposez " + BlackjackGame.getEntryCostDescription(game.getPlayer()),
+                                "§7dans le slot central doré pour activer l'entrée."
+                        ));
+                    }
                 } else {
                     inv.setItem(BUTTON_START_BET, createItem(Material.LIME_CONCRETE,
                             Component.text("✔ Valider la mise & Distribuer", NamedTextColor.GREEN, TextDecoration.BOLD),
