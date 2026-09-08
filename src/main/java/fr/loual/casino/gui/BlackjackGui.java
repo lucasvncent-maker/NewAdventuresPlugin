@@ -44,6 +44,7 @@ public class BlackjackGui {
                 54,
                 Component.text("♠ Casino - Blackjack ♠", NamedTextColor.DARK_GREEN, TextDecoration.BOLD)
         );
+        inv.setMaxStackSize(999);
         holder.setInventory(inv);
         render(inv, game);
         player.openInventory(inv);
@@ -51,6 +52,7 @@ public class BlackjackGui {
     }
 
     public static void render(Inventory inv, BlackjackGame game) {
+        inv.setMaxStackSize(999);
         // Fond tapis vert feutré
         ItemStack greenFelt = createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" "));
         ItemStack darkFelt = createItem(Material.BLACK_STAINED_GLASS_PANE, Component.text(" "));
@@ -306,7 +308,7 @@ public class BlackjackGui {
                         Component.text("Mise : §6" + game.getChallengeBet() + " Jetons", NamedTextColor.YELLOW, TextDecoration.BOLD),
                         "§aVictoire : +" + (game.getChallengeBet() * 2) + " §8| §6BJ : +" + (game.getChallengeBet() * 3)
                 );
-                curBet.setAmount(Math.max(1, Math.min(64, game.getChallengeBet())));
+                curBet.setAmount(Math.max(1, game.getChallengeBet()));
                 inv.setItem(BET_SLOT, curBet);
 
                 // Bouton Augmenter de 10 (Slot 23)
@@ -339,7 +341,7 @@ public class BlackjackGui {
                     curMeta.setEnchantmentGlintOverride(true);
                     curBet.setItemMeta(curMeta);
                 }
-                curBet.setAmount(Math.max(1, Math.min(64, game.getHordeBet())));
+                curBet.setAmount(Math.max(1, game.getHordeBet()));
                 inv.setItem(BET_SLOT, curBet);
 
                 // Bouton Augmenter de 10 (Slot 23)
@@ -544,7 +546,7 @@ public class BlackjackGui {
                         Component.text("Mise en jeu : §6" + game.getActiveChallengeBet() + " Jetons", NamedTextColor.YELLOW, TextDecoration.BOLD),
                         "§7Victoire : §ax2 §8| §6Blackjack : §ex3"
                 );
-                betDisplay.setAmount(Math.max(1, Math.min(64, game.getActiveChallengeBet())));
+                betDisplay.setAmount(Math.max(1, game.getActiveChallengeBet()));
                 inv.setItem(49, betDisplay);
             } else {
                 ItemStack betDisplay = createItem(Material.REDSTONE,
@@ -556,7 +558,7 @@ public class BlackjackGui {
                     meta.setEnchantmentGlintOverride(true);
                     betDisplay.setItemMeta(meta);
                 }
-                betDisplay.setAmount(Math.max(1, Math.min(64, game.getActiveHordeBet())));
+                betDisplay.setAmount(Math.max(1, game.getActiveHordeBet()));
                 inv.setItem(49, betDisplay);
             }
 
