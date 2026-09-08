@@ -1545,7 +1545,7 @@ public class JobListener implements Listener {
             }
         } else if (cmd.equals("sethome") || cmd.equals("set_home") || cmd.equals("sh") || cmd.equals("home") || cmd.equals("h")) {
             boolean isAventurier = jobManager.getPlayerJob(player) == PlayerJob.AVENTURIER && jobManager.getJobLevel(player, PlayerJob.AVENTURIER) >= 1;
-            if (!isAventurier && !player.isOp()) {
+            if (!isAventurier) {
                 event.setCancelled(true);
                 player.sendMessage(
                         Component.text("[Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)

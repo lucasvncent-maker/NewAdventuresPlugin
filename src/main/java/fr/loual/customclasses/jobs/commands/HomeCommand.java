@@ -38,7 +38,7 @@ public class HomeCommand implements CommandExecutor, TabCompleter {
         }
 
         boolean isAventurierM1 = jobManager.getPlayerJob(player) == PlayerJob.AVENTURIER && jobManager.getJobLevel(player, PlayerJob.AVENTURIER) >= 1;
-        if (!isAventurierM1 && !player.isOp()) {
+        if (!isAventurierM1) {
             player.sendMessage(
                     Component.text("[Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)
                             .append(Component.text("Vous devez être Aventurier de niveau 1 (accomplir la Mission 1) pour utiliser /" + label + " !", NamedTextColor.RED))
