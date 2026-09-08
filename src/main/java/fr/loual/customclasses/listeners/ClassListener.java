@@ -74,6 +74,7 @@ public class ClassListener implements Listener {
     // Capacités Spéciales (Touche F)
     private final Map<UUID, Long> abilityCooldowns = new HashMap<>();
     private final Map<UUID, Long> assassinBackstabBuff = new HashMap<>();
+    private final Map<UUID, Long> recentAssassinBackstabs = new HashMap<>();
     private final Map<UUID, ItemStack[]> assassinStoredArmor = new HashMap<>();
     private final Map<UUID, Long> assassinStealthUntil = new HashMap<>();
     private final Set<UUID> sauterelleSuperDrop = new HashSet<>();
@@ -591,6 +592,12 @@ public class ClassListener implements Listener {
                                 w.playSound(vLoc, Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.2f, 0.6f);
                                 w.playSound(vLoc, Sound.BLOCK_ANVIL_LAND, 0.7f, 1.9f);
                                 player.sendActionBar(Component.text("☠ COUP CRITIQUE DANS LE DOS (x2 DÉGÂTS) ! ☠", NamedTextColor.DARK_RED, TextDecoration.BOLD));
+
+                                // Suivi pour réinitialisation du Dash si l'ennemi meurt du coup
+                                recentAssassinBackstabs.put(victim.getUniqueId(), System.currentTimeMillis() + 2000L);
+                                if (victim instanceof LivingEntity le && le.getHealth() <= event.getFinalDamage()) {
+                                    triggerAssassinCooldownReset(player, vLoc);
+                                }
                             }
                         } else {
                             assassinBackstabBuff.remove(player.getUniqueId());
@@ -1868,6 +1875,38 @@ public class ClassListener implements Listener {
                 event.setCancelled(true);
                 event.setTarget(null);
             }
+        }
+    }
+
+    /**
+     * Réinitialisation instantanée du Pas de l'Ombre si la victime meurt du coup dans le dos.
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onEntityDeath(EntityDeathEvent event) {
+        LivingEntity victim = event.getEntity();
+        if (recentAssassinBackstabs.containsKey(victim.getUniqueId())) {
+            long expiry = recentAssassinBackstabs.remove(victim.getUniqueId());
+            if (System.currentTimeMillis() <= expiry && victim.getKiller() != null) {
+                Player killer = victim.getKiller();
+                if (classManager.getPlayerClass(killer) == PlayerClass.ASSASSIN) {
+                    triggerAssassinCooldownReset(killer, victim.getLocation().add(0, 1.0, 0));
+                }
+            }
+        }
+    }
+
+    private void triggerAssassinCooldownReset(Player player, Location vLoc) {
+        if (abilityCooldowns.remove(player.getUniqueId()) != null) {
+            World w = player.getWorld();
+            w.spawnParticle(Particle.SOUL_FIRE_FLAME, player.getLocation().add(0, 1.0, 0), 30, 0.4, 0.5, 0.4, 0.08);
+            if (vLoc != null) {
+                w.spawnParticle(Particle.SCULK_SOUL, vLoc, 20, 0.3, 0.4, 0.3, 0.05);
+            }
+            player.playSound(player.getLocation(), Sound.ENTITY_WARDEN_SONIC_BOOM, 0.6f, 1.8f);
+            player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.5f);
+            player.sendActionBar(Component.text("✦ ÉLIMINATION FURTIVE ! Pas de l'Ombre réinitialisé ! ✦", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
+            player.sendMessage(Component.text("[Assassin] ", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD)
+                    .append(Component.text("✦ Combo Furtif réussi ! Votre Pas de l'Ombre est immédiatement prêt.", NamedTextColor.LIGHT_PURPLE)));
         }
     }
 }

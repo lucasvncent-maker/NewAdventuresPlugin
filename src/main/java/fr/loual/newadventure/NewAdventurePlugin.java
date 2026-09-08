@@ -23,6 +23,7 @@ import fr.loual.customminerals.listeners.TreeMiningListener;
 import fr.loual.casino.commands.CasinoCommand;
 import fr.loual.casino.listeners.BlackjackListener;
 import fr.loual.casino.spawner.VillageCroupierSpawner;
+import fr.loual.casino.stats.CasinoStatsManager;
 import fr.loual.customminerals.recipes.RecipeManager;
 import fr.loual.newadventure.commands.ChlorineCommand;
 import org.bukkit.command.PluginCommand;
@@ -44,15 +45,17 @@ public final class NewAdventurePlugin extends JavaPlugin {
     private ClassManager classManager;
     private JobManager jobManager;
     private RecipeManager mineralRecipeManager;
+    private CasinoStatsManager casinoStatsManager;
 
     @Override
     public void onEnable() {
         // Sauvegarde de la configuration (custom minerals, cuprite, etc.)
         saveDefaultConfig();
 
-        // 1. Initialisation des modules de classes et métiers
+        // 1. Initialisation des modules de classes, métiers & casino stats
         this.classManager = new ClassManager(this);
         this.jobManager = new JobManager(this);
+        this.casinoStatsManager = new CasinoStatsManager(this);
 
         // 2. Initialisation des minéraux & Cuprite
         this.mineralRecipeManager = new RecipeManager(this);
@@ -280,5 +283,9 @@ public final class NewAdventurePlugin extends JavaPlugin {
                 }
             });
         }
+    }
+
+    public CasinoStatsManager getCasinoStatsManager() {
+        return casinoStatsManager;
     }
 }

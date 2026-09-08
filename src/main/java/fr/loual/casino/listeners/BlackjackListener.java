@@ -18,6 +18,7 @@ import org.bukkit.entity.Villager;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
@@ -394,6 +395,15 @@ public class BlackjackListener implements Listener {
     public void onCroupierDamage(EntityDamageEvent event) {
         if (isCroupier(event.getEntity())) {
             event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onFireworkDamage(EntityDamageByEntityEvent event) {
+        if (event.getDamager() instanceof org.bukkit.entity.Firework fw) {
+            if (fw.getPersistentDataContainer().has(BlackjackGame.HARMLESS_FIREWORK_KEY, PersistentDataType.BYTE)) {
+                event.setCancelled(true);
+            }
         }
     }
 }

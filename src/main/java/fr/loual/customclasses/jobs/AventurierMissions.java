@@ -21,7 +21,7 @@ public class AventurierMissions {
             new JobMission(
                     2,
                     "Mission 2 : Les Tréfonds du Nether",
-                    "Perle de l'Aventurier : Ender Pearl infinie qui n'inflige aucun dégât de chute.",
+                    "Perle Infinie (aucun dégât de chute) + Boussole Antique de Découverte (détecte les structures proches).",
                     List.of(
                             new JobMission.Requirement("NETHER_BIOMES", "Biomes explorés (Nether)", Material.NETHERRACK, 5)
                     )

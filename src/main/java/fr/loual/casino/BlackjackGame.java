@@ -14,6 +14,11 @@ import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import fr.loual.newadventure.NewAdventurePlugin;
+import org.bukkit.Color;
+import org.bukkit.FireworkEffect;
+import org.bukkit.entity.Firework;
+import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -53,6 +58,7 @@ public class BlackjackGame {
     public static final int CHALLENGE_PALIER_1 = 400; // x4 -> 1 Cuprite
     public static final int CHALLENGE_PALIER_2 = 800; // x8 -> 3 Cuprites
     public static final int GILDED_BLACKSTONE_COST = 8;
+    public static final NamespacedKey HARMLESS_FIREWORK_KEY = new NamespacedKey("casino", "harmless_firework");
 
     private final Player player;
     private final Plugin plugin;
@@ -419,10 +425,22 @@ public class BlackjackGame {
                 default -> {}
             }
 
+            // Enregistrement des statistiques
+            if (currentPlugin instanceof NewAdventurePlugin nap && nap.getCasinoStatsManager() != null) {
+                boolean won = (result == Result.PLAYER_WIN || result == Result.PLAYER_BLACKJACK);
+                boolean natural = (result == Result.PLAYER_BLACKJACK);
+                nap.getCasinoStatsManager().recordHand(targetPlayer, won, natural, challengeChips);
+            }
+
             // Vérification des conditions de victoire x8 et faillite
             if (challengeChips >= CHALLENGE_PALIER_2) {
                 this.jackpotWon = true;
                 giveCuprite(targetPlayer, 3, currentPlugin);
+                if (currentPlugin instanceof NewAdventurePlugin nap && nap.getCasinoStatsManager() != null) {
+                    nap.getCasinoStatsManager().recordCuprite(targetPlayer, 3);
+                }
+                spawnVictoryFireworks(loc, true, currentPlugin);
+
                 targetPlayer.showTitle(Title.title(
                         Component.text("✦ VICTOIRE x8 ✦", NamedTextColor.GOLD, TextDecoration.BOLD),
                         Component.text("3 Lingots de Cuprite remportés !", NamedTextColor.YELLOW)
@@ -464,6 +482,10 @@ public class BlackjackGame {
         Location loc = player.getLocation();
         Plugin currentPlugin = (plugin != null) ? plugin : (this.plugin != null ? this.plugin : Bukkit.getPluginManager().getPlugin("NewAdventurePlugin"));
         giveCuprite(player, 1, currentPlugin);
+        if (currentPlugin instanceof NewAdventurePlugin nap && nap.getCasinoStatsManager() != null) {
+            nap.getCasinoStatsManager().recordCuprite(player, 1);
+        }
+        spawnVictoryFireworks(loc, false, currentPlugin);
 
         player.showTitle(Title.title(
                 Component.text("✔ ENCAISSEMENT x4 ✔", NamedTextColor.GOLD, TextDecoration.BOLD),
@@ -478,6 +500,45 @@ public class BlackjackGame {
         saveChallengeToPdc(currentPlugin);
         resetToBetting();
         return true;
+    }
+
+    private void spawnVictoryFireworks(Location loc, boolean isJackpot, Plugin currentPlugin) {
+        World world = loc.getWorld();
+        if (world == null) return;
+        Location fwLoc = loc.clone().add(0, 2.0, 0);
+
+        try {
+            Firework fw = world.spawn(fwLoc, Firework.class);
+            FireworkMeta meta = fw.getFireworkMeta();
+            meta.addEffect(FireworkEffect.builder()
+                    .withColor(Color.fromRGB(160, 32, 240), Color.fromRGB(255, 215, 0)) // Violet et Or
+                    .withFade(Color.fromRGB(255, 105, 180), Color.fromRGB(255, 255, 255))
+                    .with(isJackpot ? FireworkEffect.Type.BALL_LARGE : FireworkEffect.Type.BURST)
+                    .trail(true)
+                    .flicker(true)
+                    .build());
+            meta.setPower(isJackpot ? 1 : 0);
+            meta.getPersistentDataContainer().set(HARMLESS_FIREWORK_KEY, PersistentDataType.BYTE, (byte) 1);
+            fw.setFireworkMeta(meta);
+
+            if (isJackpot && currentPlugin != null) {
+                Bukkit.getScheduler().runTaskLater(currentPlugin, () -> {
+                    if (loc.getWorld() != null) {
+                        Firework fw2 = loc.getWorld().spawn(fwLoc.clone().add(0.5, 0, 0.5), Firework.class);
+                        FireworkMeta meta2 = fw2.getFireworkMeta();
+                        meta2.addEffect(FireworkEffect.builder()
+                                .withColor(Color.fromRGB(255, 215, 0), Color.fromRGB(186, 85, 211))
+                                .with(FireworkEffect.Type.STAR)
+                                .trail(true)
+                                .flicker(true)
+                                .build());
+                        meta2.setPower(1);
+                        meta2.getPersistentDataContainer().set(HARMLESS_FIREWORK_KEY, PersistentDataType.BYTE, (byte) 1);
+                        fw2.setFireworkMeta(meta2);
+                    }
+                }, 8L);
+            }
+        } catch (Exception ignored) {}
     }
 
     private void giveReward(Player targetPlayer, int multiplier) {

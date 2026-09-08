@@ -32,6 +32,7 @@ public enum PlayerClass {
             Component.text("✦ Capacité [F] : Pas de l'Ombre", NamedTextColor.GOLD, TextDecoration.BOLD),
             Component.text("  • Téléporte 15 blocs en avant dans un nuage de fumée.", NamedTextColor.LIGHT_PURPLE),
             Component.text("  • Prochain coup porté dans le dos inflige x2 DÉGÂTS !", NamedTextColor.LIGHT_PURPLE),
+            Component.text("  • Élimination dans le dos : Temps de recharge du dash réinitialisé !", NamedTextColor.LIGHT_PURPLE),
             Component.empty(),
             Component.text("✦ Bonus :", NamedTextColor.GREEN, TextDecoration.BOLD),
             Component.text("  • Vitesse I permanente.", NamedTextColor.AQUA),

@@ -57,6 +57,12 @@ import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.block.Container;
 import org.bukkit.loot.Lootable;
 import fr.loual.customminerals.items.Cuprite;
+import org.bukkit.generator.structure.Structure;
+import org.bukkit.event.block.BlockDropItemEvent;
+import org.bukkit.entity.Item;
+import org.bukkit.inventory.meta.CompassMeta;
+import fr.loual.customclasses.jobs.MineurPouchManager;
+import java.util.Iterator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -77,6 +83,7 @@ public class JobListener implements Listener {
     private final Set<UUID> fallImmunity = new HashSet<>();
 
     // Aventurier
+    private final Map<UUID, Long> discoveryCompassCooldowns = new HashMap<>();
     private final Map<UUID, Long> pearlCooldowns = new HashMap<>();
     private final NamespacedKey chestBoostKey;
     private final NamespacedKey noFallPearlKey;
@@ -913,6 +920,26 @@ public class JobListener implements Listener {
             });
             return;
         }
+
+        // 7. Boussole Antique de Découverte (Aventurier M2)
+        if (CustomJobItems.isJobItem(item, CustomJobItems.ID_AVENTURIER_DISCOVERY_COMPASS)) {
+            event.setCancelled(true);
+            handleAventurierDiscoveryCompass(player, item);
+            return;
+        }
+
+        // 8. Sacoche de Minage du Mineur (Mineur M2)
+        if (CustomJobItems.isJobItem(item, CustomJobItems.ID_MINEUR_ORE_POUCH)) {
+            event.setCancelled(true);
+            if (jobManager.getPlayerJob(player) != PlayerJob.MINEUR || jobManager.getJobLevel(player, PlayerJob.MINEUR) < 2) {
+                player.sendMessage(Component.text("[Mineur] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                        .append(Component.text("Vous devez être Mineur de niveau 2 minimum pour utiliser la Sacoche de Minage !", NamedTextColor.RED)));
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                return;
+            }
+            MineurPouchManager.openPouch(player);
+            return;
+        }
     }
 
     private void consumeFarmerSoup(Player player, ItemStack item) {
@@ -1554,5 +1581,235 @@ public class JobListener implements Listener {
                 player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
             }
         }
+    }
+
+    // ==========================================
+    // Boussole Antique de Découverte (Aventurier M2)
+    // ==========================================
+    private void handleAventurierDiscoveryCompass(Player player, ItemStack item) {
+        if (jobManager.getPlayerJob(player) != PlayerJob.AVENTURIER || jobManager.getJobLevel(player, PlayerJob.AVENTURIER) < 2) {
+            player.sendMessage(Component.text("[Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                    .append(Component.text("Vous devez être Aventurier de niveau 2 minimum pour utiliser la Boussole Antique !", NamedTextColor.RED)));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+
+        World world = player.getWorld();
+        if (world.getEnvironment() != World.Environment.NORMAL) {
+            player.sendMessage(Component.text("[Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                    .append(Component.text("La Boussole Antique ne résonne que dans l'Overworld !", NamedTextColor.RED)));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+
+        UUID uuid = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        if (discoveryCompassCooldowns.getOrDefault(uuid, 0L) > now) {
+            long remaining = (discoveryCompassCooldowns.get(uuid) - now) / 1000L;
+            player.sendMessage(Component.text("⌛ La Boussole Antique se recharge... Attendez encore " + remaining + "s.", NamedTextColor.GRAY));
+            player.playSound(player.getLocation(), Sound.BLOCK_DISPENSER_FAIL, 0.8f, 1.2f);
+            return;
+        }
+
+        player.sendMessage(Component.text("🧭 Analyse des résonances cartographiques en cours...", NamedTextColor.YELLOW));
+        player.playSound(player.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1.0f, 1.2f);
+        discoveryCompassCooldowns.put(uuid, now + 60_000L);
+
+        Location origin = player.getLocation();
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            Structure[] candidateStructures = {
+                    Structure.ANCIENT_CITY,
+                    Structure.TRIAL_CHAMBERS,
+                    Structure.VILLAGE_PLAINS,
+                    Structure.VILLAGE_DESERT,
+                    Structure.VILLAGE_SAVANNA,
+                    Structure.VILLAGE_TAIGA,
+                    Structure.VILLAGE_SNOWY,
+                    Structure.MONUMENT,
+                    Structure.MANSION,
+                    Structure.PILLAGER_OUTPOST,
+                    Structure.MINESHAFT,
+                    Structure.DESERT_PYRAMID,
+                    Structure.JUNGLE_PYRAMID,
+                    Structure.SWAMP_HUT,
+                    Structure.STRONGHOLD
+            };
+
+            Location bestLoc = null;
+            Structure bestStruct = null;
+            double bestDist = Double.MAX_VALUE;
+
+            for (Structure struct : candidateStructures) {
+                try {
+                    var searchResult = world.locateNearestStructure(origin, struct, 160, true);
+                    if (searchResult != null && searchResult.getLocation() != null) {
+                        double d = origin.distance(searchResult.getLocation());
+                        if (d < bestDist) {
+                            bestDist = d;
+                            bestLoc = searchResult.getLocation();
+                            bestStruct = struct;
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            final Location foundLoc = bestLoc;
+            final Structure foundStruct = bestStruct;
+            final double finalDist = bestDist;
+
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (!player.isOnline()) return;
+
+                if (foundLoc == null) {
+                    player.sendMessage(Component.text("[Aventurier] Aucune structure inexplorée détectée dans un rayon de 2500 blocs.", NamedTextColor.GRAY));
+                    discoveryCompassCooldowns.put(uuid, System.currentTimeMillis() + 10_000L);
+                    return;
+                }
+
+                ItemMeta meta = item.getItemMeta();
+                if (meta instanceof CompassMeta cm) {
+                    cm.setLodestone(foundLoc);
+                    cm.setLodestoneTracked(false);
+                    item.setItemMeta(cm);
+                }
+                player.setCompassTarget(foundLoc);
+
+                String name = getStructureFriendlyName(foundStruct);
+                String direction = getCardinalDirection(origin, foundLoc);
+                int distInt = (int) finalDist;
+
+                player.sendMessage(Component.text("★ ========================================= ★", NamedTextColor.GOLD, TextDecoration.BOLD));
+                player.sendMessage(Component.text("     ✦ BOUSSOLE ANTIQUE DE DÉCOUVERTE ✦", NamedTextColor.YELLOW, TextDecoration.BOLD));
+                player.sendMessage(Component.text("  • Structure détectée : ", NamedTextColor.GRAY).append(Component.text(name, NamedTextColor.AQUA, TextDecoration.BOLD)));
+                player.sendMessage(Component.text("  • Distance : ", NamedTextColor.GRAY).append(Component.text(distInt + " blocs", NamedTextColor.WHITE, TextDecoration.BOLD)));
+                player.sendMessage(Component.text("  • Direction : ", NamedTextColor.GRAY).append(Component.text(direction, NamedTextColor.GOLD, TextDecoration.BOLD)));
+                player.sendMessage(Component.text("  • Coordonnées : ", NamedTextColor.GRAY).append(Component.text("X=" + foundLoc.getBlockX() + ", Z=" + foundLoc.getBlockZ(), NamedTextColor.YELLOW)));
+                player.sendMessage(Component.text("  ➜ L'aiguille de votre boussole pointe vers cette structure !", NamedTextColor.GREEN));
+                player.sendMessage(Component.text("★ ========================================= ★", NamedTextColor.GOLD, TextDecoration.BOLD));
+
+                player.sendActionBar(Component.text("✦ Découverte : " + name + " à " + distInt + "m (" + direction + ") ✦", NamedTextColor.GOLD, TextDecoration.BOLD));
+                player.playSound(player.getLocation(), Sound.ITEM_LODESTONE_COMPASS_LOCK, 1.0f, 1.1f);
+                player.playSound(player.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.8f, 1.5f);
+                world.spawnParticle(Particle.END_ROD, player.getLocation().add(0, 1.5, 0), 25, 0.4, 0.5, 0.4, 0.1);
+            });
+        });
+    }
+
+    private String getStructureFriendlyName(Structure structure) {
+        if (structure == null) return "Structure Mystérieuse";
+        String key = structure.getKey().getKey();
+        if (key.contains("village")) return "Village";
+        if (key.contains("ancient_city")) return "Cité des Abîmes (Ancient City)";
+        if (key.contains("trial_chambers")) return "Chambre des Épreuves (Trial Chamber)";
+        if (key.contains("monument")) return "Monument Océanique";
+        if (key.contains("mansion")) return "Manoir des Bois";
+        if (key.contains("pillager_outpost")) return "Avant-poste de Pillards";
+        if (key.contains("mineshaft")) return "Mine Abandonnée";
+        if (key.contains("desert_pyramid")) return "Temple du Désert";
+        if (key.contains("jungle_pyramid")) return "Temple de la Jungle";
+        if (key.contains("swamp_hut")) return "Hutte de Sorcière";
+        if (key.contains("stronghold")) return "Fort de l'End (Stronghold)";
+        return "Structure Inexplorée (" + key + ")";
+    }
+
+    private String getCardinalDirection(Location from, Location to) {
+        double dx = to.getX() - from.getX();
+        double dz = to.getZ() - from.getZ();
+        double angle = Math.toDegrees(Math.atan2(-dx, dz));
+        if (angle < 0) angle += 360;
+
+        if (angle >= 337.5 || angle < 22.5) return "Sud (+Z)";
+        if (angle >= 22.5 && angle < 67.5) return "Sud-Ouest (-X, +Z)";
+        if (angle >= 67.5 && angle < 112.5) return "Ouest (-X)";
+        if (angle >= 112.5 && angle < 157.5) return "Nord-Ouest (-X, -Z)";
+        if (angle >= 157.5 && angle < 202.5) return "Nord (-Z)";
+        if (angle >= 202.5 && angle < 247.5) return "Nord-Est (+X, -Z)";
+        if (angle >= 247.5 && angle < 292.5) return "Est (+X)";
+        return "Sud-Est (+X, +Z)";
+    }
+
+    // ==========================================
+    // Sacoche de Minage aspirante (Mineur M2)
+    // ==========================================
+    @EventHandler
+    public void onPouchInventoryClose(InventoryCloseEvent event) {
+        if (event.getInventory().getHolder() instanceof MineurPouchManager.MineurPouchHolder) {
+            if (event.getPlayer() instanceof Player p) {
+                MineurPouchManager.savePouch(p);
+                p.playSound(p.getLocation(), Sound.ITEM_BUNDLE_DROP_CONTENTS, 0.8f, 1.2f);
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onBlockDropItem(BlockDropItemEvent event) {
+        Player player = event.getPlayer();
+        if (jobManager.getPlayerJob(player) != PlayerJob.MINEUR || jobManager.getJobLevel(player, PlayerJob.MINEUR) < 2) {
+            return;
+        }
+        if (!MineurPouchManager.hasPouchInInventory(player)) {
+            return;
+        }
+
+        Iterator<Item> iterator = event.getItems().iterator();
+        int absorbedCount = 0;
+
+        while (iterator.hasNext()) {
+            Item itemEntity = iterator.next();
+            ItemStack stack = itemEntity.getItemStack();
+            if (MineurPouchManager.isAbsorbableOre(stack)) {
+                int amountBefore = stack.getAmount();
+                boolean fully = MineurPouchManager.tryAbsorb(player, stack);
+                int absorbed = amountBefore - stack.getAmount();
+                if (absorbed > 0) {
+                    absorbedCount += absorbed;
+                }
+                if (fully || stack.getAmount() <= 0) {
+                    iterator.remove();
+                } else {
+                    itemEntity.setItemStack(stack);
+                }
+            }
+        }
+
+        if (absorbedCount > 0) {
+            player.playSound(player.getLocation(), Sound.ITEM_BUNDLE_INSERT, 0.7f, 1.4f);
+            player.sendActionBar(Component.text("⛏ " + absorbedCount + " minerais aspirés dans votre Sacoche de Minage !", NamedTextColor.GOLD, TextDecoration.BOLD));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onEntityPickup(EntityPickupItemEvent event) {
+        if (event.getEntity() instanceof Player player) {
+            if (jobManager.getPlayerJob(player) != PlayerJob.MINEUR || jobManager.getJobLevel(player, PlayerJob.MINEUR) < 2) {
+                return;
+            }
+            if (!MineurPouchManager.hasPouchInInventory(player)) {
+                return;
+            }
+
+            Item itemEntity = event.getItem();
+            ItemStack stack = itemEntity.getItemStack();
+            if (MineurPouchManager.isAbsorbableOre(stack)) {
+                int before = stack.getAmount();
+                boolean fully = MineurPouchManager.tryAbsorb(player, stack);
+                int absorbed = before - stack.getAmount();
+                if (absorbed > 0) {
+                    player.playSound(player.getLocation(), Sound.ITEM_BUNDLE_INSERT, 0.6f, 1.5f);
+                    player.sendActionBar(Component.text("⛏ " + absorbed + " minerais aspirés dans votre Sacoche !", NamedTextColor.GOLD));
+                }
+                if (fully || stack.getAmount() <= 0) {
+                    event.setCancelled(true);
+                    itemEntity.remove();
+                } else {
+                    itemEntity.setItemStack(stack);
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onJobPlayerQuit(PlayerQuitEvent event) {
+        MineurPouchManager.savePouch(event.getPlayer());
     }
 }

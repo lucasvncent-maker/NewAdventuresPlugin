@@ -641,7 +641,8 @@ public class JobManager {
                             .append(Component.text("Effet Célérité I permanent + /nv pour activer la Vision Nocturne !", NamedTextColor.YELLOW)));
                 } else if (missionNumber == 2) {
                     player.sendMessage(Component.text("✦ Récompenses Mineur M2 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
-                            .append(Component.text("5% de chance de drop de la Cuprite sur les minerais + Fortune supplémentaire (+1) !", NamedTextColor.YELLOW)));
+                            .append(Component.text("Sacoche de Minage aspirante reçue + 5% de chance de drop de Cuprite + Fortune supplémentaire (+1) !", NamedTextColor.YELLOW)));
+                    giveOrDropItem(player, CustomJobItems.getMineurOrePouch());
                 } else if (missionNumber == 3) {
                     player.sendMessage(Component.text("✦ Récompenses Mineur M3 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
                             .append(Component.text("Célérité II permanent + Régénération, Résistance & Résistance au Feu sous la couche 30 !", NamedTextColor.YELLOW)));
@@ -673,9 +674,10 @@ public class JobManager {
                     player.sendMessage(Component.text("✦ Récompenses Aventurier M1 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
                             .append(Component.text("Meilleurs loots dans les coffres de structures + Accès aux commandes /sethome et /home !", NamedTextColor.YELLOW)));
                 } else if (missionNumber == 2) {
-                    player.sendMessage(Component.text("✦ Récompense Aventurier M2 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
-                            .append(Component.text("Perle Infinie de l'Aventurier reçue (infinie et aucun dégât de chute) !", NamedTextColor.YELLOW)));
+                    player.sendMessage(Component.text("✦ Récompenses Aventurier M2 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("Perle Infinie + Boussole Antique de Découverte reçues !", NamedTextColor.YELLOW)));
                     giveOrDropItem(player, CustomJobItems.getAventurierInfinitePearl());
+                    giveOrDropItem(player, CustomJobItems.getAventurierDiscoveryCompass());
                 } else if (missionNumber == 3) {
                     player.sendMessage(Component.text("✦ Récompenses Suprêmes Aventurier M3 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
                             .append(Component.text("Élytres Incassables + Fusée Infinie reçues pour explorer sans limites !", NamedTextColor.YELLOW)));

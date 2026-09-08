@@ -35,6 +35,9 @@ public class CustomJobItems {
     public static final String ID_AVENTURIER_INFINITE_PEARL = "aventurier_infinite_pearl";
     public static final String ID_AVENTURIER_UNBREAKABLE_ELYTRA = "aventurier_unbreakable_elytra";
     public static final String ID_AVENTURIER_INFINITE_FIREWORK = "aventurier_infinite_firework";
+    public static final String ID_AVENTURIER_DISCOVERY_COMPASS = "aventurier_discovery_compass";
+
+    public static final String ID_MINEUR_ORE_POUCH = "mineur_ore_pouch";
 
     public static final Color ARCHITECT_COLOR = Color.fromRGB(235, 180, 50);
 
@@ -322,6 +325,54 @@ public class CustomJobItems {
         return item;
     }
 
+    public static ItemStack getAventurierDiscoveryCompass() {
+        ItemStack item = new ItemStack(Material.RECOVERY_COMPASS);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text("✦ Boussole Antique de Découverte ✦", NamedTextColor.GOLD, TextDecoration.BOLD));
+            meta.lore(List.of(
+                    Component.text("Un antique artefact forgé par les premiers cartographes.", NamedTextColor.GRAY),
+                    Component.empty(),
+                    Component.text("✦ Clic Droit : Détecte la structure inexplorée la plus proche", NamedTextColor.YELLOW),
+                    Component.text("  (Portée : jusqu'à 5000 blocs dans l'Overworld)", NamedTextColor.DARK_AQUA),
+                    Component.text("✦ Aiguille Mystique : Oriente votre boussole vers l'objectif", NamedTextColor.AQUA),
+                    Component.text("✦ Détecte : Temples, Cités, Villages, Manoirs, Épreuves...", NamedTextColor.LIGHT_PURPLE),
+                    Component.empty(),
+                    Component.text("✖ Temps de recharge : 60 secondes", NamedTextColor.RED),
+                    Component.text("★ Réservé aux Aventuriers (Niveau 2 minimum)", NamedTextColor.DARK_GRAY)
+            ));
+            meta.addEnchant(Enchantment.UNBREAKING, 1, true);
+            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            meta.getPersistentDataContainer().set(ITEM_KEY, PersistentDataType.STRING, ID_AVENTURIER_DISCOVERY_COMPASS);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    public static ItemStack getMineurOrePouch() {
+        ItemStack item = new ItemStack(Material.BUNDLE);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text("✦ Sacoche de Minage du Mineur ✦", NamedTextColor.GOLD, TextDecoration.BOLD));
+            meta.lore(List.of(
+                    Component.text("Une sacoche enchantée tissée dans les abysses de la terre.", NamedTextColor.GRAY),
+                    Component.empty(),
+                    Component.text("✦ Aspiration Automatique :", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                    Component.text("  Aspire instantanément tous les minerais bruts minés ou", NamedTextColor.YELLOW),
+                    Component.text("  ramassés (Fer, Or, Cuivre, Diamant, Cuprite, etc.) !", NamedTextColor.YELLOW),
+                    Component.empty(),
+                    Component.text("✦ Clic Droit : Ouvre l'interface de stockage de la sacoche (27 slots)", NamedTextColor.AQUA),
+                    Component.empty(),
+                    Component.text("★ Réservé aux Mineurs (Niveau 2 minimum)", NamedTextColor.DARK_GRAY)
+            ));
+            meta.addEnchant(Enchantment.UNBREAKING, 1, true);
+            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            meta.getPersistentDataContainer().set(ITEM_KEY, PersistentDataType.STRING, ID_MINEUR_ORE_POUCH);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
     public static boolean hasFullArchitectSet(Player player) {
         if (player == null) return false;
         var inv = player.getInventory();
@@ -357,6 +408,8 @@ public class CustomJobItems {
             case ID_AVENTURIER_INFINITE_PEARL -> getAventurierInfinitePearl();
             case ID_AVENTURIER_UNBREAKABLE_ELYTRA -> getAventurierUnbreakableElytra();
             case ID_AVENTURIER_INFINITE_FIREWORK -> getAventurierInfiniteFirework();
+            case ID_AVENTURIER_DISCOVERY_COMPASS -> getAventurierDiscoveryCompass();
+            case ID_MINEUR_ORE_POUCH -> getMineurOrePouch();
             default -> null;
         };
     }

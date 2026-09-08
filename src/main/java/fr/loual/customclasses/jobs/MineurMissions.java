@@ -23,7 +23,7 @@ public class MineurMissions {
             new JobMission(
                     2,
                     "Mission 2 : Les Gemmes Rares et la Cuprite",
-                    "5% de chances d'obtenir de la Cuprite en minant des minerais + 1 niveau de Fortune supplémentaire.",
+                    "Sacoche de Minage aspirante reçue + 5% de chances de drop de Cuprite + 1 niveau de Fortune supplémentaire.",
                     List.of(
                             new JobMission.Requirement("DIAMOND", "Diamants", Material.DIAMOND, 64),
                             new JobMission.Requirement("EMERALD", "Émeraudes", Material.EMERALD, 64),
