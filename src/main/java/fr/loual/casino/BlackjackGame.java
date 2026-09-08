@@ -467,10 +467,9 @@ public class BlackjackGame {
                 }
                 case PLAYER_BUST, DEALER_WIN -> {
                     String reason = (result == Result.PLAYER_BUST) ? "Vous avez dépassé 21 (Bust) !" : "Le croupier l'emporte.";
-                    targetPlayer.sendMessage(Component.text("✘ DÉFAITE ! " + reason + " Fin de la session de défi.", NamedTextColor.RED, TextDecoration.BOLD));
+                    targetPlayer.sendMessage(Component.text("✘ DÉFAITE ! " + reason + " (Solde restant: " + challengeChips + " Jetons)", NamedTextColor.RED, TextDecoration.BOLD));
                     targetPlayer.playSound(loc, Sound.ENTITY_VILLAGER_NO, 1.0f, 0.9f);
                     targetPlayer.playSound(loc, Sound.BLOCK_ANVIL_LAND, 0.5f, 0.6f);
-                    challengeChips = 0;
                     saveChallengeToPdc(currentPlugin);
                 }
                 default -> {}
@@ -558,10 +557,9 @@ public class BlackjackGame {
                 }
                 case PLAYER_BUST, DEALER_WIN -> {
                     String reason = (result == Result.PLAYER_BUST) ? "Vous avez dépassé 21 (Bust) !" : "Le croupier l'emporte.";
-                    targetPlayer.sendMessage(Component.text("✘ DÉFAITE ! " + reason + " Votre Lingot de Cuprite est perdu.", NamedTextColor.DARK_RED, TextDecoration.BOLD));
+                    targetPlayer.sendMessage(Component.text("✘ DÉFAITE ! " + reason + " (Solde restant: " + hordeChips + " Jetons de Sang)", NamedTextColor.DARK_RED, TextDecoration.BOLD));
                     targetPlayer.playSound(loc, Sound.ENTITY_VILLAGER_NO, 1.0f, 0.9f);
                     targetPlayer.playSound(loc, Sound.BLOCK_ANVIL_LAND, 0.5f, 0.6f);
-                    hordeChips = 0;
                     saveHordeToPdc(currentPlugin);
                 }
                 default -> {}
