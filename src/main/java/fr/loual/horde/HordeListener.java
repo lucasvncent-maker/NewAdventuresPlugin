@@ -70,13 +70,22 @@ public class HordeListener implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onPlayerDeath(org.bukkit.event.entity.PlayerDeathEvent event) {
+        Player player = event.getPlayer();
+        if (hordeManager.isParticipant(player.getUniqueId())) {
+            hordeManager.removeParticipant(player.getUniqueId());
+            player.sendMessage(Component.text("☠ Vous avez succombé dans l'Arène des Damnés...", NamedTextColor.DARK_RED));
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerRespawn(org.bukkit.event.player.PlayerRespawnEvent event) {
         Player player = event.getPlayer();
         Location returnLoc = hordeManager.getReturnLocation(player.getUniqueId());
         if (returnLoc != null) {
             event.setRespawnLocation(returnLoc);
-            hordeManager.removeParticipant(player.getUniqueId());
+            hordeManager.clearReturnLocation(player.getUniqueId());
             player.sendMessage(Component.text("✦ Vous avez péri dans l'Arène et êtes réapparu à votre point d'origine.", NamedTextColor.RED));
         }
     }
@@ -84,10 +93,11 @@ public class HordeListener implements Listener {
     @EventHandler
     public void onPlayerQuit(org.bukkit.event.player.PlayerQuitEvent event) {
         Player player = event.getPlayer();
+        hordeManager.removeParticipant(player.getUniqueId());
         Location returnLoc = hordeManager.getReturnLocation(player.getUniqueId());
         if (returnLoc != null) {
             player.teleport(returnLoc);
-            hordeManager.removeParticipant(player.getUniqueId());
+            hordeManager.clearReturnLocation(player.getUniqueId());
         }
     }
 }
