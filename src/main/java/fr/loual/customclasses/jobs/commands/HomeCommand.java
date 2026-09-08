@@ -74,7 +74,7 @@ public class HomeCommand implements CommandExecutor, TabCompleter {
         player.getWorld().spawnParticle(Particle.PORTAL, player.getLocation().clone().add(0, 1, 0), 25, 0.4, 0.5, 0.4, 0.1);
         player.teleport(home);
         player.getWorld().spawnParticle(Particle.PORTAL, home.clone().add(0, 1, 0), 35, 0.4, 0.6, 0.4, 0.1);
-        player.getWorld().spawnParticle(Particle.DRAGON_BREATH, home.clone().add(0, 1, 0), 20, 0.3, 0.4, 0.3, 0.05);
+        player.getWorld().spawnParticle(Particle.REVERSE_PORTAL, home.clone().add(0, 1, 0), 20, 0.3, 0.4, 0.3, 0.05);
         player.playSound(home, Sound.ITEM_CHORUS_FRUIT_TELEPORT, 1.0f, 1.2f);
         player.sendMessage(
                 Component.text("[Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)
