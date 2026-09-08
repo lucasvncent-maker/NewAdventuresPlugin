@@ -1,15 +1,20 @@
 package fr.loual.casino;
 
+import fr.loual.customminerals.items.Cuprite;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.title.Title;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-
-import org.bukkit.Bukkit;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
@@ -19,6 +24,11 @@ import java.util.HashMap;
 import java.util.List;
 
 public class BlackjackGame {
+
+    public enum Mode {
+        CLASSIC,
+        CHALLENGE
+    }
 
     public enum State {
         BETTING,
@@ -38,19 +48,37 @@ public class BlackjackGame {
         PUSH
     }
 
+    public static final int CHALLENGE_START_CHIPS = 100;
+    public static final int CHALLENGE_PALIER_1 = 400; // x4 -> 1 Cuprite
+    public static final int CHALLENGE_PALIER_2 = 800; // x8 -> 3 Cuprites
+    public static final int GILDED_BLACKSTONE_COST = 8;
+
     private final Player player;
+    private final Plugin plugin;
     private final Deck deck = new Deck();
     private final List<Card> playerHand = new ArrayList<>();
     private final List<Card> dealerHand = new ArrayList<>();
 
+    private Mode mode = Mode.CLASSIC;
     private State state = State.BETTING;
     private Result result = Result.NONE;
     private ItemStack betItem = null;
     private boolean paidOut = false;
     private BukkitTask currentTask = null;
 
+    // Données du Mode Défi (Mission Cuprite)
+    private int challengeChips = 0;
+    private int challengeBet = 10;
+    private int activeChallengeBet = 0;
+    private boolean jackpotWon = false;
+
     public BlackjackGame(Player player) {
+        this(player, null);
+    }
+
+    public BlackjackGame(Player player, Plugin plugin) {
         this.player = player;
+        this.plugin = plugin;
     }
 
     public static int calculateScore(List<Card> hand) {
@@ -88,6 +116,8 @@ public class BlackjackGame {
 
         cancelCurrentTask();
         this.betItem = bet.clone();
+        this.activeChallengeBet = 0;
+        this.jackpotWon = false;
         this.playerHand.clear();
         this.dealerHand.clear();
         this.deck.resetAndShuffle();
@@ -96,6 +126,31 @@ public class BlackjackGame {
         this.paidOut = false;
         onUpdate.run();
 
+        runDealingAnimation(plugin, onUpdate);
+    }
+
+    public void startChallengeHand(Plugin plugin, int betChips, Runnable onUpdate) {
+        if (betChips <= 0 || betChips > challengeChips) return;
+
+        cancelCurrentTask();
+        this.activeChallengeBet = betChips;
+        this.challengeChips -= betChips;
+        this.jackpotWon = false;
+        saveChallengeToPdc(plugin);
+
+        this.betItem = null;
+        this.playerHand.clear();
+        this.dealerHand.clear();
+        this.deck.resetAndShuffle();
+        this.state = State.DEALING;
+        this.result = Result.NONE;
+        this.paidOut = false;
+        onUpdate.run();
+
+        runDealingAnimation(plugin, onUpdate);
+    }
+
+    private void runDealingAnimation(Plugin plugin, Runnable onUpdate) {
         this.currentTask = new BukkitRunnable() {
             int step = 0;
 
@@ -221,43 +276,134 @@ public class BlackjackGame {
     }
 
     public void applyPayout(Player targetPlayer) {
-        if (paidOut || betItem == null) return;
+        if (paidOut) return;
         paidOut = true;
 
         Location loc = targetPlayer.getLocation();
+        Plugin currentPlugin = (this.plugin != null) ? this.plugin : Bukkit.getPluginManager().getPlugin("NewAdventurePlugin");
 
-        switch (result) {
-            case PLAYER_BLACKJACK -> {
-                // Victoire Blackjack naturel : Payé 3 pour 1 (Triple la mise !)
-                giveReward(targetPlayer, 3);
-                targetPlayer.sendMessage(Component.text("✦ BLACKJACK NATUREL ! ✦ Payé 3 pour 1 ! Vous recevez le triple de votre mise !", NamedTextColor.GOLD, TextDecoration.BOLD));
-                targetPlayer.playSound(loc, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.1f);
-                targetPlayer.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.3f);
-                targetPlayer.spawnParticle(Particle.TOTEM_OF_UNDYING, loc.clone().add(0, 1, 0), 35, 0.5, 0.5, 0.5, 0.2);
+        if (mode == Mode.CLASSIC) {
+            if (betItem == null) return;
+            switch (result) {
+                case PLAYER_BLACKJACK -> {
+                    giveReward(targetPlayer, 3);
+                    targetPlayer.sendMessage(Component.text("✦ BLACKJACK NATUREL ! ✦ Payé 3 pour 1 ! Vous recevez le triple de votre mise !", NamedTextColor.GOLD, TextDecoration.BOLD));
+                    targetPlayer.playSound(loc, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.1f);
+                    targetPlayer.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.3f);
+                    targetPlayer.spawnParticle(Particle.TOTEM_OF_UNDYING, loc.clone().add(0, 1, 0), 35, 0.5, 0.5, 0.5, 0.2);
+                }
+                case PLAYER_WIN, DEALER_BUST -> {
+                    giveReward(targetPlayer, 2);
+                    String reason = (result == Result.DEALER_BUST) ? "Le croupier a dépassé 21 (Bust) !" : "Votre score est supérieur à celui du croupier !";
+                    targetPlayer.sendMessage(Component.text("✔ VICTOIRE ! " + reason + " Vous doublez votre mise !", NamedTextColor.GREEN, TextDecoration.BOLD));
+                    targetPlayer.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+                    targetPlayer.spawnParticle(Particle.HAPPY_VILLAGER, loc.clone().add(0, 1, 0), 25, 0.4, 0.4, 0.4, 0.05);
+                }
+                case PUSH -> {
+                    giveReward(targetPlayer, 1);
+                    targetPlayer.sendMessage(Component.text("═ ÉGALITÉ (PUSH) ! Même score que le croupier, votre mise vous est rendue.", NamedTextColor.YELLOW, TextDecoration.BOLD));
+                    targetPlayer.playSound(loc, Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.0f);
+                }
+                case PLAYER_BUST, DEALER_WIN -> {
+                    String reason = (result == Result.PLAYER_BUST) ? "Vous avez dépassé 21 (Bust) !" : "Le score du croupier est supérieur au vôtre.";
+                    targetPlayer.sendMessage(Component.text("✘ DÉFAITE ! " + reason + " Votre mise est perdue.", NamedTextColor.RED, TextDecoration.BOLD));
+                    targetPlayer.playSound(loc, Sound.ENTITY_VILLAGER_NO, 1.0f, 0.9f);
+                    targetPlayer.playSound(loc, Sound.BLOCK_ANVIL_LAND, 0.5f, 0.6f);
+                }
+                default -> {}
             }
-            case PLAYER_WIN, DEALER_BUST -> {
-                // Victoire standard : Doubler la mise !
-                giveReward(targetPlayer, 2);
-                String reason = (result == Result.DEALER_BUST) ? "Le croupier a dépassé 21 (Bust) !" : "Votre score est supérieur à celui du croupier !";
-                targetPlayer.sendMessage(Component.text("✔ VICTOIRE ! " + reason + " Vous doublez votre mise !", NamedTextColor.GREEN, TextDecoration.BOLD));
-                targetPlayer.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
-                targetPlayer.spawnParticle(Particle.HAPPY_VILLAGER, loc.clone().add(0, 1, 0), 25, 0.4, 0.4, 0.4, 0.05);
+        } else {
+            // Mode CHALLENGE
+            switch (result) {
+                case PLAYER_BLACKJACK -> {
+                    int winnings = activeChallengeBet * 3;
+                    challengeChips += winnings;
+                    targetPlayer.sendMessage(Component.text("✦ BLACKJACK NATUREL ! ✦ Payé 3 pour 1 ! +" + winnings + " Jetons (Solde: " + challengeChips + ")", NamedTextColor.GOLD, TextDecoration.BOLD));
+                    targetPlayer.playSound(loc, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.1f);
+                    targetPlayer.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.3f);
+                    targetPlayer.spawnParticle(Particle.TOTEM_OF_UNDYING, loc.clone().add(0, 1, 0), 35, 0.5, 0.5, 0.5, 0.2);
+                }
+                case PLAYER_WIN, DEALER_BUST -> {
+                    int winnings = activeChallengeBet * 2;
+                    challengeChips += winnings;
+                    String reason = (result == Result.DEALER_BUST) ? "Le croupier a sauté (Bust) !" : "Votre score l'emporte !";
+                    targetPlayer.sendMessage(Component.text("✔ VICTOIRE ! " + reason + " +" + winnings + " Jetons (Solde: " + challengeChips + ")", NamedTextColor.GREEN, TextDecoration.BOLD));
+                    targetPlayer.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+                    targetPlayer.spawnParticle(Particle.HAPPY_VILLAGER, loc.clone().add(0, 1, 0), 25, 0.4, 0.4, 0.4, 0.05);
+                }
+                case PUSH -> {
+                    challengeChips += activeChallengeBet;
+                    targetPlayer.sendMessage(Component.text("═ ÉGALITÉ (PUSH) ! Mise de " + activeChallengeBet + " Jetons restituée. (Solde: " + challengeChips + ")", NamedTextColor.YELLOW, TextDecoration.BOLD));
+                    targetPlayer.playSound(loc, Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.0f);
+                }
+                case PLAYER_BUST, DEALER_WIN -> {
+                    String reason = (result == Result.PLAYER_BUST) ? "Vous avez dépassé 21 (Bust) !" : "Le croupier l'emporte.";
+                    targetPlayer.sendMessage(Component.text("✘ DÉFAITE ! " + reason + " Perte de " + activeChallengeBet + " Jetons. (Solde: " + challengeChips + ")", NamedTextColor.RED, TextDecoration.BOLD));
+                    targetPlayer.playSound(loc, Sound.ENTITY_VILLAGER_NO, 1.0f, 0.9f);
+                    targetPlayer.playSound(loc, Sound.BLOCK_ANVIL_LAND, 0.5f, 0.6f);
+                }
+                default -> {}
             }
-            case PUSH -> {
-                // Égalité : Restitution de la mise
-                giveReward(targetPlayer, 1);
-                targetPlayer.sendMessage(Component.text("═ ÉGALITÉ (PUSH) ! Même score que le croupier, votre mise vous est rendue.", NamedTextColor.YELLOW, TextDecoration.BOLD));
-                targetPlayer.playSound(loc, Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.0f);
+
+            // Vérification des conditions de victoire x8 et faillite
+            if (challengeChips >= CHALLENGE_PALIER_2) {
+                this.jackpotWon = true;
+                giveCuprite(targetPlayer, 3, currentPlugin);
+                targetPlayer.showTitle(Title.title(
+                        Component.text("✦ VICTOIRE x8 ✦", NamedTextColor.GOLD, TextDecoration.BOLD),
+                        Component.text("3 Lingots de Cuprite remportés !", NamedTextColor.YELLOW)
+                ));
+                targetPlayer.sendMessage(Component.text("✦ JACKPOT X8 ATTEINT ! ✦ Solde: " + challengeChips + " Jetons. Vous recevez 3 Lingots de Cuprite ! Félicitations !", NamedTextColor.GOLD, TextDecoration.BOLD));
+                targetPlayer.playSound(loc, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 0.9f);
+                targetPlayer.playSound(loc, Sound.ENTITY_ENDER_DRAGON_GROWL, 0.8f, 1.2f);
+                targetPlayer.spawnParticle(Particle.TOTEM_OF_UNDYING, loc.clone().add(0, 1, 0), 60, 0.8, 0.8, 0.8, 0.3);
+
+                challengeChips = 0;
+                saveChallengeToPdc(currentPlugin);
+            } else if (challengeChips <= 0) {
+                challengeChips = 0;
+                saveChallengeToPdc(currentPlugin);
+                targetPlayer.showTitle(Title.title(
+                        Component.text("✘ FAILLITE ✘", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                        Component.text("Mise d'entrée définitivement perdue.", NamedTextColor.RED)
+                ));
+                targetPlayer.sendMessage(Component.text("✘ FAILLITE TOTALE ! ✘ Vos jetons sont tombés à zéro. Votre droit d'entrée est perdu.", NamedTextColor.DARK_RED, TextDecoration.BOLD));
+                targetPlayer.playSound(loc, Sound.ENTITY_VILLAGER_NO, 1.0f, 0.8f);
+                targetPlayer.playSound(loc, Sound.BLOCK_ANVIL_LAND, 0.7f, 0.5f);
+            } else {
+                saveChallengeToPdc(currentPlugin);
+                if (challengeChips >= CHALLENGE_PALIER_1) {
+                    targetPlayer.sendMessage(Component.text("★ PALIER x4 ATTEINT (" + challengeChips + "/400 Jetons) ! ★ Vous pouvez encaisser 1 Cuprite dès maintenant ou continuer vers le x8 (800 Jetons pour 3 Cuprites) !", NamedTextColor.YELLOW, TextDecoration.BOLD));
+                    targetPlayer.playSound(loc, Sound.BLOCK_NOTE_BLOCK_CHIME, 1.0f, 1.2f);
+                }
+                if (challengeBet > challengeChips) {
+                    challengeBet = challengeChips;
+                }
             }
-            case PLAYER_BUST, DEALER_WIN -> {
-                // Défaite : Mise perdue
-                String reason = (result == Result.PLAYER_BUST) ? "Vous avez dépassé 21 (Bust) !" : "Le score du croupier est supérieur au vôtre.";
-                targetPlayer.sendMessage(Component.text("✘ DÉFAITE ! " + reason + " Votre mise est perdue.", NamedTextColor.RED, TextDecoration.BOLD));
-                targetPlayer.playSound(loc, Sound.ENTITY_VILLAGER_NO, 1.0f, 0.9f);
-                targetPlayer.playSound(loc, Sound.BLOCK_ANVIL_LAND, 0.5f, 0.6f);
-            }
-            default -> {}
         }
+    }
+
+    public boolean cashoutPalier1(Plugin plugin) {
+        if (challengeChips < CHALLENGE_PALIER_1) return false;
+        if (state != State.BETTING && state != State.GAME_OVER) return false;
+
+        Location loc = player.getLocation();
+        Plugin currentPlugin = (plugin != null) ? plugin : (this.plugin != null ? this.plugin : Bukkit.getPluginManager().getPlugin("NewAdventurePlugin"));
+        giveCuprite(player, 1, currentPlugin);
+
+        player.showTitle(Title.title(
+                Component.text("✔ ENCAISSEMENT x4 ✔", NamedTextColor.GOLD, TextDecoration.BOLD),
+                Component.text("1 Lingot de Cuprite sécurisé !", NamedTextColor.YELLOW)
+        ));
+        player.sendMessage(Component.text("✔ MISSION VALIDÉE ! Vous encaissez 1 Lingot de Cuprite avec un solde de " + challengeChips + " Jetons !", NamedTextColor.GREEN, TextDecoration.BOLD));
+        player.playSound(loc, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.1f);
+        player.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
+        player.spawnParticle(Particle.TOTEM_OF_UNDYING, loc.clone().add(0, 1, 0), 40, 0.5, 0.5, 0.5, 0.2);
+
+        challengeChips = 0;
+        saveChallengeToPdc(currentPlugin);
+        resetToBetting();
+        return true;
     }
 
     private void giveReward(Player targetPlayer, int multiplier) {
@@ -280,8 +426,82 @@ public class BlackjackGame {
         }
     }
 
+    private void giveCuprite(Player targetPlayer, int amount, Plugin currentPlugin) {
+        if (currentPlugin == null) return;
+        ItemStack cuprite = Cuprite.create(currentPlugin, amount);
+        HashMap<Integer, ItemStack> leftover = targetPlayer.getInventory().addItem(cuprite);
+        for (ItemStack rem : leftover.values()) {
+            targetPlayer.getWorld().dropItemNaturally(targetPlayer.getLocation(), rem);
+        }
+    }
+
+    public static boolean hasEntryItems(Player player) {
+        World.Environment env = player.getWorld().getEnvironment();
+        if (env == World.Environment.THE_END) {
+            return player.getInventory().containsAtLeast(new ItemStack(Material.DRAGON_HEAD), 1);
+        } else if (env == World.Environment.NETHER) {
+            return player.getInventory().containsAtLeast(new ItemStack(Material.GILDED_BLACKSTONE), GILDED_BLACKSTONE_COST);
+        } else {
+            return player.getInventory().containsAtLeast(new ItemStack(Material.DRAGON_HEAD), 1)
+                    || player.getInventory().containsAtLeast(new ItemStack(Material.GILDED_BLACKSTONE), GILDED_BLACKSTONE_COST);
+        }
+    }
+
+    public static boolean consumeEntryItems(Player player) {
+        World.Environment env = player.getWorld().getEnvironment();
+        if (env == World.Environment.THE_END) {
+            if (!player.getInventory().containsAtLeast(new ItemStack(Material.DRAGON_HEAD), 1)) return false;
+            player.getInventory().removeItem(new ItemStack(Material.DRAGON_HEAD, 1));
+            return true;
+        } else if (env == World.Environment.NETHER) {
+            if (!player.getInventory().containsAtLeast(new ItemStack(Material.GILDED_BLACKSTONE), GILDED_BLACKSTONE_COST)) return false;
+            player.getInventory().removeItem(new ItemStack(Material.GILDED_BLACKSTONE, GILDED_BLACKSTONE_COST));
+            return true;
+        } else {
+            if (player.getInventory().containsAtLeast(new ItemStack(Material.DRAGON_HEAD), 1)) {
+                player.getInventory().removeItem(new ItemStack(Material.DRAGON_HEAD, 1));
+                return true;
+            } else if (player.getInventory().containsAtLeast(new ItemStack(Material.GILDED_BLACKSTONE), GILDED_BLACKSTONE_COST)) {
+                player.getInventory().removeItem(new ItemStack(Material.GILDED_BLACKSTONE, GILDED_BLACKSTONE_COST));
+                return true;
+            }
+            return false;
+        }
+    }
+
+    public static String getEntryCostDescription(Player player) {
+        World.Environment env = player.getWorld().getEnvironment();
+        if (env == World.Environment.THE_END) {
+            return "1 Tête de Dragon";
+        } else if (env == World.Environment.NETHER) {
+            return GILDED_BLACKSTONE_COST + " Pierres Noires Dorées";
+        } else {
+            return "1 Tête de Dragon ou " + GILDED_BLACKSTONE_COST + " Pierres Noires Dorées";
+        }
+    }
+
+    public void loadChallengeFromPdc(Plugin plugin) {
+        if (plugin == null) return;
+        NamespacedKey key = new NamespacedKey(plugin, "casino_challenge_chips");
+        Integer chips = player.getPersistentDataContainer().get(key, PersistentDataType.INTEGER);
+        this.challengeChips = (chips != null && chips > 0) ? chips : 0;
+        if (this.challengeChips > 0 && (this.challengeBet > this.challengeChips || this.challengeBet <= 0)) {
+            this.challengeBet = Math.min(10, this.challengeChips);
+        }
+    }
+
+    public void saveChallengeToPdc(Plugin plugin) {
+        if (plugin == null) return;
+        NamespacedKey key = new NamespacedKey(plugin, "casino_challenge_chips");
+        if (challengeChips > 0) {
+            player.getPersistentDataContainer().set(key, PersistentDataType.INTEGER, challengeChips);
+        } else {
+            player.getPersistentDataContainer().remove(key);
+        }
+    }
+
     public void cancelBetAndReturn(Player targetPlayer) {
-        if (state == State.BETTING && betItem != null && !paidOut) {
+        if (mode == Mode.CLASSIC && state == State.BETTING && betItem != null && !paidOut) {
             giveReward(targetPlayer, 1);
             paidOut = true;
         }
@@ -295,7 +515,32 @@ public class BlackjackGame {
         this.result = Result.NONE;
         this.betItem = null;
         this.paidOut = false;
+        this.activeChallengeBet = 0;
+        this.jackpotWon = false;
+        if (this.challengeChips > 0 && this.challengeBet > this.challengeChips) {
+            this.challengeBet = this.challengeChips;
+        } else if (this.challengeChips > 0 && this.challengeBet <= 0) {
+            this.challengeBet = Math.min(10, this.challengeChips);
+        }
     }
+
+    public void addChallengeBet(int amount) {
+        if (state != State.BETTING) return;
+        this.challengeBet = Math.min(challengeChips, this.challengeBet + amount);
+    }
+
+    public void setChallengeBet(int amount) {
+        if (state != State.BETTING) return;
+        this.challengeBet = Math.max(1, Math.min(challengeChips, amount));
+    }
+
+    public Mode getMode() { return mode; }
+    public void setMode(Mode mode) { this.mode = mode; }
+    public int getChallengeChips() { return challengeChips; }
+    public void setChallengeChips(int challengeChips) { this.challengeChips = challengeChips; }
+    public int getChallengeBet() { return challengeBet; }
+    public int getActiveChallengeBet() { return activeChallengeBet; }
+    public boolean isJackpotWon() { return jackpotWon; }
 
     public Player getPlayer() { return player; }
     public List<Card> getPlayerHand() { return playerHand; }
