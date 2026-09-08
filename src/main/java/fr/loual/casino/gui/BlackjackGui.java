@@ -221,8 +221,10 @@ public class BlackjackGui {
                             "§7Déposez 1 Cuprite au centre"
                     );
                 } else {
+                    fr.loual.horde.HordeTier tier = game.getHordeTier();
                     playerHeader = createItem(Material.REDSTONE,
-                            Component.text("✦ Solde : §c" + game.getHordeChips() + " Jetons de Sang ✦", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                            Component.text("✦ Solde : §c" + game.getHordeChips() + " Jetons ✦", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                            "§7Niveau : " + tier.getColor() + tier.getDisplayName(),
                             "§7Objectif Horde : §c300 (x3)"
                     );
                 }
@@ -447,18 +449,19 @@ public class BlackjackGui {
                 if (game.getHordeChips() <= 0) {
                     ItemStack deposit = inv.getItem(BET_SLOT);
                     org.bukkit.plugin.Plugin currentPlugin = Bukkit.getPluginManager().getPlugin("NewAdventurePlugin");
-                    boolean valid = BlackjackGame.isValidHordeEntryItem(currentPlugin, deposit);
+                    fr.loual.horde.HordeTier tier = BlackjackGame.getHordeTierFromItem(currentPlugin, deposit);
 
-                    if (valid) {
+                    if (tier != null) {
                         inv.setItem(BUTTON_START_BET, createItem(Material.LIME_CONCRETE,
-                                Component.text("✔ Démarrer la Mission Horde", NamedTextColor.DARK_RED, TextDecoration.BOLD),
-                                "§eEntrée : §f1x Lingot de Cuprite",
-                                "§7Capital : §c100 Jetons §8(Objectif Invasion : 300)"
+                                Component.text("✔ Démarrer Horde : " + tier.getDisplayName(), tier.getColor(), TextDecoration.BOLD),
+                                "§eEntrée : §f1x " + tier.getRequiredItemName(),
+                                "§7Difficulté : " + tier.getColor() + tier.getDisplayName() + " §8| §c100 Jetons (Objectif : 300)"
                         ));
                     } else {
                         inv.setItem(BUTTON_START_BET, createItem(Material.GRAY_CONCRETE,
-                                Component.text("Lingot de Cuprite requis", NamedTextColor.GRAY, TextDecoration.BOLD),
-                                "§7Déposez §61 Lingot de Cuprite §7au centre."
+                                Component.text("Objet de Cuprite requis", NamedTextColor.GRAY, TextDecoration.BOLD),
+                                "§7Déposez §61x Lingot§7, §c1x Bloc §7ou",
+                                "§d1x Bloc Renforcé §7de Cuprite au centre."
                         ));
                     }
                 } else {

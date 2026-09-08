@@ -1,6 +1,9 @@
 package fr.loual.casino;
 
 import fr.loual.customminerals.items.Cuprite;
+import fr.loual.customminerals.items.CupriteBlock;
+import fr.loual.customminerals.items.ReinforcedCupriteBlock;
+import fr.loual.horde.HordeTier;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -86,6 +89,7 @@ public class BlackjackGame {
     private int hordeChips = 0;
     private int hordeBet = 10;
     private int activeHordeBet = 0;
+    private HordeTier hordeTier = HordeTier.INGOT;
 
     public BlackjackGame(Player player) {
         this(player, null);
@@ -566,10 +570,11 @@ public class BlackjackGame {
             }
 
             if (hordeChips >= HORDE_TARGET_CHIPS) {
-                targetPlayer.sendMessage(Component.text("☠ OBJECTIF ATTEINT (300 JETONS DE SANG) ! LA HORDE SE RÉVEILLE ! ☠", NamedTextColor.DARK_RED, TextDecoration.BOLD));
+                HordeTier tier = this.hordeTier;
+                targetPlayer.sendMessage(Component.text("☠ OBJECTIF ATTEINT (300 JETONS DE SANG) ! LA HORDE (" + tier.getDisplayName().toUpperCase() + ") SE RÉVEILLE ! ☠", tier.getColor(), TextDecoration.BOLD));
                 targetPlayer.showTitle(Title.title(
-                        Component.text("☠ INVASION DE LA HORDE ☠", NamedTextColor.DARK_RED, TextDecoration.BOLD),
-                        Component.text("Le Titan Putréfié et son armée attaquent !", NamedTextColor.RED)
+                        Component.text("☠ INVASION : " + tier.getDisplayName().toUpperCase() + " ☠", tier.getColor(), TextDecoration.BOLD),
+                        Component.text("L'armée des damnés passe à l'attaque !", NamedTextColor.RED)
                 ));
                 targetPlayer.playSound(loc, Sound.ENTITY_WITHER_SPAWN, 1.0f, 0.8f);
                 targetPlayer.playSound(loc, Sound.ENTITY_ENDER_DRAGON_GROWL, 1.0f, 0.9f);
@@ -579,17 +584,19 @@ public class BlackjackGame {
                 if (currentPlugin instanceof NewAdventurePlugin nap && nap.getHordeManager() != null) {
                     Bukkit.getScheduler().runTaskLater(currentPlugin, () -> {
                         targetPlayer.closeInventory();
-                        nap.getHordeManager().startHorde(targetPlayer, targetPlayer.getLocation());
+                        nap.getHordeManager().startHorde(targetPlayer, targetPlayer.getLocation(), tier);
                     }, 30L);
                 }
             } else if (hordeChips <= 0) {
+                HordeTier lostTier = this.hordeTier;
+                this.hordeTier = HordeTier.INGOT;
                 hordeChips = 0;
                 saveHordeToPdc(currentPlugin);
                 targetPlayer.showTitle(Title.title(
                         Component.text("✘ FAILLITE ✘", NamedTextColor.DARK_RED, TextDecoration.BOLD),
-                        Component.text("Lingot de Cuprite perdu.", NamedTextColor.RED)
+                        Component.text(lostTier.getRequiredItemName() + " perdu.", NamedTextColor.RED)
                 ));
-                targetPlayer.sendMessage(Component.text("✘ FAILLITE TOTALE ! ✘ Vos jetons de sang sont tombés à zéro. Votre Cuprite est perdue.", NamedTextColor.DARK_RED, TextDecoration.BOLD));
+                targetPlayer.sendMessage(Component.text("✘ FAILLITE TOTALE ! ✘ Vos jetons de sang sont tombés à zéro. Votre mise (" + lostTier.getDisplayName() + ") est perdue.", NamedTextColor.DARK_RED, TextDecoration.BOLD));
                 targetPlayer.playSound(loc, Sound.ENTITY_VILLAGER_NO, 1.0f, 0.8f);
                 targetPlayer.playSound(loc, Sound.BLOCK_ANVIL_LAND, 0.7f, 0.5f);
             } else {
@@ -755,8 +762,21 @@ public class BlackjackGame {
     }
 
     public static boolean isValidHordeEntryItem(Plugin plugin, ItemStack item) {
-        if (item == null || item.getType().isAir()) return false;
-        return Cuprite.isCuprite(plugin, item) && item.getAmount() >= 1;
+        return getHordeTierFromItem(plugin, item) != null;
+    }
+
+    public static HordeTier getHordeTierFromItem(Plugin plugin, ItemStack item) {
+        if (item == null || item.getType().isAir() || item.getAmount() < 1) return null;
+        if (ReinforcedCupriteBlock.isReinforcedCupriteBlock(plugin, item)) {
+            return HordeTier.REINFORCED_BLOCK;
+        }
+        if (CupriteBlock.isCupriteBlock(plugin, item)) {
+            return HordeTier.BLOCK;
+        }
+        if (Cuprite.isCuprite(plugin, item)) {
+            return HordeTier.INGOT;
+        }
+        return null;
     }
 
     public void loadChallengeFromPdc(Plugin plugin) {
@@ -782,7 +802,14 @@ public class BlackjackGame {
     public void loadHordeFromPdc(Plugin plugin) {
         if (plugin == null) return;
         NamespacedKey key = new NamespacedKey(plugin, "casino_horde_chips");
+        NamespacedKey tierKey = new NamespacedKey(plugin, "casino_horde_tier");
         Integer chips = player.getPersistentDataContainer().get(key, PersistentDataType.INTEGER);
+        String tierStr = player.getPersistentDataContainer().get(tierKey, PersistentDataType.STRING);
+        if (tierStr != null) {
+            this.hordeTier = HordeTier.fromString(tierStr);
+        } else {
+            this.hordeTier = HordeTier.INGOT;
+        }
         this.hordeChips = (chips != null && chips > 0) ? chips : 0;
         if (this.hordeChips > 0 && (this.hordeBet > this.hordeChips || this.hordeBet <= 0)) {
             this.hordeBet = Math.min(10, this.hordeChips);
@@ -792,10 +819,13 @@ public class BlackjackGame {
     public void saveHordeToPdc(Plugin plugin) {
         if (plugin == null) return;
         NamespacedKey key = new NamespacedKey(plugin, "casino_horde_chips");
+        NamespacedKey tierKey = new NamespacedKey(plugin, "casino_horde_tier");
         if (hordeChips > 0) {
             player.getPersistentDataContainer().set(key, PersistentDataType.INTEGER, hordeChips);
+            player.getPersistentDataContainer().set(tierKey, PersistentDataType.STRING, hordeTier.name());
         } else {
             player.getPersistentDataContainer().remove(key);
+            player.getPersistentDataContainer().remove(tierKey);
         }
     }
 
@@ -878,6 +908,8 @@ public class BlackjackGame {
     public void setHordeChips(int hordeChips) { this.hordeChips = hordeChips; }
     public int getHordeBet() { return hordeBet; }
     public int getActiveHordeBet() { return activeHordeBet; }
+    public HordeTier getHordeTier() { return hordeTier; }
+    public void setHordeTier(HordeTier hordeTier) { this.hordeTier = hordeTier != null ? hordeTier : HordeTier.INGOT; }
 
     public Player getPlayer() { return player; }
     public List<Card> getPlayerHand() { return playerHand; }

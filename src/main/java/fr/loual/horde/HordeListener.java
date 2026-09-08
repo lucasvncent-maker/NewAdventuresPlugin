@@ -18,8 +18,11 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
+import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 public class HordeListener implements Listener {
 
@@ -45,6 +48,62 @@ public class HordeListener implements Listener {
                 Location loc = player.getLocation().add(0, 1, 0);
                 loc.getWorld().spawnParticle(Particle.HEART, loc, 3, 0.3, 0.3, 0.3, 0.05);
                 player.playSound(loc, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6f, 1.6f);
+            } else if (HordeItems.isHordeItem(mainHand, HordeItems.ID_INQUISITOR_WRATH_BLADE)) {
+                // Onde Tellurique de l'Inquisiteur
+                Location loc = event.getEntity().getLocation();
+                loc.getWorld().playSound(loc, Sound.ENTITY_ZOMBIE_BREAK_WOODEN_DOOR, 1.2f, 0.8f);
+                loc.getWorld().spawnParticle(Particle.SWEEP_ATTACK, loc.clone().add(0, 0.5, 0), 6, 0.8, 0.2, 0.8, 0.05);
+                loc.getWorld().spawnParticle(Particle.BLOCK, loc, 20, 1.2, 0.2, 1.2, Material.COPPER_BLOCK.createBlockData());
+                for (Entity near : event.getEntity().getNearbyEntities(3.5, 2.0, 3.5)) {
+                    if (near instanceof LivingEntity target && !(near instanceof Player)) {
+                        target.damage(5.0, player);
+                        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 1));
+                    }
+                }
+            } else if (HordeItems.isHordeItem(mainHand, HordeItems.ID_APOCALYPSE_CLAYMORE)) {
+                // Fléau Stellaire de l'Apocalypse
+                Location loc = event.getEntity().getLocation();
+                loc.getWorld().playSound(loc, Sound.ENTITY_GENERIC_EXPLODE, 0.8f, 1.4f);
+                loc.getWorld().spawnParticle(Particle.FLAME, loc.clone().add(0, 0.8, 0), 30, 1.2, 0.6, 1.2, 0.08);
+                loc.getWorld().spawnParticle(Particle.LAVA, loc.clone().add(0, 0.8, 0), 10, 0.5, 0.5, 0.5, 0.02);
+                for (Entity near : event.getEntity().getNearbyEntities(4.5, 2.0, 4.5)) {
+                    if (near instanceof LivingEntity target && !(near instanceof Player)) {
+                        target.damage(8.0, player);
+                        target.setFireTicks(100);
+                    }
+                }
+            }
+        }
+
+        // Effets quand un mob spécial de la horde blesse un joueur
+        if (event.getEntity() instanceof Player victim) {
+            Entity attacker = event.getDamager();
+            if (attacker instanceof org.bukkit.entity.Projectile proj && proj.getShooter() instanceof Entity shooter) {
+                attacker = shooter;
+            }
+            if (attacker instanceof LivingEntity mob) {
+                String mobType = mob.getPersistentDataContainer().get(HordeManager.MOB_KEY, PersistentDataType.STRING);
+                if (mobType != null) {
+                    switch (mobType) {
+                        case "frost" -> {
+                            victim.setFreezeTicks(Math.max(victim.getFreezeTicks(), 140));
+                            victim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, 1));
+                        }
+                        case "storm_spider" -> {
+                            victim.getWorld().strikeLightningEffect(victim.getLocation());
+                            victim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 25, 4));
+                            victim.playSound(victim.getLocation(), Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 0.5f, 1.8f);
+                        }
+                        case "plague_archer" -> {
+                            victim.addPotionEffect(new PotionEffect(PotionEffectType.POISON, 80, 1));
+                            victim.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 60, 0));
+                        }
+                        case "infernal_brute" -> {
+                            victim.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 80, 1));
+                            victim.setFireTicks(80);
+                        }
+                    }
+                }
             }
         }
     }
@@ -52,12 +111,25 @@ public class HordeListener implements Listener {
     @EventHandler(priority = EventPriority.HIGH)
     public void onEntityDeath(EntityDeathEvent event) {
         LivingEntity entity = event.getEntity();
-        if (entity.getPersistentDataContainer().has(HordeManager.MOB_KEY, PersistentDataType.STRING)) {
+        String mobType = entity.getPersistentDataContainer().get(HordeManager.MOB_KEY, PersistentDataType.STRING);
+        if (mobType != null) {
             // Empêche les débris de mob (os, flèches, yeux, chair) de polluer l'arène
             event.getDrops().clear();
-            // Effet visuel de disparition
-            entity.getWorld().spawnParticle(Particle.SOUL, entity.getLocation().add(0, 1, 0), 10, 0.3, 0.3, 0.3, 0.05);
-            entity.getWorld().playSound(entity.getLocation(), Sound.ENTITY_ZOMBIE_VILLAGER_CONVERTED, 0.8f, 1.6f);
+
+            if ("infernal_blaze".equals(mobType)) {
+                // Déflagration pyrotechnique à la mort du Blaze
+                entity.getWorld().spawnParticle(Particle.EXPLOSION, entity.getLocation().add(0, 0.5, 0), 2);
+                entity.getWorld().spawnParticle(Particle.FLAME, entity.getLocation().add(0, 0.5, 0), 25, 0.4, 0.4, 0.4, 0.05);
+                entity.getWorld().playSound(entity.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.9f, 1.3f);
+            } else if ("frost".equals(mobType)) {
+                // Éclats de givre à la mort
+                entity.getWorld().spawnParticle(Particle.SNOWFLAKE, entity.getLocation().add(0, 0.5, 0), 25, 0.5, 0.5, 0.5, 0.05);
+                entity.getWorld().playSound(entity.getLocation(), Sound.BLOCK_GLASS_BREAK, 1.0f, 1.5f);
+            } else {
+                // Effet visuel standard de disparition
+                entity.getWorld().spawnParticle(Particle.SOUL, entity.getLocation().add(0, 1, 0), 10, 0.3, 0.3, 0.3, 0.05);
+                entity.getWorld().playSound(entity.getLocation(), Sound.ENTITY_ZOMBIE_VILLAGER_CONVERTED, 0.8f, 1.6f);
+            }
         }
     }
 

@@ -286,7 +286,8 @@ public class BlackjackListener implements Listener {
                         // Clic sur Valider l'entrée (Slot 49)
                         if (rawSlot == BlackjackGui.BUTTON_START_BET) {
                             ItemStack deposit = topInv.getItem(BlackjackGui.BET_SLOT);
-                            if (BlackjackGame.isValidHordeEntryItem(plugin, deposit)) {
+                            fr.loual.horde.HordeTier tier = BlackjackGame.getHordeTierFromItem(plugin, deposit);
+                            if (tier != null) {
                                 int remainder = deposit.getAmount() - 1;
 
                                 topInv.setItem(BlackjackGui.BET_SLOT, null);
@@ -299,16 +300,17 @@ public class BlackjackListener implements Listener {
                                     }
                                 }
 
+                                game.setHordeTier(tier);
                                 game.setHordeChips(BlackjackGame.HORDE_START_CHIPS);
                                 game.setHordeBet(10);
                                 game.saveHordeToPdc(plugin);
                                 player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
                                 player.playSound(player.getLocation(), Sound.ENTITY_WITHER_SPAWN, 0.8f, 1.2f);
-                                player.sendMessage(Component.text("✦ MISSION HORDE ACTIVÉE ! ✦ Vous recevez 100 Jetons de Sang. Atteignez 300 jetons (x3) pour invoquer la Horde !", NamedTextColor.DARK_RED, TextDecoration.BOLD));
+                                player.sendMessage(Component.text("✦ MISSION HORDE (" + tier.getDisplayName().toUpperCase() + ") ACTIVÉE ! ✦ Entrée: 1x " + tier.getRequiredItemName() + ". Vous recevez 100 Jetons de Sang. Atteignez 300 jetons (x3) pour invoquer la Horde !", tier.getColor(), TextDecoration.BOLD));
                                 BlackjackGui.render(topInv, game);
                             } else {
                                 player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
-                                player.sendMessage(Component.text("§cDéposez 1 Lingot de Cuprite au centre pour débuter la mission horde !"));
+                                player.sendMessage(Component.text("§cDéposez 1 Lingot, 1 Bloc ou 1 Bloc Renforcé de Cuprite au centre pour débuter la mission horde !"));
                             }
                         } else if (rawSlot == BlackjackGui.BUTTON_QUIT) {
                             player.closeInventory();

@@ -68,7 +68,12 @@ public class HordeCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             case "status" -> {
-                sender.sendMessage(Component.text("Statut Horde : " + (hordeManager.isHordeActive() ? "ACTIVE (Vague " + hordeManager.getCurrentWave() + "/4)" : "INACTIVE"), NamedTextColor.GOLD));
+                if (hordeManager.isHordeActive()) {
+                    sender.sendMessage(Component.text("Statut Horde : ", NamedTextColor.GOLD)
+                            .append(Component.text("ACTIVE [" + hordeManager.getCurrentTier().getDisplayName() + "] (Vague " + hordeManager.getCurrentWave() + "/4)", hordeManager.getCurrentTier().getColor(), TextDecoration.BOLD)));
+                } else {
+                    sender.sendMessage(Component.text("Statut Horde : INACTIVE", NamedTextColor.GRAY));
+                }
                 return true;
             }
             case "start" -> {
@@ -84,8 +89,19 @@ public class HordeCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage(Component.text("Une Horde est déjà active !", NamedTextColor.RED));
                     return true;
                 }
-                hordeManager.startHorde(player, player.getLocation());
-                player.sendMessage(Component.text("✦ Invasion de la Horde lancée dans l'Arène !", NamedTextColor.GREEN));
+
+                fr.loual.horde.HordeTier tier = fr.loual.horde.HordeTier.INGOT;
+                if (args.length > 1) {
+                    String param = args[1].toLowerCase();
+                    if (param.contains("reinf") || param.contains("renforc") || param.contains("apocal") || param.contains("extreme")) {
+                        tier = fr.loual.horde.HordeTier.REINFORCED_BLOCK;
+                    } else if (param.contains("bloc") || param.contains("block") || param.contains("hero")) {
+                        tier = fr.loual.horde.HordeTier.BLOCK;
+                    }
+                }
+
+                hordeManager.startHorde(player, player.getLocation(), tier);
+                player.sendMessage(Component.text("✦ Invasion de la Horde [" + tier.getDisplayName() + "] lancée dans l'Arène !", tier.getColor(), TextDecoration.BOLD));
                 return true;
             }
             case "stop" -> {
@@ -119,6 +135,13 @@ public class HordeCommand implements CommandExecutor, TabCompleter {
             }
             for (String s : options) {
                 if (s.startsWith(args[0].toLowerCase())) list.add(s);
+            }
+            return list;
+        } else if (args.length == 2 && "start".equalsIgnoreCase(args[0]) && sender.hasPermission("horde.admin")) {
+            List<String> list = new ArrayList<>();
+            List<String> tiers = List.of("standard", "heroique", "apocalypse");
+            for (String t : tiers) {
+                if (t.startsWith(args[1].toLowerCase())) list.add(t);
             }
             return list;
         }

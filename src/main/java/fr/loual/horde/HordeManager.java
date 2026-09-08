@@ -1,6 +1,9 @@
 package fr.loual.horde;
 
 import fr.loual.customminerals.items.Cuprite;
+import fr.loual.customminerals.items.CupriteBlock;
+import fr.loual.customminerals.items.ReinforcedCupriteBlock;
+import fr.loual.customminerals.items.CupriteHammer;
 import fr.loual.newadventure.NewAdventurePlugin;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
@@ -40,6 +43,10 @@ public class HordeManager {
     public static final NamespacedKey KAMIKAZE_KEY = new NamespacedKey("horde", "kamikaze");
     public static final NamespacedKey NECRO_KEY = new NamespacedKey("horde", "necromancer");
     public static final NamespacedKey BOSS_KEY = new NamespacedKey("horde", "boss");
+    public static final NamespacedKey VORTEX_KEY = new NamespacedKey("horde", "vortex");
+    public static final NamespacedKey FROST_KEY = new NamespacedKey("horde", "frost");
+    public static final NamespacedKey SUPER_KAMIKAZE_KEY = new NamespacedKey("horde", "super_kamikaze");
+    public static final NamespacedKey INFERNAL_BLAZE_KEY = new NamespacedKey("horde", "infernal_blaze");
 
     public static final int ARENA_X = 10000;
     public static final int ARENA_Y = 120;
@@ -50,6 +57,7 @@ public class HordeManager {
 
     private final NewAdventurePlugin plugin;
     private State state = State.INACTIVE;
+    private HordeTier currentTier = HordeTier.INGOT;
     private Location centerLocation;
     private int currentWave = 0;
     private int defeatCountdown = 0;
@@ -74,6 +82,10 @@ public class HordeManager {
 
     public State getState() {
         return state;
+    }
+
+    public HordeTier getCurrentTier() {
+        return currentTier;
     }
 
     public int getCurrentWave() {
@@ -241,12 +253,18 @@ public class HordeManager {
     }
 
     public void startHorde(Player initiator, Location location) {
+        startHorde(initiator, location, HordeTier.INGOT);
+    }
+
+    public void startHorde(Player initiator, Location location, HordeTier tier) {
         if (isHordeActive()) {
             if (initiator != null) {
                 initiator.sendMessage(Component.text("Une Horde des Damnés est déjà en cours dans le monde !", NamedTextColor.RED));
             }
             return;
         }
+
+        this.currentTier = (tier != null) ? tier : HordeTier.INGOT;
 
         World world = (initiator != null) ? initiator.getWorld() : ((location != null && location.getWorld() != null) ? location.getWorld() : Bukkit.getWorlds().get(0));
         if (world == null) return;
@@ -302,10 +320,10 @@ public class HordeManager {
         String initiatorName = (initiator != null) ? initiator.getName() : "Un mystérieux rituel";
         Bukkit.broadcast(Component.empty());
         Bukkit.broadcast(Component.text("☠ =================================================== ☠", NamedTextColor.DARK_RED, TextDecoration.BOLD));
-        Bukkit.broadcast(Component.text("✦ ALERTE DU CASINO : L'INVASION DE LA HORDE A DÉBUTÉ ! ✦", NamedTextColor.RED, TextDecoration.BOLD));
-        Bukkit.broadcast(Component.text("L'armée des morts-vivants déferle suite au défi de ", NamedTextColor.GOLD)
+        Bukkit.broadcast(Component.text("✦ ALERTE DU CASINO : " + currentTier.getDisplayName().toUpperCase() + " DE LA HORDE A DÉBUTÉ ! ✦", currentTier.getColor(), TextDecoration.BOLD));
+        Bukkit.broadcast(Component.text("L'armée des démons déferle suite au défi de ", NamedTextColor.GOLD)
                 .append(Component.text(initiatorName, NamedTextColor.YELLOW, TextDecoration.BOLD))
-                .append(Component.text(" !", NamedTextColor.GOLD)));
+                .append(Component.text(" (Mise: " + currentTier.getRequiredItemName() + ") !", NamedTextColor.GOLD)));
         Bukkit.broadcast(Component.text("Les combattants sont téléportés dans l'Arène des Damnés ! Tapez ", NamedTextColor.YELLOW)
                 .append(Component.text("/horde join", NamedTextColor.AQUA, TextDecoration.BOLD))
                 .append(Component.text(" pour prêter main-forte !", NamedTextColor.YELLOW)));
@@ -318,8 +336,8 @@ public class HordeManager {
                 p.playSound(centerLocation, Sound.EVENT_RAID_HORN, SoundCategory.HOSTILE, 2.0f, 0.8f);
                 p.playSound(p.getLocation(), Sound.ENTITY_WITHER_SPAWN, 1.0f, 0.8f);
                 p.showTitle(Title.title(
-                        Component.text("☠ L'ARÈNE DES DAMNÉS ☠", NamedTextColor.DARK_RED, TextDecoration.BOLD),
-                        Component.text("Préparez-vous au combat...", NamedTextColor.GOLD),
+                        Component.text("☠ " + currentTier.getDisplayName().toUpperCase() + " : L'ARÈNE ☠", currentTier.getColor(), TextDecoration.BOLD),
+                        Component.text("Préparez-vous à l'assaut...", NamedTextColor.GOLD),
                         Title.Times.times(Duration.ofMillis(500), Duration.ofSeconds(3), Duration.ofSeconds(1))
                 ));
             }
@@ -331,9 +349,9 @@ public class HordeManager {
 
         // Création de la BossBar
         bossBar = BossBar.bossBar(
-                Component.text("☠ Horde des Damnés : Préparation de l'assaut... ☠", NamedTextColor.RED, TextDecoration.BOLD),
+                Component.text("☠ Horde (" + currentTier.getDisplayName() + ") : Préparation de l'assaut... ☠", currentTier.getColor(), TextDecoration.BOLD),
                 1.0f,
-                BossBar.Color.RED,
+                currentTier == HordeTier.REINFORCED_BLOCK ? BossBar.Color.PURPLE : (currentTier == HordeTier.BLOCK ? BossBar.Color.RED : BossBar.Color.YELLOW),
                 BossBar.Overlay.NOTCHED_10
         );
 
@@ -416,10 +434,11 @@ public class HordeManager {
                 progress = Math.max(0f, Math.min(1f, progress));
                 bossBar.progress(progress);
 
+                String tierLabel = currentTier == HordeTier.INGOT ? "" : "[" + currentTier.getDisplayName() + "] ";
                 if (!allPacksSpawned) {
-                    bossBar.name(Component.text("☠ Vague " + currentWave + "/4 : " + remaining + " monstres (Renforts imminents...) ☠", NamedTextColor.RED, TextDecoration.BOLD));
+                    bossBar.name(Component.text("☠ " + tierLabel + "Vague " + currentWave + "/4 : " + remaining + " monstres (Renforts imminents...) ☠", currentTier.getColor(), TextDecoration.BOLD));
                 } else {
-                    bossBar.name(Component.text("☠ Vague " + currentWave + "/4 : " + remaining + " monstres restants ☠", NamedTextColor.RED, TextDecoration.BOLD));
+                    bossBar.name(Component.text("☠ " + tierLabel + "Vague " + currentWave + "/4 : " + remaining + " monstres restants ☠", currentTier.getColor(), TextDecoration.BOLD));
                 }
 
                 // Si plus aucun monstre dans la vague et que tous les packs sont sortis -> Vague suivante
@@ -427,7 +446,6 @@ public class HordeManager {
                     state = State.WAVE_CLEARED;
                     onWaveCleared();
                 } else {
-                    // Particules kamikaze et spéciaux
                     tickSpecialMobs();
                 }
             } else if (currentWave == 4) {
@@ -440,7 +458,11 @@ public class HordeManager {
                     double maxHp = (maxAttr != null) ? maxAttr.getValue() : 300.0;
                     float progress = (float) Math.max(0f, Math.min(1f, hp / maxHp));
                     bossBar.progress(progress);
-                    bossBar.name(Component.text("☠ LE TITAN PUTRÉFIÉ : " + (int) hp + " / " + (int) maxHp + " HP ☠", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
+
+                    Component bName = bossEntity.customName() != null ? bossEntity.customName() : Component.text("LE BOSS");
+                    bossBar.name(Component.text("☠ ", currentTier.getColor(), TextDecoration.BOLD)
+                            .append(bName)
+                            .append(Component.text(" : " + (int) hp + " / " + (int) maxHp + " HP ☠", currentTier.getColor(), TextDecoration.BOLD)));
 
                     tickBossSkills();
                 }
@@ -454,14 +476,13 @@ public class HordeManager {
             if (entity == null || !entity.isValid()) continue;
 
             if (entity instanceof Zombie zombie) {
-                // Kamikaze
+                // Kamikaze classique
                 if (zombie.getPersistentDataContainer().has(KAMIKAZE_KEY, PersistentDataType.BYTE)) {
                     zombie.getWorld().spawnParticle(Particle.SMOKE, zombie.getLocation().add(0, 1.2, 0), 4, 0.1, 0.1, 0.1, 0.02);
                     zombie.getWorld().spawnParticle(Particle.FLAME, zombie.getLocation().add(0, 1.2, 0), 2, 0.1, 0.1, 0.1, 0.01);
 
                     Player nearest = findNearestPlayer(zombie.getLocation(), 2.8);
                     if (nearest != null) {
-                        // Explose !
                         Location loc = zombie.getLocation();
                         loc.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, loc, 1);
                         loc.getWorld().playSound(loc, Sound.ENTITY_GENERIC_EXPLODE, 1.2f, 1.0f);
@@ -471,9 +492,68 @@ public class HordeManager {
                     }
                 }
 
+                // Super-Kamikaze (Explosion massive)
+                if (zombie.getPersistentDataContainer().has(SUPER_KAMIKAZE_KEY, PersistentDataType.BYTE)) {
+                    zombie.getWorld().spawnParticle(Particle.SMOKE, zombie.getLocation().add(0, 1.2, 0), 8, 0.2, 0.2, 0.2, 0.04);
+                    zombie.getWorld().spawnParticle(Particle.FLAME, zombie.getLocation().add(0, 1.2, 0), 6, 0.2, 0.2, 0.2, 0.03);
+
+                    Player nearest = findNearestPlayer(zombie.getLocation(), 3.0);
+                    if (nearest != null) {
+                        Location loc = zombie.getLocation();
+                        loc.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, loc, 2);
+                        loc.getWorld().playSound(loc, Sound.ENTITY_GENERIC_EXPLODE, 1.5f, 0.7f);
+                        loc.getWorld().createExplosion(loc, 4.5f, false, false);
+                        zombie.remove();
+                        activeMobs.remove(uuid);
+                    }
+                }
+
+                // Zombie Vortex / Gravitationnel
+                if (zombie.getPersistentDataContainer().has(VORTEX_KEY, PersistentDataType.BYTE)) {
+                    zombie.getWorld().spawnParticle(Particle.PORTAL, zombie.getLocation().add(0, 1.2, 0), 5, 0.3, 0.3, 0.3, 0.1);
+                    if (Math.random() < 0.25) { // Toutes les ~4 secondes
+                        Location zLoc = zombie.getLocation();
+                        zLoc.getWorld().playSound(zLoc, Sound.BLOCK_BEACON_POWER_SELECT, 1.3f, 1.8f);
+                        zLoc.getWorld().spawnParticle(Particle.REVERSE_PORTAL, zLoc.clone().add(0, 1, 0), 35, 1.5, 0.8, 1.5, 0.08);
+                        for (Entity e : zombie.getNearbyEntities(9.0, 4.0, 9.0)) {
+                            if (e instanceof Player p) {
+                                Vector pull = zLoc.toVector().subtract(p.getLocation().toVector()).normalize().multiply(0.7).setY(0.25);
+                                p.setVelocity(pull);
+                                p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 1));
+                                p.sendActionBar(Component.text("⚠ Le Vortex magnétique vous attire vers le danger !", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
+                            }
+                        }
+                    }
+                }
+
+                // Zombie Frimaire / Cryomancien
+                if (zombie.getPersistentDataContainer().has(FROST_KEY, PersistentDataType.BYTE)) {
+                    zombie.getWorld().spawnParticle(Particle.SNOWFLAKE, zombie.getLocation().add(0, 1.2, 0), 3, 0.2, 0.3, 0.2, 0.02);
+                    for (Entity e : zombie.getNearbyEntities(3.5, 2.0, 3.5)) {
+                        if (e instanceof Player p) {
+                            p.setFreezeTicks(Math.max(p.getFreezeTicks(), 140));
+                            p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 30, 0));
+                        }
+                    }
+                }
+
                 // Nécromancien
                 if (zombie.getPersistentDataContainer().has(NECRO_KEY, PersistentDataType.BYTE)) {
                     zombie.getWorld().spawnParticle(Particle.WITCH, zombie.getLocation().add(0, 1.5, 0), 3, 0.2, 0.3, 0.2, 0.02);
+                }
+            } else if (entity instanceof Blaze blaze) {
+                // Blaze Infernal
+                if (blaze.getPersistentDataContainer().has(INFERNAL_BLAZE_KEY, PersistentDataType.BYTE)) {
+                    blaze.getWorld().spawnParticle(Particle.LAVA, blaze.getLocation().add(0, 0.8, 0), 2, 0.2, 0.2, 0.2, 0.01);
+                    if (Math.random() < 0.3) {
+                        Player nearest = findNearestPlayer(blaze.getLocation(), 16.0);
+                        if (nearest != null) {
+                            Vector dir = nearest.getLocation().add(0, 1.0, 0).toVector().subtract(blaze.getLocation().add(0, 1.0, 0).toVector()).normalize();
+                            SmallFireball fireball = blaze.launchProjectile(SmallFireball.class, dir.multiply(0.85));
+                            fireball.setShooter(blaze);
+                            blaze.getWorld().playSound(blaze.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 1.0f, 1.2f);
+                        }
+                    }
                 }
             } else if (entity instanceof WitherSkeleton ws) {
                 // Faucheur d'âmes
@@ -481,9 +561,21 @@ public class HordeManager {
                     ws.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME, ws.getLocation().add(0, 1.2, 0), 2, 0.15, 0.2, 0.15, 0.01);
                 }
             } else if (entity instanceof PiglinBrute pb) {
-                // Bourreau enragé
+                // Bourreau enragé / démoniaque
                 if (Math.random() < 0.2) {
                     pb.getWorld().spawnParticle(Particle.ANGRY_VILLAGER, pb.getLocation().add(0, 2.0, 0), 1, 0.1, 0.1, 0.1, 0);
+                }
+            } else if (entity instanceof AbstractSkeleton skeleton) {
+                // Squelette Pesteur
+                String type = skeleton.getPersistentDataContainer().get(MOB_KEY, PersistentDataType.STRING);
+                if ("plague_archer".equals(type)) {
+                    skeleton.getWorld().spawnParticle(Particle.SPORE_BLOSSOM_AIR, skeleton.getLocation().add(0, 1.2, 0), 4, 0.3, 0.4, 0.3, 0.02);
+                }
+            } else if (entity instanceof Spider spider) {
+                // Veuve des tempêtes
+                String type = spider.getPersistentDataContainer().get(MOB_KEY, PersistentDataType.STRING);
+                if ("storm_spider".equals(type)) {
+                    spider.getWorld().spawnParticle(Particle.ELECTRIC_SPARK, spider.getLocation().add(0, 0.5, 0), 3, 0.2, 0.2, 0.2, 0.05);
                 }
             }
         }
@@ -493,50 +585,138 @@ public class HordeManager {
         if (bossEntity == null || !bossEntity.isValid()) return;
         bossSkillCooldown++;
 
-        // Particules permanentes autour du Boss
         Location bLoc = bossEntity.getLocation();
         bLoc.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME, bLoc.clone().add(0, 1.0, 0), 6, 0.5, 0.8, 0.5, 0.02);
 
         if (bossSkillCooldown >= 8) { // Toutes les 8 secondes
             bossSkillCooldown = 0;
-            int skill = (int) (Math.random() * 3);
 
-            if (skill == 0) {
-                // Compétence 1 : Onde Sismique
-                bLoc.getWorld().playSound(bLoc, Sound.ENTITY_ZOMBIE_BREAK_WOODEN_DOOR, 1.5f, 0.6f);
-                bLoc.getWorld().playSound(bLoc, Sound.ENTITY_WIND_CHARGE_WIND_BURST, 1.5f, 0.8f);
-                bLoc.getWorld().spawnParticle(Particle.SWEEP_ATTACK, bLoc.clone().add(0, 0.5, 0), 10, 2.0, 0.2, 2.0, 0.1);
-                bLoc.getWorld().spawnParticle(Particle.BLOCK, bLoc, 40, 2.5, 0.2, 2.5, Material.DIRT.createBlockData());
-
-                for (Entity e : bossEntity.getNearbyEntities(8.0, 4.0, 8.0)) {
-                    if (e instanceof Player p) {
-                        Vector vec = p.getLocation().toVector().subtract(bLoc.toVector()).normalize().multiply(1.3).setY(0.7);
-                        p.setVelocity(vec);
-                        p.damage(6.0, bossEntity);
-                        p.sendMessage(Component.text("✦ Le Titan Putréfié frappe le sol avec fracas !", NamedTextColor.RED));
+            if (currentTier == HordeTier.INGOT) {
+                // Compétences Tier 1 : Titan Putréfié
+                int skill = (int) (Math.random() * 3);
+                if (skill == 0) {
+                    // Onde Sismique
+                    bLoc.getWorld().playSound(bLoc, Sound.ENTITY_ZOMBIE_BREAK_WOODEN_DOOR, 1.5f, 0.6f);
+                    bLoc.getWorld().playSound(bLoc, Sound.ENTITY_WIND_CHARGE_WIND_BURST, 1.5f, 0.8f);
+                    bLoc.getWorld().spawnParticle(Particle.SWEEP_ATTACK, bLoc.clone().add(0, 0.5, 0), 10, 2.0, 0.2, 2.0, 0.1);
+                    bLoc.getWorld().spawnParticle(Particle.BLOCK, bLoc, 40, 2.5, 0.2, 2.5, Material.DIRT.createBlockData());
+                    for (Entity e : bossEntity.getNearbyEntities(8.0, 4.0, 8.0)) {
+                        if (e instanceof Player p) {
+                            Vector vec = p.getLocation().toVector().subtract(bLoc.toVector()).normalize().multiply(1.3).setY(0.7);
+                            p.setVelocity(vec);
+                            p.damage(6.0, bossEntity);
+                            p.sendMessage(Component.text("✦ Le Titan Putréfié frappe le sol avec fracas !", NamedTextColor.RED));
+                        }
+                    }
+                } else if (skill == 1) {
+                    // Éveil des Ombres
+                    bLoc.getWorld().playSound(bLoc, Sound.ENTITY_WITHER_AMBIENT, 1.2f, 1.4f);
+                    bLoc.getWorld().spawnParticle(Particle.SOUL, bLoc.clone().add(0, 1.0, 0), 25, 1.0, 0.5, 1.0, 0.05);
+                    for (int i = 0; i < 3; i++) {
+                        double angle = Math.random() * Math.PI * 2;
+                        double dist = 2.5 + Math.random() * 3.0;
+                        Location spawnLoc = bLoc.clone().add(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+                        spawnMinion(spawnLoc);
+                    }
+                } else {
+                    // Brume Putride
+                    bLoc.getWorld().playSound(bLoc, Sound.BLOCK_BREWING_STAND_BREW, 1.5f, 0.5f);
+                    bLoc.getWorld().spawnParticle(Particle.ENTITY_EFFECT, bLoc.clone().add(0, 1.0, 0), 50, 4.0, 1.0, 4.0, Color.fromRGB(75, 0, 130));
+                    for (Entity e : bossEntity.getNearbyEntities(6.0, 3.0, 6.0)) {
+                        if (e instanceof Player p) {
+                            p.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 100, 0));
+                            p.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 80, 0));
+                            p.sendMessage(Component.text("✦ Une brume mortelle émane du Titan Putréfié !", NamedTextColor.DARK_PURPLE));
+                        }
                     }
                 }
-            } else if (skill == 1) {
-                // Compétence 2 : Éveil des Ombres (Invoque 3 zombies)
-                bLoc.getWorld().playSound(bLoc, Sound.ENTITY_WITHER_AMBIENT, 1.2f, 1.4f);
-                bLoc.getWorld().spawnParticle(Particle.SOUL, bLoc.clone().add(0, 1.0, 0), 25, 1.0, 0.5, 1.0, 0.05);
-
-                for (int i = 0; i < 3; i++) {
-                    double angle = Math.random() * Math.PI * 2;
-                    double dist = 2.5 + Math.random() * 3.0;
-                    Location spawnLoc = bLoc.clone().add(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
-                    spawnMinion(spawnLoc);
+            } else if (currentTier == HordeTier.BLOCK) {
+                // Compétences Tier 2 : Général Inquisiteur
+                int skill = (int) (Math.random() * 3);
+                if (skill == 0) {
+                    // Vortex & Écrasement Inquisiteur
+                    bLoc.getWorld().playSound(bLoc, Sound.BLOCK_BEACON_POWER_SELECT, 1.5f, 1.2f);
+                    bLoc.getWorld().playSound(bLoc, Sound.ENTITY_ZOMBIE_BREAK_WOODEN_DOOR, 1.5f, 0.5f);
+                    bLoc.getWorld().spawnParticle(Particle.REVERSE_PORTAL, bLoc.clone().add(0, 1, 0), 50, 3.0, 1.5, 3.0, 0.1);
+                    for (Entity e : bossEntity.getNearbyEntities(10.0, 5.0, 10.0)) {
+                        if (e instanceof Player p) {
+                            Vector pull = bLoc.toVector().subtract(p.getLocation().toVector()).normalize().multiply(1.1).setY(0.4);
+                            p.setVelocity(pull);
+                            p.damage(7.0, bossEntity);
+                            p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 1));
+                            p.sendMessage(Component.text("✦ Le Général Inquisiteur déploie une onde gravitationnelle !", NamedTextColor.RED));
+                        }
+                    }
+                } else if (skill == 1) {
+                    // Mâchoires des Abysses
+                    bLoc.getWorld().playSound(bLoc, Sound.ENTITY_EVOKER_FANGS_ATTACK, 1.4f, 0.8f);
+                    World w = bLoc.getWorld();
+                    for (int i = 0; i < 8; i++) {
+                        double angle = i * (Math.PI / 4.0);
+                        Location fangLoc = bLoc.clone().add(Math.cos(angle) * 3.5, 0, Math.sin(angle) * 3.5);
+                        w.spawn(fangLoc, EvokerFangs.class);
+                    }
+                    for (Player p : w.getPlayers()) {
+                        if (isInArena(p.getLocation())) {
+                            w.spawn(p.getLocation(), EvokerFangs.class);
+                            p.sendMessage(Component.text("✦ Les mâchoires de l'Inquisition jaillissent du sol !", NamedTextColor.GOLD));
+                        }
+                    }
+                } else {
+                    // Invocations du Conseil (1 Frimaire + 1 Vortex)
+                    bLoc.getWorld().playSound(bLoc, Sound.ENTITY_WITHER_SPAWN, 1.0f, 1.5f);
+                    spawnFrostZombies(bLoc.getWorld(), 1);
+                    spawnVortexZombies(bLoc.getWorld(), 1);
                 }
             } else {
-                // Compétence 3 : Brume Putride (Poison & Wither)
-                bLoc.getWorld().playSound(bLoc, Sound.BLOCK_BREWING_STAND_BREW, 1.5f, 0.5f);
-                bLoc.getWorld().spawnParticle(Particle.ENTITY_EFFECT, bLoc.clone().add(0, 1.0, 0), 50, 4.0, 1.0, 4.0, Color.fromRGB(75, 0, 130));
-
-                for (Entity e : bossEntity.getNearbyEntities(6.0, 3.0, 6.0)) {
-                    if (e instanceof Player p) {
-                        p.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 100, 0));
-                        p.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 80, 0));
-                        p.sendMessage(Component.text("✦ Une brume mortelle émane du Titan Putréfié !", NamedTextColor.DARK_PURPLE));
+                // Compétences Tier 3 : L'Archidémon de Cuprite
+                int skill = (int) (Math.random() * 4);
+                if (skill == 0) {
+                    // Cataclysme Solaire (Pluie de Météores)
+                    bLoc.getWorld().playSound(bLoc, Sound.ENTITY_GHAST_SHOOT, 1.5f, 0.6f);
+                    for (Player p : bLoc.getWorld().getPlayers()) {
+                        if (isInArena(p.getLocation())) {
+                            for (int i = 0; i < 2; i++) {
+                                Location dropLoc = p.getLocation().clone().add((Math.random() - 0.5) * 4, 9, (Math.random() - 0.5) * 4);
+                                SmallFireball fb = bLoc.getWorld().spawn(dropLoc, SmallFireball.class);
+                                fb.setVelocity(new Vector(0, -0.9, 0));
+                                fb.setShooter(bossEntity);
+                            }
+                            p.sendMessage(Component.text("✦ Des météores de feu solaire s'abattent du ciel !", NamedTextColor.GOLD, TextDecoration.BOLD));
+                        }
+                    }
+                } else if (skill == 1) {
+                    // Nova Tellurique Infernale
+                    bLoc.getWorld().playSound(bLoc, Sound.ENTITY_GENERIC_EXPLODE, 1.5f, 0.5f);
+                    bLoc.getWorld().playSound(bLoc, Sound.ENTITY_RAVAGER_ROAR, 1.5f, 0.7f);
+                    bLoc.getWorld().spawnParticle(Particle.FLAME, bLoc.clone().add(0, 1, 0), 80, 4.0, 1.5, 4.0, 0.1);
+                    bLoc.getWorld().spawnParticle(Particle.LAVA, bLoc.clone().add(0, 1, 0), 30, 2.5, 1.0, 2.5, 0.05);
+                    for (Entity e : bossEntity.getNearbyEntities(10.0, 5.0, 10.0)) {
+                        if (e instanceof Player p) {
+                            Vector launch = p.getLocation().toVector().subtract(bLoc.toVector()).normalize().multiply(1.2).setY(0.9);
+                            p.setVelocity(launch);
+                            p.damage(10.0, bossEntity);
+                            p.setFireTicks(100);
+                            p.sendMessage(Component.text("✦ L'Archidémon libère une Nova Tellurique destructrice !", NamedTextColor.RED, TextDecoration.BOLD));
+                        }
+                    }
+                } else if (skill == 2) {
+                    // Faille Démoniaque (2 Blazes + 1 Super Kamikaze)
+                    bLoc.getWorld().playSound(bLoc, Sound.ENTITY_BLAZE_DEATH, 1.2f, 0.6f);
+                    spawnInfernalBlazes(bLoc.getWorld(), 2);
+                    spawnSuperKamikazes(bLoc.getWorld(), 1);
+                } else {
+                    // Déchirement Spectral (Téléportation furtive)
+                    Player target = findNearestPlayer(bLoc, 18.0);
+                    if (target != null) {
+                        Vector backDir = target.getLocation().getDirection().multiply(-1.5);
+                        Location tpLoc = target.getLocation().clone().add(backDir);
+                        tpLoc.setY(ARENA_Y + 1.0);
+                        bossEntity.teleport(tpLoc);
+                        bLoc.getWorld().playSound(tpLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.5f, 0.6f);
+                        bLoc.getWorld().strikeLightningEffect(tpLoc);
+                        target.damage(8.0, bossEntity);
+                        target.sendMessage(Component.text("✦ L'Archidémon surgit dans votre dos avec violence !", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
                     }
                 }
             }
@@ -583,13 +763,13 @@ public class HordeManager {
         if (world == null) return;
 
         if (currentWave < 4) {
-            bossBar.color(BossBar.Color.RED);
-            bossBar.name(Component.text("☠ Vague " + currentWave + "/4 en cours... ☠", NamedTextColor.RED, TextDecoration.BOLD));
+            bossBar.color(currentTier == HordeTier.REINFORCED_BLOCK ? BossBar.Color.PURPLE : (currentTier == HordeTier.BLOCK ? BossBar.Color.RED : BossBar.Color.YELLOW));
+            bossBar.name(Component.text("☠ [" + currentTier.getDisplayName() + "] Vague " + currentWave + "/4 en cours... ☠", currentTier.getColor(), TextDecoration.BOLD));
             spawnWave(currentWave);
         } else {
             // Vague 4 : Boss !
-            bossBar.color(BossBar.Color.PURPLE);
-            bossBar.name(Component.text("☠ LE TITAN PUTRÉFIÉ ARRIVE ! ☠", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
+            bossBar.color(currentTier == HordeTier.REINFORCED_BLOCK ? BossBar.Color.PURPLE : (currentTier == HordeTier.BLOCK ? BossBar.Color.RED : BossBar.Color.PURPLE));
+            bossBar.name(Component.text("☠ L'ASSASSIN DES DAMNÉS ARRIVE ! ☠", currentTier.getColor(), TextDecoration.BOLD));
             spawnBoss();
         }
     }
@@ -598,15 +778,23 @@ public class HordeManager {
         World world = centerLocation.getWorld();
         if (world == null) return;
 
+        if (currentTier == HordeTier.BLOCK) {
+            spawnWaveBlock(world, wave);
+        } else if (currentTier == HordeTier.REINFORCED_BLOCK) {
+            spawnWaveReinforced(world, wave);
+        } else {
+            spawnWaveIngot(world, wave);
+        }
+    }
+
+    private void spawnWaveIngot(World world, int wave) {
         switch (wave) {
             case 1 -> {
                 // Vague 1 (Total : 16 mobs)
                 totalWaveMobs = 16;
-                // Pack 1 (t=0s) : 4 Éclaireurs + 2 Rôdeurs
                 spawnScouts(world, 4);
                 spawnArchers(world, 2);
 
-                // Pack 2 (t=7s / 140 ticks) : 3 Éclaireurs + 2 Rôdeurs + 2 Araignées
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 1) return;
                     announceReinforcements(world);
@@ -615,7 +803,6 @@ public class HordeManager {
                     spawnSpiders(world, 2);
                 }, 140L));
 
-                // Pack 3 (t=15s / 300 ticks) : 3 Araignées + 2 Rôdeurs
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 1) return;
                     announceReinforcements(world);
@@ -627,11 +814,9 @@ public class HordeManager {
             case 2 -> {
                 // Vague 2 (Total : 16 mobs)
                 totalWaveMobs = 16;
-                // Pack 1 (t=0s) : 3 Briseurs + 3 Rôdeurs
                 spawnBreakers(world, 3);
                 spawnArchers(world, 3);
 
-                // Pack 2 (t=8s / 160 ticks) : 2 Faucheurs + 2 Kamikazes + 1 Briseur
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 2) return;
                     announceReinforcements(world);
@@ -640,7 +825,6 @@ public class HordeManager {
                     spawnBreakers(world, 1);
                 }, 160L));
 
-                // Pack 3 (t=16s / 320 ticks) : 2 Faucheurs + 2 Kamikazes + 1 Briseur
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 2) return;
                     announceReinforcements(world);
@@ -653,11 +837,9 @@ public class HordeManager {
             case 3 -> {
                 // Vague 3 (Total : 16 mobs)
                 totalWaveMobs = 16;
-                // Pack 1 (t=0s) : 3 Gardes d'Élite + 3 Faucheurs
                 spawnElites(world, 3);
                 spawnReapers(world, 3);
 
-                // Pack 2 (t=8s / 160 ticks) : 2 Bourreaux + 2 Nécromanciens + 1 Garde d'Élite
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 3) return;
                     announceReinforcements(world);
@@ -666,7 +848,6 @@ public class HordeManager {
                     spawnElites(world, 1);
                 }, 160L));
 
-                // Pack 3 (t=16s / 320 ticks) : 2 Bourreaux + 2 Rôdeurs + 1 Kamikaze
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 3) return;
                     announceReinforcements(world);
@@ -679,10 +860,178 @@ public class HordeManager {
         }
     }
 
+    private void spawnWaveBlock(World world, int wave) {
+        switch (wave) {
+            case 1 -> {
+                totalWaveMobs = 18;
+                // Pack 1 (t=0s) : 4 Briseurs + 2 Rôdeurs
+                spawnBreakers(world, 4);
+                spawnArchers(world, 2);
+
+                // Pack 2 (t=7s / 140 ticks) : 3 Éclaireurs + 2 Squelettes Pesteurs + 2 Zombies Vortex
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 1) return;
+                    announceReinforcements(world);
+                    spawnScouts(world, 3);
+                    spawnPlagueArchers(world, 2);
+                    spawnVortexZombies(world, 2);
+                }, 140L));
+
+                // Pack 3 (t=15s / 300 ticks) : 3 Araignées + 2 Zombies Frimaires
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 1) return;
+                    announceReinforcements(world);
+                    spawnSpiders(world, 3);
+                    spawnFrostZombies(world, 2);
+                    allPacksSpawned = true;
+                }, 300L));
+            }
+            case 2 -> {
+                totalWaveMobs = 18;
+                // Pack 1 (t=0s) : 3 Faucheurs + 3 Squelettes Pesteurs
+                spawnReapers(world, 3);
+                spawnPlagueArchers(world, 3);
+
+                // Pack 2 (t=8s / 160 ticks) : 2 Bourreaux + 2 Kamikazes + 2 Zombies Vortex
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 2) return;
+                    announceReinforcements(world);
+                    spawnBrutes(world, 2);
+                    spawnKamikazes(world, 2);
+                    spawnVortexZombies(world, 2);
+                }, 160L));
+
+                // Pack 3 (t=16s / 320 ticks) : 2 Faucheurs + 2 Zombies Frimaires + 2 Kamikazes
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 2) return;
+                    announceReinforcements(world);
+                    spawnReapers(world, 2);
+                    spawnFrostZombies(world, 2);
+                    spawnKamikazes(world, 2);
+                    allPacksSpawned = true;
+                }, 320L));
+            }
+            case 3 -> {
+                totalWaveMobs = 18;
+                // Pack 1 (t=0s) : 4 Gardes d'Élite + 2 Zombies Vortex
+                spawnElites(world, 4);
+                spawnVortexZombies(world, 2);
+
+                // Pack 2 (t=8s / 160 ticks) : 3 Bourreaux + 2 Nécromanciens + 2 Zombies Frimaires
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 3) return;
+                    announceReinforcements(world);
+                    spawnBrutes(world, 3);
+                    spawnNecromancers(world, 2);
+                    spawnFrostZombies(world, 2);
+                }, 160L));
+
+                // Pack 3 (t=16s / 320 ticks) : 2 Gardes d'Élite + 2 Squelettes Pesteurs + 1 Super-Kamikaze
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 3) return;
+                    announceReinforcements(world);
+                    spawnElites(world, 2);
+                    spawnPlagueArchers(world, 2);
+                    spawnSuperKamikazes(world, 1);
+                    allPacksSpawned = true;
+                }, 320L));
+            }
+        }
+    }
+
+    private void spawnWaveReinforced(World world, int wave) {
+        switch (wave) {
+            case 1 -> {
+                totalWaveMobs = 20;
+                // Pack 1 (t=0s) : 4 Faucheurs + 3 Squelettes Pesteurs
+                spawnReapers(world, 4);
+                spawnPlagueArchers(world, 3);
+
+                // Pack 2 (t=7s / 140 ticks) : 3 Veuves des Tempêtes + 2 Blazes Infernaux + 2 Zombies Vortex
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 1) return;
+                    announceReinforcements(world);
+                    spawnStormSpiders(world, 3);
+                    spawnInfernalBlazes(world, 2);
+                    spawnVortexZombies(world, 2);
+                }, 140L));
+
+                // Pack 3 (t=15s / 300 ticks) : 3 Bourreaux Démoniaques + 3 Zombies Frimaires
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 1) return;
+                    announceReinforcements(world);
+                    spawnInfernalBrutes(world, 3);
+                    spawnFrostZombies(world, 3);
+                    allPacksSpawned = true;
+                }, 300L));
+            }
+            case 2 -> {
+                totalWaveMobs = 20;
+                // Pack 1 (t=0s) : 4 Gardes d'Élite + 2 Blazes Infernaux
+                spawnElites(world, 4);
+                spawnInfernalBlazes(world, 2);
+
+                // Pack 2 (t=8s / 160 ticks) : 3 Bourreaux Démoniaques + 2 Super-Kamikazes + 2 Zombies Vortex
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 2) return;
+                    announceReinforcements(world);
+                    spawnInfernalBrutes(world, 3);
+                    spawnSuperKamikazes(world, 2);
+                    spawnVortexZombies(world, 2);
+                }, 160L));
+
+                // Pack 3 (t=16s / 320 ticks) : 3 Veuves des Tempêtes + 2 Blazes Infernaux + 2 Squelettes Pesteurs
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 2) return;
+                    announceReinforcements(world);
+                    spawnStormSpiders(world, 3);
+                    spawnInfernalBlazes(world, 2);
+                    spawnPlagueArchers(world, 2);
+                    allPacksSpawned = true;
+                }, 320L));
+            }
+            case 3 -> {
+                totalWaveMobs = 20;
+                // Pack 1 (t=0s) : 4 Bourreaux Démoniaques + 3 Blazes Infernaux
+                spawnInfernalBrutes(world, 4);
+                spawnInfernalBlazes(world, 3);
+
+                // Pack 2 (t=8s / 160 ticks) : 3 Nécromanciens + 2 Super-Kamikazes + 2 Zombies Vortex
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 3) return;
+                    announceReinforcements(world);
+                    spawnNecromancers(world, 3);
+                    spawnSuperKamikazes(world, 2);
+                    spawnVortexZombies(world, 2);
+                }, 160L));
+
+                // Pack 3 (t=16s / 320 ticks) : 2 Bourreaux Démoniaques + 2 Veuves des Tempêtes + 2 Zombies Frimaires
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 3) return;
+                    announceReinforcements(world);
+                    spawnInfernalBrutes(world, 2);
+                    spawnStormSpiders(world, 2);
+                    spawnFrostZombies(world, 2);
+                    allPacksSpawned = true;
+                }, 320L));
+            }
+        }
+    }
+
     private void spawnBoss() {
         World world = centerLocation.getWorld();
         if (world == null) return;
 
+        if (currentTier == HordeTier.BLOCK) {
+            spawnBossBlock(world);
+        } else if (currentTier == HordeTier.REINFORCED_BLOCK) {
+            spawnBossReinforced(world);
+        } else {
+            spawnBossIngot(world);
+        }
+    }
+
+    private void spawnBossIngot(World world) {
         allPacksSpawned = true;
 
         Location bossLoc = centerLocation.clone().add(0, 1, 0);
@@ -695,34 +1044,20 @@ public class HordeManager {
         boss.setRemoveWhenFarAway(false);
         boss.setPersistent(true);
 
-        // Attributs colossaux
         AttributeInstance hpAttr = boss.getAttribute(Attribute.MAX_HEALTH);
         if (hpAttr != null) {
             hpAttr.setBaseValue(300.0);
             boss.setHealth(300.0);
         }
-
         AttributeInstance scaleAttr = boss.getAttribute(Attribute.SCALE);
-        if (scaleAttr != null) {
-            scaleAttr.setBaseValue(1.65); // Géant imposant !
-        }
-
+        if (scaleAttr != null) scaleAttr.setBaseValue(1.65);
         AttributeInstance knockAttr = boss.getAttribute(Attribute.KNOCKBACK_RESISTANCE);
-        if (knockAttr != null) {
-            knockAttr.setBaseValue(0.9);
-        }
-
+        if (knockAttr != null) knockAttr.setBaseValue(0.9);
         AttributeInstance speedAttr = boss.getAttribute(Attribute.MOVEMENT_SPEED);
-        if (speedAttr != null) {
-            speedAttr.setBaseValue(0.28);
-        }
-
+        if (speedAttr != null) speedAttr.setBaseValue(0.28);
         AttributeInstance dmgAttr = boss.getAttribute(Attribute.ATTACK_DAMAGE);
-        if (dmgAttr != null) {
-            dmgAttr.setBaseValue(12.0);
-        }
+        if (dmgAttr != null) dmgAttr.setBaseValue(12.0);
 
-        // Équipement du Boss
         var inv = boss.getEquipment();
         if (inv != null) {
             inv.setHelmet(new ItemStack(Material.NETHERITE_HELMET));
@@ -743,8 +1078,6 @@ public class HordeManager {
         this.bossEntity = boss;
         this.activeMobs.add(boss.getUniqueId());
 
-        // Renforts programmés pendant le combat de Boss
-        // Renfort 1 (t=12s / 240 ticks) : 2 Gardes d'Élite + 2 Rôdeurs
         waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (state != State.WAVE_IN_PROGRESS || currentWave != 4) return;
             announceReinforcements(world);
@@ -752,12 +1085,142 @@ public class HordeManager {
             spawnArchers(world, 2);
         }, 240L));
 
-        // Renfort 2 (t=26s / 520 ticks) : 2 Bourreaux + 2 Kamikazes
         waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (state != State.WAVE_IN_PROGRESS || currentWave != 4) return;
             announceReinforcements(world);
             spawnBrutes(world, 2);
             spawnKamikazes(world, 2);
+        }, 520L));
+    }
+
+    private void spawnBossBlock(World world) {
+        allPacksSpawned = true;
+
+        Location bossLoc = centerLocation.clone().add(0, 1, 0);
+        world.strikeLightningEffect(bossLoc);
+        world.playSound(bossLoc, Sound.ENTITY_WITHER_SPAWN, 2.0f, 0.6f);
+
+        Zombie boss = (Zombie) world.spawnEntity(bossLoc, EntityType.ZOMBIE);
+        boss.customName(Component.text("☠ LE GÉNÉRAL INQUISITEUR ☠", NamedTextColor.RED, TextDecoration.BOLD));
+        boss.setCustomNameVisible(true);
+        boss.setRemoveWhenFarAway(false);
+        boss.setPersistent(true);
+
+        AttributeInstance hpAttr = boss.getAttribute(Attribute.MAX_HEALTH);
+        if (hpAttr != null) {
+            hpAttr.setBaseValue(450.0);
+            boss.setHealth(450.0);
+        }
+        AttributeInstance scaleAttr = boss.getAttribute(Attribute.SCALE);
+        if (scaleAttr != null) scaleAttr.setBaseValue(1.75);
+        AttributeInstance knockAttr = boss.getAttribute(Attribute.KNOCKBACK_RESISTANCE);
+        if (knockAttr != null) knockAttr.setBaseValue(0.95);
+        AttributeInstance speedAttr = boss.getAttribute(Attribute.MOVEMENT_SPEED);
+        if (speedAttr != null) speedAttr.setBaseValue(0.30);
+        AttributeInstance dmgAttr = boss.getAttribute(Attribute.ATTACK_DAMAGE);
+        if (dmgAttr != null) dmgAttr.setBaseValue(16.0);
+
+        var inv = boss.getEquipment();
+        if (inv != null) {
+            inv.setHelmet(new ItemStack(Material.WITHER_SKELETON_SKULL));
+            inv.setChestplate(new ItemStack(Material.NETHERITE_CHESTPLATE));
+            inv.setLeggings(new ItemStack(Material.NETHERITE_LEGGINGS));
+            inv.setBoots(new ItemStack(Material.NETHERITE_BOOTS));
+            inv.setItemInMainHand(new ItemStack(Material.NETHERITE_AXE));
+            inv.setHelmetDropChance(0f);
+            inv.setChestplateDropChance(0f);
+            inv.setLeggingsDropChance(0f);
+            inv.setBootsDropChance(0f);
+            inv.setItemInMainHandDropChance(0f);
+        }
+
+        boss.getPersistentDataContainer().set(MOB_KEY, PersistentDataType.STRING, "boss");
+        boss.getPersistentDataContainer().set(BOSS_KEY, PersistentDataType.BYTE, (byte) 1);
+
+        this.bossEntity = boss;
+        this.activeMobs.add(boss.getUniqueId());
+
+        waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (state != State.WAVE_IN_PROGRESS || currentWave != 4) return;
+            announceReinforcements(world);
+            spawnBrutes(world, 2);
+            spawnPlagueArchers(world, 2);
+            spawnVortexZombies(world, 1);
+        }, 240L));
+
+        waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (state != State.WAVE_IN_PROGRESS || currentWave != 4) return;
+            announceReinforcements(world);
+            spawnReapers(world, 2);
+            spawnKamikazes(world, 2);
+            spawnFrostZombies(world, 1);
+        }, 520L));
+    }
+
+    private void spawnBossReinforced(World world) {
+        allPacksSpawned = true;
+
+        Location bossLoc = centerLocation.clone().add(0, 1, 0);
+        world.strikeLightningEffect(bossLoc);
+        world.strikeLightningEffect(bossLoc.clone().add(2, 0, 2));
+        world.strikeLightningEffect(bossLoc.clone().add(-2, 0, -2));
+        world.playSound(bossLoc, Sound.ENTITY_ENDER_DRAGON_GROWL, 2.0f, 0.5f);
+        world.playSound(bossLoc, Sound.ENTITY_WITHER_DEATH, 1.5f, 0.8f);
+
+        Zombie boss = (Zombie) world.spawnEntity(bossLoc, EntityType.ZOMBIE);
+        boss.customName(Component.text("☠ L'ARCHIDÉMON DE CUPRITE ☠", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
+        boss.setCustomNameVisible(true);
+        boss.setRemoveWhenFarAway(false);
+        boss.setPersistent(true);
+
+        AttributeInstance hpAttr = boss.getAttribute(Attribute.MAX_HEALTH);
+        if (hpAttr != null) {
+            hpAttr.setBaseValue(650.0);
+            boss.setHealth(650.0);
+        }
+        AttributeInstance scaleAttr = boss.getAttribute(Attribute.SCALE);
+        if (scaleAttr != null) scaleAttr.setBaseValue(1.85);
+        AttributeInstance knockAttr = boss.getAttribute(Attribute.KNOCKBACK_RESISTANCE);
+        if (knockAttr != null) knockAttr.setBaseValue(0.98);
+        AttributeInstance speedAttr = boss.getAttribute(Attribute.MOVEMENT_SPEED);
+        if (speedAttr != null) speedAttr.setBaseValue(0.32);
+        AttributeInstance dmgAttr = boss.getAttribute(Attribute.ATTACK_DAMAGE);
+        if (dmgAttr != null) dmgAttr.setBaseValue(20.0);
+
+        var inv = boss.getEquipment();
+        if (inv != null) {
+            inv.setHelmet(new ItemStack(Material.NETHERITE_HELMET));
+            inv.setChestplate(new ItemStack(Material.NETHERITE_CHESTPLATE));
+            inv.setLeggings(new ItemStack(Material.NETHERITE_LEGGINGS));
+            inv.setBoots(new ItemStack(Material.NETHERITE_BOOTS));
+            inv.setItemInMainHand(new ItemStack(Material.NETHERITE_SWORD));
+            inv.setHelmetDropChance(0f);
+            inv.setChestplateDropChance(0f);
+            inv.setLeggingsDropChance(0f);
+            inv.setBootsDropChance(0f);
+            inv.setItemInMainHandDropChance(0f);
+        }
+
+        boss.getPersistentDataContainer().set(MOB_KEY, PersistentDataType.STRING, "boss");
+        boss.getPersistentDataContainer().set(BOSS_KEY, PersistentDataType.BYTE, (byte) 1);
+
+        this.bossEntity = boss;
+        this.activeMobs.add(boss.getUniqueId());
+
+        waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (state != State.WAVE_IN_PROGRESS || currentWave != 4) return;
+            announceReinforcements(world);
+            spawnInfernalBlazes(world, 2);
+            spawnInfernalBrutes(world, 2);
+            spawnVortexZombies(world, 1);
+        }, 240L));
+
+        waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (state != State.WAVE_IN_PROGRESS || currentWave != 4) return;
+            announceReinforcements(world);
+            spawnSuperKamikazes(world, 2);
+            spawnStormSpiders(world, 2);
+            spawnInfernalBlazes(world, 1);
         }, 520L));
     }
 
@@ -940,6 +1403,169 @@ public class HordeManager {
         spider.getPersistentDataContainer().set(MOB_KEY, PersistentDataType.STRING, "spider");
     }
 
+    private void setupVortexZombie(Zombie z) {
+        z.customName(Component.text("⚡ Zombie du Vortex ⚡", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
+        z.setCustomNameVisible(true);
+        z.setRemoveWhenFarAway(false);
+        z.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, PotionEffect.INFINITE_DURATION, 1));
+        var eq = z.getEquipment();
+        if (eq != null) {
+            ItemStack helm = new ItemStack(Material.LEATHER_HELMET);
+            LeatherArmorMeta meta = (LeatherArmorMeta) helm.getItemMeta();
+            if (meta != null) {
+                meta.setColor(Color.PURPLE);
+                helm.setItemMeta(meta);
+            }
+            eq.setHelmet(helm);
+            ItemStack chest = new ItemStack(Material.LEATHER_CHESTPLATE);
+            LeatherArmorMeta cMeta = (LeatherArmorMeta) chest.getItemMeta();
+            if (cMeta != null) {
+                cMeta.setColor(Color.PURPLE);
+                chest.setItemMeta(cMeta);
+            }
+            eq.setChestplate(chest);
+            eq.setItemInMainHand(new ItemStack(Material.IRON_AXE));
+            eq.setHelmetDropChance(0f);
+            eq.setChestplateDropChance(0f);
+            eq.setItemInMainHandDropChance(0f);
+        }
+        z.getPersistentDataContainer().set(MOB_KEY, PersistentDataType.STRING, "vortex_zombie");
+        z.getPersistentDataContainer().set(VORTEX_KEY, PersistentDataType.BYTE, (byte) 1);
+    }
+
+    private void setupFrostZombie(Zombie z) {
+        z.customName(Component.text("❄ Zombie Frimaire ❄", NamedTextColor.AQUA, TextDecoration.BOLD));
+        z.setCustomNameVisible(true);
+        z.setRemoveWhenFarAway(false);
+        var eq = z.getEquipment();
+        if (eq != null) {
+            eq.setHelmet(new ItemStack(Material.PACKED_ICE));
+            ItemStack chest = new ItemStack(Material.LEATHER_CHESTPLATE);
+            LeatherArmorMeta cMeta = (LeatherArmorMeta) chest.getItemMeta();
+            if (cMeta != null) {
+                cMeta.setColor(Color.AQUA);
+                chest.setItemMeta(cMeta);
+            }
+            eq.setChestplate(chest);
+            eq.setItemInMainHand(new ItemStack(Material.DIAMOND_SHOVEL));
+            eq.setHelmetDropChance(0f);
+            eq.setChestplateDropChance(0f);
+            eq.setItemInMainHandDropChance(0f);
+        }
+        z.getPersistentDataContainer().set(MOB_KEY, PersistentDataType.STRING, "frost");
+        z.getPersistentDataContainer().set(FROST_KEY, PersistentDataType.BYTE, (byte) 1);
+    }
+
+    private void setupSuperKamikaze(Zombie z) {
+        z.customName(Component.text("💥 GIGA-KAMIKAZE 💥", NamedTextColor.DARK_RED, TextDecoration.BOLD));
+        z.setCustomNameVisible(true);
+        z.setRemoveWhenFarAway(false);
+        z.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, PotionEffect.INFINITE_DURATION, 2));
+        var eq = z.getEquipment();
+        if (eq != null) {
+            eq.setHelmet(new ItemStack(Material.TNT));
+            eq.setChestplate(new ItemStack(Material.CHAINMAIL_CHESTPLATE));
+            eq.setHelmetDropChance(0f);
+            eq.setChestplateDropChance(0f);
+        }
+        z.getPersistentDataContainer().set(MOB_KEY, PersistentDataType.STRING, "super_kamikaze");
+        z.getPersistentDataContainer().set(SUPER_KAMIKAZE_KEY, PersistentDataType.BYTE, (byte) 1);
+    }
+
+    private void setupInfernalBlaze(Blaze b) {
+        b.customName(Component.text("🔥 Blaze Infernal des Abysses 🔥", NamedTextColor.GOLD, TextDecoration.BOLD));
+        b.setCustomNameVisible(true);
+        b.setRemoveWhenFarAway(false);
+        AttributeInstance hp = b.getAttribute(Attribute.MAX_HEALTH);
+        if (hp != null) {
+            hp.setBaseValue(35.0);
+            b.setHealth(35.0);
+        }
+        b.getPersistentDataContainer().set(MOB_KEY, PersistentDataType.STRING, "infernal_blaze");
+        b.getPersistentDataContainer().set(INFERNAL_BLAZE_KEY, PersistentDataType.BYTE, (byte) 1);
+    }
+
+    private void setupPlagueArcher(AbstractSkeleton s) {
+        s.customName(Component.text("☠ Squelette Pestilentiel ☠", NamedTextColor.DARK_GREEN, TextDecoration.BOLD));
+        s.setCustomNameVisible(true);
+        s.setRemoveWhenFarAway(false);
+        s.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, PotionEffect.INFINITE_DURATION, 1));
+        var eq = s.getEquipment();
+        if (eq != null) {
+            ItemStack helm = new ItemStack(Material.LEATHER_HELMET);
+            LeatherArmorMeta meta = (LeatherArmorMeta) helm.getItemMeta();
+            if (meta != null) {
+                meta.setColor(Color.GREEN);
+                helm.setItemMeta(meta);
+            }
+            eq.setHelmet(helm);
+            ItemStack chest = new ItemStack(Material.LEATHER_CHESTPLATE);
+            LeatherArmorMeta cMeta = (LeatherArmorMeta) chest.getItemMeta();
+            if (cMeta != null) {
+                cMeta.setColor(Color.GREEN);
+                chest.setItemMeta(cMeta);
+            }
+            eq.setChestplate(chest);
+            eq.setItemInMainHand(new ItemStack(Material.BOW));
+            eq.setHelmetDropChance(0f);
+            eq.setChestplateDropChance(0f);
+            eq.setItemInMainHandDropChance(0f);
+        }
+        s.getPersistentDataContainer().set(MOB_KEY, PersistentDataType.STRING, "plague_archer");
+    }
+
+    private void setupInfernalBrute(PiglinBrute pb) {
+        pb.customName(Component.text("👹 Bourreau Démoniaque 👹", NamedTextColor.DARK_RED, TextDecoration.BOLD));
+        pb.setCustomNameVisible(true);
+        pb.setRemoveWhenFarAway(false);
+        pb.setImmuneToZombification(true);
+
+        AttributeInstance hpAttr = pb.getAttribute(Attribute.MAX_HEALTH);
+        if (hpAttr != null) {
+            hpAttr.setBaseValue(60.0);
+            pb.setHealth(60.0);
+        }
+        AttributeInstance speedAttr = pb.getAttribute(Attribute.MOVEMENT_SPEED);
+        if (speedAttr != null) {
+            speedAttr.setBaseValue(0.34);
+        }
+        AttributeInstance knockAttr = pb.getAttribute(Attribute.KNOCKBACK_RESISTANCE);
+        if (knockAttr != null) {
+            knockAttr.setBaseValue(0.7);
+        }
+        AttributeInstance dmgAttr = pb.getAttribute(Attribute.ATTACK_DAMAGE);
+        if (dmgAttr != null) {
+            dmgAttr.setBaseValue(14.0);
+        }
+
+        var eq = pb.getEquipment();
+        if (eq != null) {
+            eq.setHelmet(new ItemStack(Material.NETHERITE_HELMET));
+            eq.setItemInMainHand(new ItemStack(Material.NETHERITE_AXE));
+            eq.setHelmetDropChance(0f);
+            eq.setItemInMainHandDropChance(0f);
+        }
+        pb.getPersistentDataContainer().set(MOB_KEY, PersistentDataType.STRING, "infernal_brute");
+    }
+
+    private void setupStormSpider(Spider spider) {
+        spider.customName(Component.text("⚡ Veuve des Tempêtes ⚡", NamedTextColor.AQUA, TextDecoration.BOLD));
+        spider.setCustomNameVisible(true);
+        spider.setRemoveWhenFarAway(false);
+
+        AttributeInstance hpAttr = spider.getAttribute(Attribute.MAX_HEALTH);
+        if (hpAttr != null) {
+            hpAttr.setBaseValue(35.0);
+            spider.setHealth(35.0);
+        }
+        AttributeInstance speedAttr = spider.getAttribute(Attribute.MOVEMENT_SPEED);
+        if (speedAttr != null) {
+            speedAttr.setBaseValue(0.36);
+        }
+        spider.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, PotionEffect.INFINITE_DURATION, 1));
+        spider.getPersistentDataContainer().set(MOB_KEY, PersistentDataType.STRING, "storm_spider");
+    }
+
     private void announceReinforcements(World world) {
         if (world == null || state != State.WAVE_IN_PROGRESS) return;
         for (Player p : world.getPlayers()) {
@@ -1048,6 +1674,76 @@ public class HordeManager {
         }
     }
 
+    private void spawnVortexZombies(World world, int count) {
+        for (int i = 0; i < count; i++) {
+            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            playSpawnEffect(loc);
+            Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
+            setupVortexZombie(z);
+            activeMobs.add(z.getUniqueId());
+        }
+    }
+
+    private void spawnFrostZombies(World world, int count) {
+        for (int i = 0; i < count; i++) {
+            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            playSpawnEffect(loc);
+            Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
+            setupFrostZombie(z);
+            activeMobs.add(z.getUniqueId());
+        }
+    }
+
+    private void spawnSuperKamikazes(World world, int count) {
+        for (int i = 0; i < count; i++) {
+            Location loc = getRandomSpawnLocation(9.0, 15.0);
+            playSpawnEffect(loc);
+            Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
+            setupSuperKamikaze(z);
+            activeMobs.add(z.getUniqueId());
+        }
+    }
+
+    private void spawnInfernalBlazes(World world, int count) {
+        for (int i = 0; i < count; i++) {
+            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            playSpawnEffect(loc);
+            Blaze b = (Blaze) world.spawnEntity(loc, EntityType.BLAZE);
+            setupInfernalBlaze(b);
+            activeMobs.add(b.getUniqueId());
+        }
+    }
+
+    private void spawnPlagueArchers(World world, int count) {
+        for (int i = 0; i < count; i++) {
+            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            playSpawnEffect(loc);
+            AbstractSkeleton s = (AbstractSkeleton) world.spawnEntity(loc, EntityType.SKELETON);
+            setupPlagueArcher(s);
+            activeMobs.add(s.getUniqueId());
+        }
+    }
+
+    private void spawnInfernalBrutes(World world, int count) {
+        for (int i = 0; i < count; i++) {
+            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            playSpawnEffect(loc);
+            PiglinBrute pb = (PiglinBrute) world.spawnEntity(loc, EntityType.PIGLIN_BRUTE);
+            setupInfernalBrute(pb);
+            activeMobs.add(pb.getUniqueId());
+        }
+    }
+
+    private void spawnStormSpiders(World world, int count) {
+        for (int i = 0; i < count; i++) {
+            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            playSpawnEffect(loc);
+            Spider spider = (Spider) world.spawnEntity(loc, EntityType.SPIDER);
+            setupStormSpider(spider);
+            activeMobs.add(spider.getUniqueId());
+        }
+    }
+
     private Location getRandomSpawnLocation(double minRadius, double maxRadius) {
         World world = centerLocation.getWorld();
         double angle = Math.random() * Math.PI * 2;
@@ -1078,17 +1774,39 @@ public class HordeManager {
             world.setStorm(false);
             world.setThundering(false);
 
-            // Annonce victorieuse
+            // Annonce victorieuse selon le tier
+            String bossDefeated;
+            String chestDesc;
+            int orbCount;
+            int orbXp;
+
+            if (currentTier == HordeTier.BLOCK) {
+                bossDefeated = "Le Général Inquisiteur est tombé au combat.";
+                chestDesc = "Le Trésor Héroïque de Cuprite est apparu !";
+                orbCount = 25;
+                orbXp = 50;
+            } else if (currentTier == HordeTier.REINFORCED_BLOCK) {
+                bossDefeated = "L'ARCHIDÉMON DE CUPRITE A ÉTÉ PULVÉRISÉ !";
+                chestDesc = "Le Trésor Suprême de l'Apocalypse est apparu !";
+                orbCount = 40;
+                orbXp = 75;
+            } else {
+                bossDefeated = "Le Titan Putréfié est tombé.";
+                chestDesc = "Le Coffre Ancestral du Triomphe est apparu !";
+                orbCount = 15;
+                orbXp = 35;
+            }
+
             Bukkit.broadcast(Component.empty());
-            Bukkit.broadcast(Component.text("★ =================================================== ★", NamedTextColor.GOLD, TextDecoration.BOLD));
-            Bukkit.broadcast(Component.text("✦ VICTOIRE ÉPIQUE : LA HORDE DES DAMNÉS A ÉTÉ ÉLIMINÉE ! ✦", NamedTextColor.GREEN, TextDecoration.BOLD));
-            Bukkit.broadcast(Component.text("Le Titan Putréfié est tombé. Le Coffre Ancestral du Triomphe est apparu !", NamedTextColor.YELLOW));
+            Bukkit.broadcast(Component.text("★ =================================================== ★", currentTier.getColor(), TextDecoration.BOLD));
+            Bukkit.broadcast(Component.text("✦ VICTOIRE ÉPIQUE : LA HORDE [" + currentTier.getDisplayName().toUpperCase() + "] A ÉTÉ VAINCUE ! ✦", NamedTextColor.GREEN, TextDecoration.BOLD));
+            Bukkit.broadcast(Component.text(bossDefeated + " " + chestDesc, NamedTextColor.YELLOW));
             Bukkit.broadcast(Component.text("Vous disposez de 45 secondes pour piller le coffre avant d'être retéléporté (ou tapez /horde leave) !", NamedTextColor.GOLD));
-            Bukkit.broadcast(Component.text("★ =================================================== ★", NamedTextColor.GOLD, TextDecoration.BOLD));
+            Bukkit.broadcast(Component.text("★ =================================================== ★", currentTier.getColor(), TextDecoration.BOLD));
             Bukkit.broadcast(Component.empty());
 
             // Feux d'artifice
-            for (int i = 0; i < 5; i++) {
+            for (int i = 0; i < (currentTier == HordeTier.REINFORCED_BLOCK ? 9 : 5); i++) {
                 final int delay = i * 8;
                 Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     Location fLoc = centerLocation.clone().add((Math.random() - 0.5) * 8, 2, (Math.random() - 0.5) * 8);
@@ -1109,9 +1827,9 @@ public class HordeManager {
             spawnRewardChest(centerLocation);
 
             // Orbes d'XP
-            for (int i = 0; i < 15; i++) {
+            for (int i = 0; i < orbCount; i++) {
                 ExperienceOrb orb = (ExperienceOrb) world.spawnEntity(centerLocation.clone().add((Math.random() - 0.5) * 3, 1, (Math.random() - 0.5) * 3), EntityType.EXPERIENCE_ORB);
-                orb.setExperience(35);
+                orb.setExperience(orbXp);
             }
         }
 
@@ -1136,23 +1854,56 @@ public class HordeManager {
             var inv = chest.getInventory();
             inv.clear();
 
-            // 1. Arme Légendaire du Boss
-            inv.setItem(13, HordeItems.getTitanSoulSlicer());
-
-            // 2. Cuprites (6 Lingots)
-            inv.setItem(11, Cuprite.create(plugin, 6));
-
-            // 3. Débris Antiques
-            inv.setItem(15, new ItemStack(Material.ANCIENT_DEBRIS, 2));
-
-            // 4. Pomme d'or enchantée
-            inv.setItem(12, new ItemStack(Material.ENCHANTED_GOLDEN_APPLE, 1));
-
-            // 5. Diamants
-            inv.setItem(14, new ItemStack(Material.DIAMOND, 8));
+            if (currentTier == HordeTier.BLOCK) {
+                // Tier 2 (Bloc de Cuprite)
+                // 1. Arme Légendaire Tier 2
+                inv.setItem(13, HordeItems.getInquisitorWrathBlade());
+                // 2. Marteau en Cuprite Tier 2 (4x4x4)
+                inv.setItem(4, CupriteHammer.create(plugin, 2));
+                // 3. 5 Blocs de Cuprite
+                inv.setItem(11, CupriteBlock.create(plugin, 5));
+                // 4. Lingots de Netherite
+                inv.setItem(15, new ItemStack(Material.NETHERITE_INGOT, 3));
+                // 5. Pommes d'or enchantées
+                inv.setItem(12, new ItemStack(Material.ENCHANTED_GOLDEN_APPLE, 2));
+                // 6. Blocs de Diamant
+                inv.setItem(14, new ItemStack(Material.DIAMOND_BLOCK, 2));
+                // 7. Totem d'immortalité
+                inv.setItem(22, new ItemStack(Material.TOTEM_OF_UNDYING, 1));
+            } else if (currentTier == HordeTier.REINFORCED_BLOCK) {
+                // Tier 3 (Bloc de Cuprite Renforcé) - Récompenses Divines / Extrêmes
+                // 1. Arme Ultime Tier 3
+                inv.setItem(13, HordeItems.getApocalypseClaymore());
+                // 2. Marteau en Cuprite Tier 3 (5x5x5)
+                inv.setItem(4, CupriteHammer.create(plugin, 3));
+                // 3. 3 Blocs de Cuprite Renforcés
+                inv.setItem(11, ReinforcedCupriteBlock.create(plugin, 3));
+                // 4. Bloc de Netherite
+                inv.setItem(15, new ItemStack(Material.NETHERITE_BLOCK, 1));
+                // 5. Pommes de Notch
+                inv.setItem(12, new ItemStack(Material.ENCHANTED_GOLDEN_APPLE, 4));
+                // 6. Blocs de diamant
+                inv.setItem(14, new ItemStack(Material.DIAMOND_BLOCK, 5));
+                // 7. Totems d'immortalité
+                inv.setItem(22, new ItemStack(Material.TOTEM_OF_UNDYING, 2));
+                // 8. Cuprites bonus
+                inv.setItem(10, Cuprite.create(plugin, 16));
+            } else {
+                // Tier 1 (Lingot de Cuprite)
+                // 1. Arme Légendaire Tier 1
+                inv.setItem(13, HordeItems.getTitanSoulSlicer());
+                // 2. Cuprites (6 Lingots)
+                inv.setItem(11, Cuprite.create(plugin, 6));
+                // 3. Débris Antiques
+                inv.setItem(15, new ItemStack(Material.ANCIENT_DEBRIS, 2));
+                // 4. Pomme d'or enchantée
+                inv.setItem(12, new ItemStack(Material.ENCHANTED_GOLDEN_APPLE, 1));
+                // 5. Diamants
+                inv.setItem(14, new ItemStack(Material.DIAMOND, 8));
+            }
 
             // Particules au-dessus du coffre
-            world.spawnParticle(Particle.TOTEM_OF_UNDYING, loc.clone().add(0.5, 1.2, 0.5), 40, 0.4, 0.4, 0.4, 0.1);
+            world.spawnParticle(Particle.TOTEM_OF_UNDYING, loc.clone().add(0.5, 1.2, 0.5), 60, 0.4, 0.4, 0.4, 0.1);
             world.playSound(loc, Sound.BLOCK_CHEST_OPEN, 1.0f, 0.8f);
         }
     }
