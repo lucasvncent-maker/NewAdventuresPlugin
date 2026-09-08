@@ -225,26 +225,24 @@ public class BlackjackListener implements Listener {
                             player.closeInventory();
                         }
                     } else {
-                        // Session active : boutons de mise en jetons
-                        if (rawSlot == BlackjackGui.BUTTON_CHALLENGE_BET_10) {
-                            game.addChallengeBet(10);
-                            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f);
+                        // Session active : 2 boutons pour ajuster la mise (+10 / -10)
+                        if (rawSlot == BlackjackGui.BUTTON_CHALLENGE_BET_DECREASE) {
+                            int oldBet = game.getChallengeBet();
+                            game.adjustChallengeBet(-10);
+                            if (game.getChallengeBet() != oldBet) {
+                                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 0.9f);
+                            } else {
+                                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                            }
                             BlackjackGui.render(topInv, game);
-                        } else if (rawSlot == BlackjackGui.BUTTON_CHALLENGE_BET_25) {
-                            game.addChallengeBet(25);
-                            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.4f);
-                            BlackjackGui.render(topInv, game);
-                        } else if (rawSlot == BlackjackGui.BUTTON_CHALLENGE_BET_50) {
-                            game.addChallengeBet(50);
-                            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.6f);
-                            BlackjackGui.render(topInv, game);
-                        } else if (rawSlot == BlackjackGui.BUTTON_BET_CURRENT || rawSlot == BlackjackGui.BUTTON_CHALLENGE_BET_RESET) {
-                            game.setChallengeBet(Math.min(10, game.getChallengeChips()));
-                            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 0.8f);
-                            BlackjackGui.render(topInv, game);
-                        } else if (rawSlot == BlackjackGui.BUTTON_CHALLENGE_BET_ALL_IN) {
-                            game.setChallengeBet(game.getChallengeChips());
-                            player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f);
+                        } else if (rawSlot == BlackjackGui.BUTTON_CHALLENGE_BET_INCREASE) {
+                            int oldBet = game.getChallengeBet();
+                            game.adjustChallengeBet(10);
+                            if (game.getChallengeBet() != oldBet) {
+                                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.4f);
+                            } else {
+                                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                            }
                             BlackjackGui.render(topInv, game);
                         } else if (rawSlot == BlackjackGui.BUTTON_START_BET) {
                             int bet = game.getChallengeBet();

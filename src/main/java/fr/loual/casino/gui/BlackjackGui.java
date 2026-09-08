@@ -30,12 +30,9 @@ public class BlackjackGui {
     public static final int BUTTON_CASHOUT = 46;
 
     public static final int SLOT_CHALLENGE_STATUS = 18;
-    public static final int BUTTON_CHALLENGE_BET_10 = 19;
-    public static final int BUTTON_CHALLENGE_BET_25 = 20;
-    public static final int BUTTON_CHALLENGE_BET_50 = 21;
+    public static final int BUTTON_CHALLENGE_BET_DECREASE = 21;
     public static final int BUTTON_BET_CURRENT = 22;
-    public static final int BUTTON_CHALLENGE_BET_ALL_IN = 23;
-    public static final int BUTTON_CHALLENGE_BET_RESET = 24;
+    public static final int BUTTON_CHALLENGE_BET_INCREASE = 23;
 
     private static final int[] DEALER_CARD_SLOTS = { 10, 11, 12, 13, 14, 15, 16 };
     private static final int[] PLAYER_CARD_SLOTS = { 28, 29, 30, 31, 32, 33, 34 };
@@ -278,7 +275,7 @@ public class BlackjackGui {
                     inv.setItem(BET_SLOT, null);
                 }
             } else {
-                // Mode CHALLENGE avec session active : boutons de mise en jetons
+                // Mode CHALLENGE avec session active : 2 boutons pour ajuster la mise (+10 / -10)
                 inv.setItem(SLOT_CHALLENGE_STATUS, createItem(Material.EXPERIENCE_BOTTLE,
                         Component.text("✦ Progression Mission ✦", NamedTextColor.YELLOW, TextDecoration.BOLD),
                         "§7Solde actuel : §a§l" + game.getChallengeChips() + " Jetons",
@@ -286,45 +283,37 @@ public class BlackjackGui {
                         "§7Palier x8 : §d800 Jetons §7(§d3 Cuprites§7)"
                 ));
 
-                inv.setItem(BUTTON_CHALLENGE_BET_10, createItem(Material.IRON_NUGGET,
-                        Component.text("+10 Jetons", NamedTextColor.WHITE, TextDecoration.BOLD),
-                        "§7Ajouter 10 jetons à la mise."
+                // Bouton Diminuer de 10 (Slot 21)
+                inv.setItem(BUTTON_CHALLENGE_BET_DECREASE, createItem(Material.RED_DYE,
+                        Component.text("−10 Jetons", NamedTextColor.RED, TextDecoration.BOLD),
+                        "§7Diminuer la mise de §c10 Jetons§7.",
+                        "§7Mise minimale : §f" + Math.min(10, game.getChallengeChips()) + " Jetons",
+                        "",
+                        "§c➤ Cliquer pour réduire la mise"
                 ));
 
-                inv.setItem(BUTTON_CHALLENGE_BET_25, createItem(Material.GOLD_NUGGET,
-                        Component.text("+25 Jetons", NamedTextColor.GOLD, TextDecoration.BOLD),
-                        "§7Ajouter 25 jetons à la mise."
-                ));
-
-                inv.setItem(BUTTON_CHALLENGE_BET_50, createItem(Material.DIAMOND,
-                        Component.text("+50 Jetons", NamedTextColor.AQUA, TextDecoration.BOLD),
-                        "§7Ajouter 50 jetons à la mise."
-                ));
-
+                // Mise sélectionnée au centre (Slot 22)
                 ItemStack curBet = createItem(Material.SUNFLOWER,
                         Component.text("Mise sélectionnée : §6§l" + game.getChallengeBet() + " Jetons", NamedTextColor.YELLOW, TextDecoration.BOLD),
-                        "§7Solde restant en cas de défaite : §f" + (game.getChallengeChips() - game.getChallengeBet()) + " Jetons",
+                        "§7Solde restant si défaite : §f" + (game.getChallengeChips() - game.getChallengeBet()) + " Jetons",
                         "§7Victoire normale : §a+" + (game.getChallengeBet() * 2) + " Jetons (x2)",
-                        "§6Blackjack naturel (x3) : §e+" + (game.getChallengeBet() * 3) + " Jetons",
-                        "",
-                        "§e➤ Cliquer pour réinitialiser au minimum (10)"
+                        "§6Blackjack naturel (x3) : §e+" + (game.getChallengeBet() * 3) + " Jetons"
                 );
                 curBet.setAmount(Math.max(1, Math.min(64, game.getChallengeBet())));
                 inv.setItem(BET_SLOT, curBet);
 
-                inv.setItem(BUTTON_CHALLENGE_BET_ALL_IN, createItem(Material.NETHERITE_SCRAP,
-                        Component.text("§c§lALL-IN (" + game.getChallengeChips() + " Jetons)", NamedTextColor.RED, TextDecoration.BOLD),
-                        "§cMiser la totalité de vos jetons restants !",
-                        "§4Quitte ou double !"
+                // Bouton Augmenter de 10 (Slot 23)
+                inv.setItem(BUTTON_CHALLENGE_BET_INCREASE, createItem(Material.LIME_DYE,
+                        Component.text("+10 Jetons", NamedTextColor.GREEN, TextDecoration.BOLD),
+                        "§7Augmenter la mise de §a10 Jetons§7.",
+                        "§7Mise maximale : §f" + game.getChallengeChips() + " Jetons",
+                        "",
+                        "§a➤ Cliquer pour augmenter la mise"
                 ));
 
-                inv.setItem(BUTTON_CHALLENGE_BET_RESET, createItem(Material.REDSTONE,
-                        Component.text("Mise minimale (10)", NamedTextColor.RED, TextDecoration.BOLD),
-                        "§7Réduire la mise à 10 jetons."
-                ));
-
-                inv.setItem(13, createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" ")));
-                inv.setItem(31, createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" ")));
+                for (int s : new int[]{ 13, 19, 20, 24, 25, 31 }) {
+                    inv.setItem(s, createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" ")));
+                }
             }
         } else {
             List<Card> pHand = game.getPlayerHand();

@@ -615,6 +615,15 @@ public class BlackjackGame {
         this.challengeBet = Math.min(challengeChips, this.challengeBet + amount);
     }
 
+    public void adjustChallengeBet(int delta) {
+        if (state != State.BETTING) return;
+        int minBet = Math.min(10, challengeChips);
+        int newBet = this.challengeBet + delta;
+        if (newBet < minBet) newBet = minBet;
+        if (newBet > challengeChips) newBet = challengeChips;
+        this.challengeBet = newBet;
+    }
+
     public void setChallengeBet(int amount) {
         if (state != State.BETTING) return;
         this.challengeBet = Math.max(1, Math.min(challengeChips, amount));
