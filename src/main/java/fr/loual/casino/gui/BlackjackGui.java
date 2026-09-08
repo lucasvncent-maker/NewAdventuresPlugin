@@ -23,6 +23,7 @@ public class BlackjackGui {
     public static final int BET_SLOT = 22;
     public static final int BUTTON_START_BET = 49;
     public static final int BUTTON_HIT = 47;
+    public static final int BUTTON_DOUBLE = 48;
     public static final int BUTTON_STAND = 51;
     public static final int BUTTON_REPLAY = 48;
     public static final int BUTTON_QUIT = 50;
@@ -59,7 +60,6 @@ public class BlackjackGui {
 
         for (int i = 0; i < 54; i++) {
             if (i == BET_SLOT && game.getMode() == BlackjackGame.Mode.CLASSIC && game.getState() == BlackjackGame.State.BETTING) {
-                // S'assurer que le slot de mise n'a JAMAIS de vitre de fond en mode classique
                 ItemStack current = inv.getItem(BET_SLOT);
                 if (current != null && (current.getType() == Material.GREEN_STAINED_GLASS_PANE 
                         || current.getType() == Material.BLACK_STAINED_GLASS_PANE 
@@ -98,7 +98,9 @@ public class BlackjackGui {
                     Material.GOLD_INGOT,
                     Component.text("Mode : Standard (Objets)", NamedTextColor.GOLD, TextDecoration.BOLD),
                     "§7Pariez n'importe quel objet de votre inventaire.",
-                    "§7Doublez (x2) ou triplez (x3) votre mise !",
+                    "§aVictoire standard : §fLe double (x2) !",
+                    "§6Blackjack naturel : §eTriple (3:1 / x3) !",
+                    "§bFive-Card Charlie : §f5 cartes = Victoire (x2) !",
                     "",
                     "§d➤ Cliquer pour passer en Mode Défi Cuprite"
             ));
@@ -108,6 +110,7 @@ public class BlackjackGui {
                     Component.text("Mode : Défi Cuprite", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD),
                     "§7Mission spéciale du Croupier !",
                     "§7Multipliez vos jetons pour remporter de la Cuprite.",
+                    "§bFive-Card Charlie & Doubler inclus !",
                     "",
                     "§a➤ Cliquer pour repasser en Mode Standard"
             );
@@ -258,13 +261,15 @@ public class BlackjackGui {
             } else {
                 // Mode CHALLENGE
                 if (game.getChallengeChips() <= 0) {
-                    // Bannière des règles
+                    // Bannière des règles avec Charlie et Doubler
                     inv.setItem(SLOT_CHALLENGE_STATUS, createItem(Material.BOOK,
                             Component.text("§6§lRègles du Défi Cuprite"),
                             "§e• Droit d'entrée : §f" + BlackjackGame.getEntryCostDescription(game.getPlayer()),
                             "§e• Départ : §a100 Jetons de défi",
                             "§e• Palier x4 (400 jetons) : §61 Lingot de Cuprite",
                             "§e• Palier x8 (800 jetons) : §d3 Lingots de Cuprite !",
+                            "§b• Doubler (Double Down) : §fMise doublée sur 2 cartes !",
+                            "§b• Five-Card Charlie : §f5 cartes sans sauter = Victoire !",
                             "§c• Faillite (0 jeton) : Mise d'entrée perdue !"
                     ));
 
@@ -387,8 +392,8 @@ public class BlackjackGui {
 
                 if (hasBet) {
                     Component itemNameComp = (betInSlot.getItemMeta() != null && betInSlot.getItemMeta().hasDisplayName())
-                        ? betInSlot.getItemMeta().displayName()
-                        : Component.translatable(betInSlot.translationKey());
+                            ? betInSlot.getItemMeta().displayName()
+                            : Component.translatable(betInSlot.translationKey());
 
                     ItemStack startBtn = new ItemStack(Material.LIME_CONCRETE);
                     ItemMeta startMeta = startBtn.getItemMeta();
@@ -400,6 +405,7 @@ public class BlackjackGui {
                                 .append(itemNameComp));
                         lore.add(Component.text("Victoire standard : Le double (x2) !", NamedTextColor.GREEN));
                         lore.add(Component.text("Blackjack (21 naturel) : Payé 3 pour 1 (x3) !", NamedTextColor.GOLD));
+                        lore.add(Component.text("Five-Card Charlie : 5 cartes = Victoire (x2) !", NamedTextColor.AQUA));
                         lore.add(Component.text("Défaite : Votre mise est perdue.", NamedTextColor.RED));
                         lore.add(Component.empty());
                         lore.add(Component.text("➤ Cliquez pour lancer la partie !", NamedTextColor.GREEN));
@@ -428,6 +434,7 @@ public class BlackjackGui {
                             "§eMise : §f" + game.getChallengeBet() + " Jetons",
                             "§7Victoire : §a+" + (game.getChallengeBet() * 2) + " Jetons (x2)",
                             "§6Blackjack (21 naturel) : §e+" + (game.getChallengeBet() * 3) + " Jetons (x3)",
+                            "§bFive-Card Charlie : §f5 cartes = Victoire (x2) !",
                             "§cDéfaite : §7Perte de vos " + game.getChallengeBet() + " Jetons.",
                             "",
                             "§a➤ Cliquez pour lancer la manche !"
@@ -465,15 +472,42 @@ public class BlackjackGui {
         } else if (game.getState() == BlackjackGame.State.PLAYING) {
             int pScore = BlackjackGame.calculateScore(game.getPlayerHand());
 
-            // Bouton Tirer (Hit)
+            // Bouton Tirer (Hit - Slot 47)
             ItemStack hitBtn = createItem(Material.LIME_CONCRETE,
                     Component.text("➤ TIRER (Hit)  §e[" + pScore + "/21]", NamedTextColor.GREEN, TextDecoration.BOLD),
                     "§7Prendre une carte supplémentaire.",
                     "§7Votre score actuel : §e" + pScore + "§7/21",
+                    "§bFive-Card Charlie : §f5 cartes = Victoire auto !",
                     "§cAttention si votre score dépasse 21 !"
             );
             hitBtn.setAmount(Math.max(1, Math.min(64, pScore)));
             inv.setItem(BUTTON_HIT, hitBtn);
+
+            // Bouton Doubler (Double Down - Slot 48) : Disponible sur les 2 premières cartes
+            if (game.getPlayerHand().size() == 2) {
+                boolean canDouble = game.canDoubleDown();
+                if (canDouble) {
+                    ItemStack doubleBtn = createItem(Material.GOLD_BLOCK,
+                            Component.text("✦ DOUBLER (Double Down) ✦", NamedTextColor.GOLD, TextDecoration.BOLD),
+                            "§7Double votre mise pour cette manche.",
+                            "§eVous ne recevrez qu'1 seule carte supplémentaire !",
+                            "§7Puis le croupier jouera immédiatement.",
+                            "",
+                            "§a➤ Cliquez pour doubler votre mise !"
+                    );
+                    inv.setItem(BUTTON_DOUBLE, doubleBtn);
+                } else {
+                    ItemStack doubleBtn = createItem(Material.GRAY_CONCRETE,
+                            Component.text("✦ DOUBLER (Double Down) ✦", NamedTextColor.GRAY, TextDecoration.BOLD),
+                            "§7Double la mise actuelle pour 1 seule carte.",
+                            "",
+                            "§cRessources insuffisantes pour doubler."
+                    );
+                    inv.setItem(BUTTON_DOUBLE, doubleBtn);
+                }
+            } else {
+                inv.setItem(BUTTON_DOUBLE, createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" ")));
+            }
 
             // Rappel de la mise (Slot 49)
             if (game.getMode() == BlackjackGame.Mode.CLASSIC) {
@@ -486,6 +520,7 @@ public class BlackjackGui {
                         lore.add(Component.text("§6Mise actuelle en jeu : §e" + bet.getAmount() + "x"));
                         lore.add(Component.text("§aVictoire standard = Double (x2)"));
                         lore.add(Component.text("§6Blackjack (21 naturel) = Triple (3:1 / x3)"));
+                        lore.add(Component.text("§bFive-Card Charlie = Victoire auto (x2)"));
                         lore.add(Component.text("§cDéfaite = Mise perdue"));
                         meta.lore(lore);
                         betDisplay.setItemMeta(meta);
@@ -497,13 +532,14 @@ public class BlackjackGui {
                         Component.text("Mise en jeu : §6§l" + game.getActiveChallengeBet() + " Jetons", NamedTextColor.YELLOW, TextDecoration.BOLD),
                         "§aVictoire standard : +" + (game.getActiveChallengeBet() * 2) + " Jetons",
                         "§6Blackjack naturel : +" + (game.getActiveChallengeBet() * 3) + " Jetons",
+                        "§bFive-Card Charlie : +" + (game.getActiveChallengeBet() * 2) + " Jetons",
                         "§cDéfaite : Perte de la mise"
                 );
                 betDisplay.setAmount(Math.max(1, Math.min(64, game.getActiveChallengeBet())));
                 inv.setItem(49, betDisplay);
             }
 
-            // Bouton Rester (Stand)
+            // Bouton Rester (Stand - Slot 51)
             ItemStack standBtn = createItem(Material.RED_CONCRETE,
                     Component.text("■ RESTER (Stand)  §e[Garder " + pScore + "]", NamedTextColor.RED, TextDecoration.BOLD),
                     "§7Garder votre score actuel de §e" + pScore + "§7.",
@@ -534,6 +570,12 @@ public class BlackjackGui {
                             Component.text("✦ BLACKJACK NATUREL ! ✦", NamedTextColor.GOLD, TextDecoration.BOLD),
                             "§aFélicitations ! Vous avez fait 21 dès la distribution.",
                             "§6Payé 3 pour 1 : Votre mise a été triplée (x3) !"
+                    ));
+                    case FIVE_CARD_CHARLIE -> inv.setItem(49, createItem(Material.TOTEM_OF_UNDYING,
+                            Component.text("✦ FIVE-CARD CHARLIE ! ✦", NamedTextColor.GOLD, TextDecoration.BOLD),
+                            "§aExploit ! 5 cartes tirées sans dépasser 21 !",
+                            "§6Victoire immédiate (x2) remportée !",
+                            "§7La main du croupier a été battue d'office."
                     ));
                     case PLAYER_WIN, DEALER_BUST -> inv.setItem(49, createItem(Material.EMERALD_BLOCK,
                             Component.text("✔ VICTOIRE ! ✔", NamedTextColor.GREEN, TextDecoration.BOLD),

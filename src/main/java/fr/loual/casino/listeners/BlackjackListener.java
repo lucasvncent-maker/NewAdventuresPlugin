@@ -192,6 +192,17 @@ public class BlackjackListener implements Listener {
                                 BlackjackGui.render(topInv, game);
                             }
                         });
+                    } else if (rawSlot == BlackjackGui.BUTTON_DOUBLE) {
+                        if (game.canDoubleDown()) {
+                            game.doubleDownAnimated(plugin, () -> {
+                                if (player.getOpenInventory().getTopInventory().getHolder() instanceof BlackjackGuiHolder) {
+                                    BlackjackGui.render(topInv, game);
+                                }
+                            });
+                        } else {
+                            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                            player.sendMessage(Component.text("§cVous n'avez pas assez d'items dans votre inventaire pour doubler votre mise !"));
+                        }
                     } else if (rawSlot == BlackjackGui.BUTTON_STAND) {
                         game.standAnimated(plugin, () -> {
                             if (player.getOpenInventory().getTopInventory().getHolder() instanceof BlackjackGuiHolder) {
@@ -277,6 +288,17 @@ public class BlackjackListener implements Listener {
                                 BlackjackGui.render(topInv, game);
                             }
                         });
+                    } else if (rawSlot == BlackjackGui.BUTTON_DOUBLE) {
+                        if (game.canDoubleDown()) {
+                            game.doubleDownAnimated(plugin, () -> {
+                                if (player.getOpenInventory().getTopInventory().getHolder() instanceof BlackjackGuiHolder) {
+                                    BlackjackGui.render(topInv, game);
+                                }
+                            });
+                        } else {
+                            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                            player.sendMessage(Component.text("§cVous n'avez pas assez de jetons pour doubler votre mise (" + game.getActiveChallengeBet() + " requis) !"));
+                        }
                     } else if (rawSlot == BlackjackGui.BUTTON_STAND) {
                         game.standAnimated(plugin, () -> {
                             if (player.getOpenInventory().getTopInventory().getHolder() instanceof BlackjackGuiHolder) {

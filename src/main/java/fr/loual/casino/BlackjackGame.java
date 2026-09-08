@@ -42,6 +42,7 @@ public class BlackjackGame {
         NONE,
         PLAYER_BLACKJACK,
         PLAYER_WIN,
+        FIVE_CARD_CHARLIE,
         DEALER_BUST,
         DEALER_WIN,
         PLAYER_BUST,
@@ -222,8 +223,66 @@ public class BlackjackGame {
             state = State.GAME_OVER;
             result = Result.PLAYER_BUST;
             applyPayout(player);
+        } else if (playerHand.size() >= 5) {
+            // Règle du Five-Card Charlie : 5 cartes sans sauter = Victoire instantanée !
+            state = State.GAME_OVER;
+            result = Result.FIVE_CARD_CHARLIE;
+            applyPayout(player);
         }
         onUpdate.run();
+    }
+
+    public boolean canDoubleDown() {
+        if (state != State.PLAYING || playerHand.size() != 2) return false;
+        if (mode == Mode.CLASSIC) {
+            if (betItem == null || betItem.getType().isAir()) return false;
+            ItemStack check = betItem.clone();
+            check.setAmount(1);
+            return player.getInventory().containsAtLeast(check, betItem.getAmount());
+        } else {
+            return challengeChips >= activeChallengeBet;
+        }
+    }
+
+    public boolean doubleDownAnimated(Plugin plugin, Runnable onUpdate) {
+        if (!canDoubleDown()) return false;
+
+        // 1. Déduire la mise supplémentaire
+        if (mode == Mode.CLASSIC) {
+            ItemStack toRemove = betItem.clone();
+            toRemove.setAmount(betItem.getAmount());
+            HashMap<Integer, ItemStack> notRemoved = player.getInventory().removeItem(toRemove);
+            if (!notRemoved.isEmpty()) {
+                return false;
+            }
+            betItem.setAmount(betItem.getAmount() * 2);
+        } else {
+            challengeChips -= activeChallengeBet;
+            activeChallengeBet *= 2;
+            saveChallengeToPdc(plugin);
+        }
+
+        // 2. Sons d'activation
+        player.playSound(player.getLocation(), Sound.ITEM_ARMOR_EQUIP_GOLD, 1.0f, 1.2f);
+        player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.5f);
+
+        // 3. Tirer EXACTEMENT une seule carte supplémentaire
+        playerHand.add(deck.draw());
+        int pScore = calculateScore(playerHand);
+        onUpdate.run();
+
+        // 4. Résolution automatique
+        if (pScore > 21) {
+            state = State.GAME_OVER;
+            result = Result.PLAYER_BUST;
+            applyPayout(player);
+            onUpdate.run();
+        } else {
+            // Tour du croupier automatique
+            standAnimated(plugin, onUpdate);
+        }
+
+        return true;
     }
 
     public void standAnimated(Plugin plugin, Runnable onUpdate) {
@@ -292,6 +351,13 @@ public class BlackjackGame {
                     targetPlayer.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.3f);
                     targetPlayer.spawnParticle(Particle.TOTEM_OF_UNDYING, loc.clone().add(0, 1, 0), 35, 0.5, 0.5, 0.5, 0.2);
                 }
+                case FIVE_CARD_CHARLIE -> {
+                    giveReward(targetPlayer, 2);
+                    targetPlayer.sendMessage(Component.text("✦ FIVE-CARD CHARLIE ! ✦ 5 cartes sans sauter ! Victoire immédiate (x2) !", NamedTextColor.GOLD, TextDecoration.BOLD));
+                    targetPlayer.playSound(loc, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.2f);
+                    targetPlayer.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
+                    targetPlayer.spawnParticle(Particle.TOTEM_OF_UNDYING, loc.clone().add(0, 1, 0), 40, 0.5, 0.5, 0.5, 0.2);
+                }
                 case PLAYER_WIN, DEALER_BUST -> {
                     giveReward(targetPlayer, 2);
                     String reason = (result == Result.DEALER_BUST) ? "Le croupier a dépassé 21 (Bust) !" : "Votre score est supérieur à celui du croupier !";
@@ -322,6 +388,14 @@ public class BlackjackGame {
                     targetPlayer.playSound(loc, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.1f);
                     targetPlayer.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.3f);
                     targetPlayer.spawnParticle(Particle.TOTEM_OF_UNDYING, loc.clone().add(0, 1, 0), 35, 0.5, 0.5, 0.5, 0.2);
+                }
+                case FIVE_CARD_CHARLIE -> {
+                    int winnings = activeChallengeBet * 2;
+                    challengeChips += winnings;
+                    targetPlayer.sendMessage(Component.text("✦ FIVE-CARD CHARLIE ! ✦ 5 cartes sans sauter ! +" + winnings + " Jetons (Solde: " + challengeChips + ")", NamedTextColor.GOLD, TextDecoration.BOLD));
+                    targetPlayer.playSound(loc, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.2f);
+                    targetPlayer.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
+                    targetPlayer.spawnParticle(Particle.TOTEM_OF_UNDYING, loc.clone().add(0, 1, 0), 40, 0.5, 0.5, 0.5, 0.2);
                 }
                 case PLAYER_WIN, DEALER_BUST -> {
                     int winnings = activeChallengeBet * 2;
