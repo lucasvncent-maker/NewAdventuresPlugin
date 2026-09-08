@@ -53,6 +53,8 @@ public class HordeListener implements Listener {
     public void onEntityDeath(EntityDeathEvent event) {
         LivingEntity entity = event.getEntity();
         if (entity.getPersistentDataContainer().has(HordeManager.MOB_KEY, PersistentDataType.STRING)) {
+            // Empêche les débris de mob (os, flèches, yeux, chair) de polluer l'arène
+            event.getDrops().clear();
             // Effet visuel de disparition
             entity.getWorld().spawnParticle(Particle.SOUL, entity.getLocation().add(0, 1, 0), 10, 0.3, 0.3, 0.3, 0.05);
             entity.getWorld().playSound(entity.getLocation(), Sound.ENTITY_ZOMBIE_VILLAGER_CONVERTED, 0.8f, 1.6f);

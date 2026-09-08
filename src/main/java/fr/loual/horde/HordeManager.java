@@ -59,6 +59,8 @@ public class HordeManager {
     private LivingEntity bossEntity = null;
     private BossBar bossBar = null;
     private BukkitTask hordeTask = null;
+    private final List<BukkitTask> waveTasks = new ArrayList<>();
+    private boolean allPacksSpawned = false;
     private int totalWaveMobs = 0;
     private int bossSkillCooldown = 0;
 
@@ -256,6 +258,11 @@ public class HordeManager {
         this.currentWave = 0;
         this.defeatCountdown = 0;
         this.activeMobs.clear();
+        for (BukkitTask t : waveTasks) {
+            if (t != null) t.cancel();
+        }
+        this.waveTasks.clear();
+        this.allPacksSpawned = false;
         this.bossEntity = null;
         this.returnLocations.clear();
         this.activeParticipants.clear();
@@ -408,14 +415,19 @@ public class HordeManager {
                 float progress = totalWaveMobs > 0 ? (float) remaining / (float) totalWaveMobs : 0f;
                 progress = Math.max(0f, Math.min(1f, progress));
                 bossBar.progress(progress);
-                bossBar.name(Component.text("☠ Vague " + currentWave + "/4 : " + remaining + " monstres restants ☠", NamedTextColor.RED, TextDecoration.BOLD));
 
-                // Si plus aucun monstre dans la vague -> Vague suivante
-                if (remaining == 0) {
+                if (!allPacksSpawned) {
+                    bossBar.name(Component.text("☠ Vague " + currentWave + "/4 : " + remaining + " monstres (Renforts imminents...) ☠", NamedTextColor.RED, TextDecoration.BOLD));
+                } else {
+                    bossBar.name(Component.text("☠ Vague " + currentWave + "/4 : " + remaining + " monstres restants ☠", NamedTextColor.RED, TextDecoration.BOLD));
+                }
+
+                // Si plus aucun monstre dans la vague et que tous les packs sont sortis -> Vague suivante
+                if (remaining == 0 && allPacksSpawned) {
                     state = State.WAVE_CLEARED;
                     onWaveCleared();
                 } else {
-                    // Particules kamikaze et sons
+                    // Particules kamikaze et spéciaux
                     tickSpecialMobs();
                 }
             } else if (currentWave == 4) {
@@ -439,29 +451,40 @@ public class HordeManager {
     private void tickSpecialMobs() {
         for (UUID uuid : new ArrayList<>(activeMobs)) {
             Entity entity = Bukkit.getEntity(uuid);
-            if (!(entity instanceof Zombie zombie) || !zombie.isValid()) continue;
+            if (entity == null || !entity.isValid()) continue;
 
-            // Kamikaze
-            if (zombie.getPersistentDataContainer().has(KAMIKAZE_KEY, PersistentDataType.BYTE)) {
-                zombie.getWorld().spawnParticle(Particle.SMOKE, zombie.getLocation().add(0, 1.2, 0), 4, 0.1, 0.1, 0.1, 0.02);
-                zombie.getWorld().spawnParticle(Particle.FLAME, zombie.getLocation().add(0, 1.2, 0), 2, 0.1, 0.1, 0.1, 0.01);
+            if (entity instanceof Zombie zombie) {
+                // Kamikaze
+                if (zombie.getPersistentDataContainer().has(KAMIKAZE_KEY, PersistentDataType.BYTE)) {
+                    zombie.getWorld().spawnParticle(Particle.SMOKE, zombie.getLocation().add(0, 1.2, 0), 4, 0.1, 0.1, 0.1, 0.02);
+                    zombie.getWorld().spawnParticle(Particle.FLAME, zombie.getLocation().add(0, 1.2, 0), 2, 0.1, 0.1, 0.1, 0.01);
 
-                Player nearest = findNearestPlayer(zombie.getLocation(), 2.8);
-                if (nearest != null) {
-                    // Explose !
-                    Location loc = zombie.getLocation();
-                    loc.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, loc, 1);
-                    loc.getWorld().playSound(loc, Sound.ENTITY_GENERIC_EXPLODE, 1.2f, 1.0f);
-                    // Dégâts sans casser les blocs
-                    loc.getWorld().createExplosion(loc, 3.2f, false, false);
-                    zombie.remove();
-                    activeMobs.remove(uuid);
+                    Player nearest = findNearestPlayer(zombie.getLocation(), 2.8);
+                    if (nearest != null) {
+                        // Explose !
+                        Location loc = zombie.getLocation();
+                        loc.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, loc, 1);
+                        loc.getWorld().playSound(loc, Sound.ENTITY_GENERIC_EXPLODE, 1.2f, 1.0f);
+                        loc.getWorld().createExplosion(loc, 3.2f, false, false);
+                        zombie.remove();
+                        activeMobs.remove(uuid);
+                    }
                 }
-            }
 
-            // Nécromancien
-            if (zombie.getPersistentDataContainer().has(NECRO_KEY, PersistentDataType.BYTE)) {
-                zombie.getWorld().spawnParticle(Particle.WITCH, zombie.getLocation().add(0, 1.5, 0), 3, 0.2, 0.3, 0.2, 0.02);
+                // Nécromancien
+                if (zombie.getPersistentDataContainer().has(NECRO_KEY, PersistentDataType.BYTE)) {
+                    zombie.getWorld().spawnParticle(Particle.WITCH, zombie.getLocation().add(0, 1.5, 0), 3, 0.2, 0.3, 0.2, 0.02);
+                }
+            } else if (entity instanceof WitherSkeleton ws) {
+                // Faucheur d'âmes
+                if (Math.random() < 0.25) {
+                    ws.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME, ws.getLocation().add(0, 1.2, 0), 2, 0.15, 0.2, 0.15, 0.01);
+                }
+            } else if (entity instanceof PiglinBrute pb) {
+                // Bourreau enragé
+                if (Math.random() < 0.2) {
+                    pb.getWorld().spawnParticle(Particle.ANGRY_VILLAGER, pb.getLocation().add(0, 2.0, 0), 1, 0.1, 0.1, 0.1, 0);
+                }
             }
         }
     }
@@ -550,6 +573,11 @@ public class HordeManager {
 
         state = State.WAVE_IN_PROGRESS;
         activeMobs.clear();
+        for (BukkitTask task : waveTasks) {
+            if (task != null) task.cancel();
+        }
+        waveTasks.clear();
+        allPacksSpawned = false;
 
         World world = centerLocation.getWorld();
         if (world == null) return;
@@ -572,46 +600,81 @@ public class HordeManager {
 
         switch (wave) {
             case 1 -> {
-                // Vague 1 : 14 Éclaireurs
-                totalWaveMobs = 14;
-                for (int i = 0; i < totalWaveMobs; i++) {
-                    Location loc = getRandomSpawnLocation(8.0, 15.0);
-                    Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
-                    setupScout(z);
-                    activeMobs.add(z.getUniqueId());
-                }
+                // Vague 1 (Total : 16 mobs)
+                totalWaveMobs = 16;
+                // Pack 1 (t=0s) : 4 Éclaireurs + 2 Rôdeurs
+                spawnScouts(world, 4);
+                spawnArchers(world, 2);
+
+                // Pack 2 (t=7s / 140 ticks) : 3 Éclaireurs + 2 Rôdeurs + 2 Araignées
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 1) return;
+                    announceReinforcements(world);
+                    spawnScouts(world, 3);
+                    spawnArchers(world, 2);
+                    spawnSpiders(world, 2);
+                }, 140L));
+
+                // Pack 3 (t=15s / 300 ticks) : 3 Araignées + 2 Rôdeurs
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 1) return;
+                    announceReinforcements(world);
+                    spawnSpiders(world, 3);
+                    spawnArchers(world, 2);
+                    allPacksSpawned = true;
+                }, 300L));
             }
             case 2 -> {
-                // Vague 2 : 8 Briseurs de Siège + 4 Kamikazes
-                totalWaveMobs = 12;
-                for (int i = 0; i < 8; i++) {
-                    Location loc = getRandomSpawnLocation(8.0, 15.0);
-                    Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
-                    setupBreaker(z);
-                    activeMobs.add(z.getUniqueId());
-                }
-                for (int i = 0; i < 4; i++) {
-                    Location loc = getRandomSpawnLocation(9.0, 15.0);
-                    Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
-                    setupKamikaze(z);
-                    activeMobs.add(z.getUniqueId());
-                }
+                // Vague 2 (Total : 16 mobs)
+                totalWaveMobs = 16;
+                // Pack 1 (t=0s) : 3 Briseurs + 3 Rôdeurs
+                spawnBreakers(world, 3);
+                spawnArchers(world, 3);
+
+                // Pack 2 (t=8s / 160 ticks) : 2 Faucheurs + 2 Kamikazes + 1 Briseur
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 2) return;
+                    announceReinforcements(world);
+                    spawnReapers(world, 2);
+                    spawnKamikazes(world, 2);
+                    spawnBreakers(world, 1);
+                }, 160L));
+
+                // Pack 3 (t=16s / 320 ticks) : 2 Faucheurs + 2 Kamikazes + 1 Briseur
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 2) return;
+                    announceReinforcements(world);
+                    spawnReapers(world, 2);
+                    spawnKamikazes(world, 2);
+                    spawnBreakers(world, 1);
+                    allPacksSpawned = true;
+                }, 320L));
             }
             case 3 -> {
-                // Vague 3 : 7 Gardes d'Élite + 3 Nécromanciens
-                totalWaveMobs = 10;
-                for (int i = 0; i < 7; i++) {
-                    Location loc = getRandomSpawnLocation(8.0, 15.0);
-                    Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
-                    setupElite(z);
-                    activeMobs.add(z.getUniqueId());
-                }
-                for (int i = 0; i < 3; i++) {
-                    Location loc = getRandomSpawnLocation(9.0, 15.0);
-                    Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
-                    setupNecromancer(z);
-                    activeMobs.add(z.getUniqueId());
-                }
+                // Vague 3 (Total : 16 mobs)
+                totalWaveMobs = 16;
+                // Pack 1 (t=0s) : 3 Gardes d'Élite + 3 Faucheurs
+                spawnElites(world, 3);
+                spawnReapers(world, 3);
+
+                // Pack 2 (t=8s / 160 ticks) : 2 Bourreaux + 2 Nécromanciens + 1 Garde d'Élite
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 3) return;
+                    announceReinforcements(world);
+                    spawnBrutes(world, 2);
+                    spawnNecromancers(world, 2);
+                    spawnElites(world, 1);
+                }, 160L));
+
+                // Pack 3 (t=16s / 320 ticks) : 2 Bourreaux + 2 Rôdeurs + 1 Kamikaze
+                waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (state != State.WAVE_IN_PROGRESS || currentWave != 3) return;
+                    announceReinforcements(world);
+                    spawnBrutes(world, 2);
+                    spawnArchers(world, 2);
+                    spawnKamikazes(world, 1);
+                    allPacksSpawned = true;
+                }, 320L));
             }
         }
     }
@@ -619,6 +682,8 @@ public class HordeManager {
     private void spawnBoss() {
         World world = centerLocation.getWorld();
         if (world == null) return;
+
+        allPacksSpawned = true;
 
         Location bossLoc = centerLocation.clone().add(0, 1, 0);
         world.strikeLightningEffect(bossLoc);
@@ -677,6 +742,23 @@ public class HordeManager {
 
         this.bossEntity = boss;
         this.activeMobs.add(boss.getUniqueId());
+
+        // Renforts programmés pendant le combat de Boss
+        // Renfort 1 (t=12s / 240 ticks) : 2 Gardes d'Élite + 2 Rôdeurs
+        waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (state != State.WAVE_IN_PROGRESS || currentWave != 4) return;
+            announceReinforcements(world);
+            spawnElites(world, 2);
+            spawnArchers(world, 2);
+        }, 240L));
+
+        // Renfort 2 (t=26s / 520 ticks) : 2 Bourreaux + 2 Kamikazes
+        waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (state != State.WAVE_IN_PROGRESS || currentWave != 4) return;
+            announceReinforcements(world);
+            spawnBrutes(world, 2);
+            spawnKamikazes(world, 2);
+        }, 520L));
     }
 
     private void spawnMinion(Location loc) {
@@ -774,6 +856,196 @@ public class HordeManager {
         }
         z.getPersistentDataContainer().set(MOB_KEY, PersistentDataType.STRING, "necromancer");
         z.getPersistentDataContainer().set(NECRO_KEY, PersistentDataType.BYTE, (byte) 1);
+    }
+
+    private void setupShadowArcher(AbstractSkeleton s) {
+        s.customName(Component.text("Rôdeur des Ombres", NamedTextColor.DARK_GRAY, TextDecoration.BOLD));
+        s.setCustomNameVisible(true);
+        s.setRemoveWhenFarAway(false);
+        s.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, PotionEffect.INFINITE_DURATION, 0));
+        var eq = s.getEquipment();
+        if (eq != null) {
+            ItemStack helm = new ItemStack(Material.LEATHER_HELMET);
+            LeatherArmorMeta meta = (LeatherArmorMeta) helm.getItemMeta();
+            if (meta != null) {
+                meta.setColor(Color.BLACK);
+                helm.setItemMeta(meta);
+            }
+            eq.setHelmet(helm);
+            eq.setChestplate(new ItemStack(Material.CHAINMAIL_CHESTPLATE));
+            eq.setItemInMainHand(new ItemStack(Material.BOW));
+            eq.setHelmetDropChance(0f);
+            eq.setChestplateDropChance(0f);
+            eq.setItemInMainHandDropChance(0f);
+        }
+        s.getPersistentDataContainer().set(MOB_KEY, PersistentDataType.STRING, "archer");
+    }
+
+    private void setupSoulReaper(WitherSkeleton ws) {
+        ws.customName(Component.text("Faucheur d'Âmes", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
+        ws.setCustomNameVisible(true);
+        ws.setRemoveWhenFarAway(false);
+        ws.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, PotionEffect.INFINITE_DURATION, 0));
+        var eq = ws.getEquipment();
+        if (eq != null) {
+            eq.setChestplate(new ItemStack(Material.CHAINMAIL_CHESTPLATE));
+            eq.setItemInMainHand(new ItemStack(Material.IRON_SWORD));
+            eq.setChestplateDropChance(0f);
+            eq.setItemInMainHandDropChance(0f);
+        }
+        ws.getPersistentDataContainer().set(MOB_KEY, PersistentDataType.STRING, "reaper");
+    }
+
+    private void setupEnragedBrute(PiglinBrute pb) {
+        pb.customName(Component.text("Bourreau Enragé", NamedTextColor.GOLD, TextDecoration.BOLD));
+        pb.setCustomNameVisible(true);
+        pb.setRemoveWhenFarAway(false);
+        pb.setImmuneToZombification(true);
+
+        AttributeInstance hpAttr = pb.getAttribute(Attribute.MAX_HEALTH);
+        if (hpAttr != null) {
+            hpAttr.setBaseValue(40.0);
+            pb.setHealth(40.0);
+        }
+        AttributeInstance speedAttr = pb.getAttribute(Attribute.MOVEMENT_SPEED);
+        if (speedAttr != null) {
+            speedAttr.setBaseValue(0.32);
+        }
+        AttributeInstance knockAttr = pb.getAttribute(Attribute.KNOCKBACK_RESISTANCE);
+        if (knockAttr != null) {
+            knockAttr.setBaseValue(0.5);
+        }
+
+        var eq = pb.getEquipment();
+        if (eq != null) {
+            eq.setHelmet(new ItemStack(Material.GOLDEN_HELMET));
+            eq.setItemInMainHand(new ItemStack(Material.GOLDEN_AXE));
+            eq.setHelmetDropChance(0f);
+            eq.setItemInMainHandDropChance(0f);
+        }
+        pb.getPersistentDataContainer().set(MOB_KEY, PersistentDataType.STRING, "brute");
+    }
+
+    private void setupShadowSpider(Spider spider) {
+        spider.customName(Component.text("Araignée des Ténèbres", NamedTextColor.DARK_RED));
+        spider.setCustomNameVisible(true);
+        spider.setRemoveWhenFarAway(false);
+
+        AttributeInstance hpAttr = spider.getAttribute(Attribute.MAX_HEALTH);
+        if (hpAttr != null) {
+            hpAttr.setBaseValue(24.0);
+            spider.setHealth(24.0);
+        }
+        spider.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, PotionEffect.INFINITE_DURATION, 1));
+        spider.getPersistentDataContainer().set(MOB_KEY, PersistentDataType.STRING, "spider");
+    }
+
+    private void announceReinforcements(World world) {
+        if (world == null || state != State.WAVE_IN_PROGRESS) return;
+        for (Player p : world.getPlayers()) {
+            if (isInArena(p.getLocation())) {
+                p.playSound(p.getLocation(), Sound.ENTITY_RAVAGER_ROAR, 1.2f, 1.3f);
+                p.playSound(p.getLocation(), Sound.ENTITY_ZOMBIE_ATTACK_IRON_DOOR, 1.0f, 0.9f);
+                p.sendActionBar(Component.text("⚠ Des renforts ennemis surgissent dans l'arène ! ⚠", NamedTextColor.RED, TextDecoration.BOLD));
+            }
+        }
+    }
+
+    private void playSpawnEffect(Location loc) {
+        World world = loc.getWorld();
+        if (world == null) return;
+        world.spawnParticle(Particle.SMOKE, loc.clone().add(0, 0.5, 0), 10, 0.3, 0.5, 0.3, 0.05);
+        world.spawnParticle(Particle.SOUL, loc.clone().add(0, 0.5, 0), 6, 0.3, 0.5, 0.3, 0.02);
+    }
+
+    private void spawnScouts(World world, int count) {
+        for (int i = 0; i < count; i++) {
+            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            playSpawnEffect(loc);
+            Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
+            setupScout(z);
+            activeMobs.add(z.getUniqueId());
+        }
+    }
+
+    private void spawnArchers(World world, int count) {
+        for (int i = 0; i < count; i++) {
+            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            playSpawnEffect(loc);
+            AbstractSkeleton s = (AbstractSkeleton) world.spawnEntity(loc, EntityType.SKELETON);
+            setupShadowArcher(s);
+            activeMobs.add(s.getUniqueId());
+        }
+    }
+
+    private void spawnBreakers(World world, int count) {
+        for (int i = 0; i < count; i++) {
+            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            playSpawnEffect(loc);
+            Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
+            setupBreaker(z);
+            activeMobs.add(z.getUniqueId());
+        }
+    }
+
+    private void spawnKamikazes(World world, int count) {
+        for (int i = 0; i < count; i++) {
+            Location loc = getRandomSpawnLocation(9.0, 15.0);
+            playSpawnEffect(loc);
+            Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
+            setupKamikaze(z);
+            activeMobs.add(z.getUniqueId());
+        }
+    }
+
+    private void spawnElites(World world, int count) {
+        for (int i = 0; i < count; i++) {
+            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            playSpawnEffect(loc);
+            Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
+            setupElite(z);
+            activeMobs.add(z.getUniqueId());
+        }
+    }
+
+    private void spawnNecromancers(World world, int count) {
+        for (int i = 0; i < count; i++) {
+            Location loc = getRandomSpawnLocation(9.0, 15.0);
+            playSpawnEffect(loc);
+            Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
+            setupNecromancer(z);
+            activeMobs.add(z.getUniqueId());
+        }
+    }
+
+    private void spawnReapers(World world, int count) {
+        for (int i = 0; i < count; i++) {
+            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            playSpawnEffect(loc);
+            WitherSkeleton ws = (WitherSkeleton) world.spawnEntity(loc, EntityType.WITHER_SKELETON);
+            setupSoulReaper(ws);
+            activeMobs.add(ws.getUniqueId());
+        }
+    }
+
+    private void spawnBrutes(World world, int count) {
+        for (int i = 0; i < count; i++) {
+            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            playSpawnEffect(loc);
+            PiglinBrute pb = (PiglinBrute) world.spawnEntity(loc, EntityType.PIGLIN_BRUTE);
+            setupEnragedBrute(pb);
+            activeMobs.add(pb.getUniqueId());
+        }
+    }
+
+    private void spawnSpiders(World world, int count) {
+        for (int i = 0; i < count; i++) {
+            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            playSpawnEffect(loc);
+            Spider spider = (Spider) world.spawnEntity(loc, EntityType.SPIDER);
+            setupShadowSpider(spider);
+            activeMobs.add(spider.getUniqueId());
+        }
     }
 
     private Location getRandomSpawnLocation(double minRadius, double maxRadius) {
@@ -904,6 +1176,12 @@ public class HordeManager {
             hordeTask.cancel();
             hordeTask = null;
         }
+
+        for (BukkitTask task : waveTasks) {
+            if (task != null) task.cancel();
+        }
+        waveTasks.clear();
+        allPacksSpawned = false;
 
         for (UUID uuid : activeMobs) {
             Entity e = Bukkit.getEntity(uuid);
