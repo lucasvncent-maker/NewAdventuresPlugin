@@ -102,8 +102,7 @@ public class BlackjackGui {
                     Component.text("Mode : Standard (Objets)", NamedTextColor.GOLD, TextDecoration.BOLD),
                     "§7Pariez n'importe quel objet de votre inventaire.",
                     "§aVictoire standard : §fLe double (x2) !",
-                    "§6Blackjack naturel : §eTriple (3:1 / x3) !",
-                    "§bFive-Card Charlie : §f5 cartes = Victoire (x2) !",
+                    "§6Blackjack naturel : §ePayé 3 pour 1 (x3) !",
                     "",
                     "§d➤ Cliquer pour passer en Mode Défi Cuprite"
             ));
@@ -113,7 +112,6 @@ public class BlackjackGui {
                     Component.text("Mode : Défi Cuprite", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD),
                     "§7Mission spéciale du Croupier !",
                     "§7Multipliez vos jetons pour remporter de la Cuprite.",
-                    "§bFive-Card Charlie & Doubler inclus !",
                     "",
                     "§a➤ Cliquer pour repasser en Mode Standard"
             );
@@ -266,8 +264,6 @@ public class BlackjackGui {
                             "§e• Départ : §a100 Jetons de défi",
                             "§e• Palier x4 (400 jetons) : §61 Lingot de Cuprite",
                             "§e• Palier x8 (800 jetons) : §d3 Lingots de Cuprite !",
-                            "§b• Doubler (Double Down) : §fMise doublée sur 2 cartes !",
-                            "§b• Five-Card Charlie : §f5 cartes sans sauter = Victoire !",
                             "§c• Faillite (0 jeton) : Mise d'entrée perdue !"
                     ));
                     for (int s : new int[]{ 19, 20, 24 }) {
@@ -387,7 +383,6 @@ public class BlackjackGui {
                                 .append(itemNameComp));
                         lore.add(Component.text("Victoire standard : Le double (x2) !", NamedTextColor.GREEN));
                         lore.add(Component.text("Blackjack (21 naturel) : Payé 3 pour 1 (x3) !", NamedTextColor.GOLD));
-                        lore.add(Component.text("Five-Card Charlie : 5 cartes = Victoire (x2) !", NamedTextColor.AQUA));
                         lore.add(Component.text("Défaite : Votre mise est perdue.", NamedTextColor.RED));
                         lore.add(Component.empty());
                         lore.add(Component.text("➤ Cliquez pour lancer la partie !", NamedTextColor.GREEN));
@@ -433,7 +428,6 @@ public class BlackjackGui {
                             "§eMise : §f" + game.getChallengeBet() + " Jetons",
                             "§7Victoire : §a+" + (game.getChallengeBet() * 2) + " Jetons (x2)",
                             "§6Blackjack (21 naturel) : §e+" + (game.getChallengeBet() * 3) + " Jetons (x3)",
-                            "§bFive-Card Charlie : §f5 cartes = Victoire (x2) !",
                             "§cDéfaite : §7Perte de vos " + game.getChallengeBet() + " Jetons.",
                             "",
                             "§a➤ Cliquez pour lancer la manche !"
@@ -476,7 +470,6 @@ public class BlackjackGui {
                     Component.text("➤ TIRER (Hit)  §e[" + pScore + "/21]", NamedTextColor.GREEN, TextDecoration.BOLD),
                     "§7Prendre une carte supplémentaire.",
                     "§7Votre score actuel : §e" + pScore + "§7/21",
-                    "§bFive-Card Charlie : §f5 cartes = Victoire auto !",
                     "§cAttention si votre score dépasse 21 !"
             );
             hitBtn.setAmount(Math.max(1, Math.min(64, pScore)));
@@ -519,7 +512,6 @@ public class BlackjackGui {
                         lore.add(Component.text("§6Mise actuelle en jeu : §e" + bet.getAmount() + "x"));
                         lore.add(Component.text("§aVictoire standard = Double (x2)"));
                         lore.add(Component.text("§6Blackjack (21 naturel) = Triple (3:1 / x3)"));
-                        lore.add(Component.text("§bFive-Card Charlie = Victoire auto (x2)"));
                         lore.add(Component.text("§cDéfaite = Mise perdue"));
                         meta.lore(lore);
                         betDisplay.setItemMeta(meta);
@@ -531,7 +523,6 @@ public class BlackjackGui {
                         Component.text("Mise en jeu : §6§l" + game.getActiveChallengeBet() + " Jetons", NamedTextColor.YELLOW, TextDecoration.BOLD),
                         "§aVictoire standard : +" + (game.getActiveChallengeBet() * 2) + " Jetons",
                         "§6Blackjack naturel : +" + (game.getActiveChallengeBet() * 3) + " Jetons",
-                        "§bFive-Card Charlie : +" + (game.getActiveChallengeBet() * 2) + " Jetons",
                         "§cDéfaite : Perte de la mise"
                 );
                 betDisplay.setAmount(Math.max(1, Math.min(64, game.getActiveChallengeBet())));
