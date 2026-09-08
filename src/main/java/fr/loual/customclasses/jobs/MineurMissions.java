@@ -22,8 +22,8 @@ public class MineurMissions {
             // Mission 2
             new JobMission(
                     2,
-                    "Mission 2 : Les Gemmes Rares et la Cuprite",
-                    "Sacoche de Minage aspirante reçue + 5% de chances de drop de Cuprite + 1 niveau de Fortune supplémentaire.",
+                    "Mission 2 : L'Artisanat Minier & la Sacoche",
+                    "Sacoche de Minage aspirante reçue + 1 niveau de Fortune supplémentaire garanti (+1).",
                     List.of(
                             new JobMission.Requirement("DIAMOND", "Diamants", Material.DIAMOND, 64),
                             new JobMission.Requirement("EMERALD", "Émeraudes", Material.EMERALD, 64),
@@ -34,12 +34,24 @@ public class MineurMissions {
             // Mission 3
             new JobMission(
                     3,
-                    "Mission 3 : Les Richesses des Profondeurs",
-                    "Célérité II permanent + Régénération I, Résistance I et Résistance au Feu I sous la couche 30.",
+                    "Mission 3 : La Maîtrise des Tréfonds",
+                    "Célérité II permanent + 5% de chances de drop de Cuprite supplémentaire sur tous les minerais.",
                     List.of(
                             new JobMission.Requirement("AMETHYST", "Améthystes", Material.AMETHYST_SHARD, 64),
                             new JobMission.Requirement("SCULK_SENSOR", "Capteurs Sculk", Material.SCULK_SENSOR, 64),
                             new JobMission.Requirement("SPAWNER", "Générateurs (Spawners)", Material.SPAWNER, 3)
+                    )
+            ),
+
+            // Mission 4
+            new JobMission(
+                    4,
+                    "Mission 4 : Le Maître des Abysses & de la Netherite",
+                    "Bénédiction sous la couche Y=30 (Régénération I, Résistance I, Résistance au Feu I) + 1 niveau de Fortune supplémentaire ultime (Fortune +2 total) !",
+                    List.of(
+                            new JobMission.Requirement("ANCIENT_DEBRIS", "Débris Antiques", Material.ANCIENT_DEBRIS, 16),
+                            new JobMission.Requirement("CUPRITE", "Cuprites", Material.RAW_COPPER, 32),
+                            new JobMission.Requirement("ECHO_SHARD", "Éclats d'Écho", Material.ECHO_SHARD, 16)
                     )
             )
     );

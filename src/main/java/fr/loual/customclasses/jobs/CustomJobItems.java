@@ -36,6 +36,7 @@ public class CustomJobItems {
     public static final String ID_AVENTURIER_UNBREAKABLE_ELYTRA = "aventurier_unbreakable_elytra";
     public static final String ID_AVENTURIER_INFINITE_FIREWORK = "aventurier_infinite_firework";
     public static final String ID_AVENTURIER_DISCOVERY_COMPASS = "aventurier_discovery_compass";
+    public static final String ID_AVENTURIER_GRAPPLING_HOOK = "aventurier_grappling_hook";
 
     public static final String ID_MINEUR_ORE_POUCH = "mineur_ore_pouch";
 
@@ -349,6 +350,30 @@ public class CustomJobItems {
         return item;
     }
 
+    public static ItemStack getAventurierGrapplingHook() {
+        ItemStack item = new ItemStack(Material.FISHING_ROD);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text("✦ Grappin d'Exploration de l'Aventurier ✦", NamedTextColor.AQUA, TextDecoration.BOLD));
+            meta.lore(List.of(
+                    Component.text("Un outil d'escalade d'élite conçu pour franchir les gouffres et gravir les sommets.", NamedTextColor.GRAY),
+                    Component.empty(),
+                    Component.text("✦ Clic Droit : Lance le grappin à longue portée", NamedTextColor.YELLOW),
+                    Component.text("✦ Accroche / Rembobinage : Vous propulse à pleine vitesse vers la cible !", NamedTextColor.GREEN),
+                    Component.text("✦ Synergie : Combinez avec les Élytres pour un envol immédiat", NamedTextColor.LIGHT_PURPLE),
+                    Component.empty(),
+                    Component.text("✖ Cooldown : 2 secondes", NamedTextColor.RED),
+                    Component.text("★ Réservé aux Aventuriers (Niveau 4)", NamedTextColor.DARK_GRAY)
+            ));
+            meta.setUnbreakable(true);
+            meta.addEnchant(Enchantment.UNBREAKING, 1, true);
+            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            meta.getPersistentDataContainer().set(ITEM_KEY, PersistentDataType.STRING, ID_AVENTURIER_GRAPPLING_HOOK);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
     public static ItemStack getMineurOrePouch() {
         ItemStack item = new ItemStack(Material.BUNDLE);
         ItemMeta meta = item.getItemMeta();
@@ -409,6 +434,7 @@ public class CustomJobItems {
             case ID_AVENTURIER_UNBREAKABLE_ELYTRA -> getAventurierUnbreakableElytra();
             case ID_AVENTURIER_INFINITE_FIREWORK -> getAventurierInfiniteFirework();
             case ID_AVENTURIER_DISCOVERY_COMPASS -> getAventurierDiscoveryCompass();
+            case ID_AVENTURIER_GRAPPLING_HOOK -> getAventurierGrapplingHook();
             case ID_MINEUR_ORE_POUCH -> getMineurOrePouch();
             default -> null;
         };

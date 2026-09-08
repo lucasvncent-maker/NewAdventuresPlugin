@@ -33,10 +33,11 @@ public enum PlayerJob {
             Component.text("✦ Passif :", NamedTextColor.GOLD, TextDecoration.BOLD),
             Component.text("  • 25% de chances d'appliquer un effet Fortune supplémentaire lors du minage d'un minerai.", NamedTextColor.YELLOW),
             Component.empty(),
-            Component.text("✦ Progression (3 Missions) :", NamedTextColor.AQUA, TextDecoration.BOLD),
+            Component.text("✦ Progression (4 Missions) :", NamedTextColor.AQUA, TextDecoration.BOLD),
             Component.text("  • M1 : Célérité I permanent + Vision nocturne activable (/nv)", NamedTextColor.DARK_AQUA),
-            Component.text("  • M2 : 5% de chances d'obtenir de la Cuprite + 1 niveau de Fortune supplémentaire", NamedTextColor.DARK_AQUA),
-            Component.text("  • M3 : Célérité II permanent + Régénération, Résistance et Résistance au Feu sous la couche Y=30", NamedTextColor.DARK_AQUA)
+            Component.text("  • M2 : Sacoche de Minage aspirante reçue + Fortune supplémentaire (+1)", NamedTextColor.DARK_AQUA),
+            Component.text("  • M3 : Célérité II permanent + 5% de drop de Cuprite supplémentaire sur tous les minerais", NamedTextColor.DARK_AQUA),
+            Component.text("  • M4 : Bénédiction sous la couche Y=30 (Regen, Résistance, Feu) + Fortune ultime (+2 total)", NamedTextColor.DARK_AQUA)
     )),
 
     ARCHITECTE("Architecte", "architecte", Material.SCAFFOLDING, List.of(
@@ -64,10 +65,11 @@ public enum PlayerJob {
             Component.text("  • Vitesse I permanente pour parcourir le monde sans faiblir.", NamedTextColor.YELLOW),
             Component.text("  • Coffres de structures enrichis : minerais précieux, cuprite, épée en or Sharpness VII Looting IV !", NamedTextColor.YELLOW),
             Component.empty(),
-            Component.text("✦ Progression (3 Missions) :", NamedTextColor.AQUA, TextDecoration.BOLD),
+            Component.text("✦ Progression (4 Missions) :", NamedTextColor.AQUA, TextDecoration.BOLD),
             Component.text("  • M1 : Explorer 5 structures Overworld ➔ Meilleurs loots + /sethome & /home", NamedTextColor.DARK_AQUA),
-            Component.text("  • M2 : Explorer les 5 biomes du Nether ➔ Perle infinie sans dégât de chute", NamedTextColor.DARK_AQUA),
-            Component.text("  • M3 : 3 Pommes Cheat, 3 Élytres, 8 Éponges ➔ Élytres Incassables & Feu d'artifice infini", NamedTextColor.DARK_AQUA)
+            Component.text("  • M2 : Explorer les 5 biomes du Nether ➔ Perle infinie + Boussole Antique de Découverte", NamedTextColor.DARK_AQUA),
+            Component.text("  • M3 : 3 Pommes Cheat, 3 Élytres, 8 Éponges ➔ Élytres Incassables & Feu d'artifice infini", NamedTextColor.DARK_AQUA),
+            Component.text("  • M4 : 4 Totems, 16 Shulkers, 2 Cœurs de la Mer ➔ Grappin d'Exploration + /ec + /sethome 2", NamedTextColor.DARK_AQUA)
     ));
 
     private final String displayName;

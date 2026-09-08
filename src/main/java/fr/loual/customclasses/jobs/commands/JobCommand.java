@@ -3,6 +3,7 @@ package fr.loual.customclasses.jobs.commands;
 import fr.loual.newadventure.NewAdventurePlugin;
 import fr.loual.customclasses.jobs.AgriculteurMissions;
 import fr.loual.customclasses.jobs.ArchitecteMissions;
+import fr.loual.customclasses.jobs.AventurierMissions;
 import fr.loual.customclasses.jobs.JobManager;
 import fr.loual.customclasses.jobs.JobMission;
 import fr.loual.customclasses.jobs.MineurMissions;
@@ -193,9 +194,9 @@ public class JobCommand implements CommandExecutor, TabCompleter {
                     }
                 } else if (pj == PlayerJob.MINEUR) {
                     int level = jobManager.getJobLevel(target, pj);
-                    sender.sendMessage(Component.text("Niveau de mission complété : " + level + " / 3", NamedTextColor.YELLOW));
+                    sender.sendMessage(Component.text("Niveau de mission complété : " + level + " / 4", NamedTextColor.YELLOW));
 
-                    if (level < 3) {
+                    if (level < 4) {
                         JobMission current = MineurMissions.getMission(level + 1);
                         if (current != null) {
                             sender.sendMessage(Component.empty());
@@ -218,11 +219,15 @@ public class JobCommand implements CommandExecutor, TabCompleter {
                         sender.sendMessage(Component.text("  • Célérité " + (level >= 3 ? "II" : "I") + " permanent", NamedTextColor.YELLOW));
                         sender.sendMessage(Component.text("  • Commande /nv (Vision Nocturne activable)", NamedTextColor.YELLOW));
                         if (level >= 2) {
-                            sender.sendMessage(Component.text("  • 5% de chance de Cuprite sur tous les minerais", NamedTextColor.YELLOW));
+                            sender.sendMessage(Component.text("  • Sacoche de Minage aspirante", NamedTextColor.YELLOW));
                             sender.sendMessage(Component.text("  • +1 niveau de Fortune supplémentaire garanti", NamedTextColor.YELLOW));
                         }
                         if (level >= 3) {
+                            sender.sendMessage(Component.text("  • 5% de chance de drop de Cuprite sur tous les minerais", NamedTextColor.YELLOW));
+                        }
+                        if (level >= 4) {
                             sender.sendMessage(Component.text("  • Bénédiction sous la couche Y=30 (Regen, Résistance, Résistance au Feu)", NamedTextColor.YELLOW));
+                            sender.sendMessage(Component.text("  • Fortune ultime (+2 au total garanti)", NamedTextColor.YELLOW));
                         }
                     }
                 } else if (pj == PlayerJob.ARCHITECTE) {
@@ -261,6 +266,41 @@ public class JobCommand implements CommandExecutor, TabCompleter {
                         }
                         if (level >= 5) {
                             sender.sendMessage(Component.text("  • Chaussures de l'Architecte (Saut II /jb) + Plume de l'Architecte (Vol 30s)", NamedTextColor.YELLOW));
+                        }
+                    }
+                } else if (pj == PlayerJob.AVENTURIER) {
+                    int level = jobManager.getJobLevel(target, pj);
+                    sender.sendMessage(Component.text("Niveau de mission complété : " + level + " / 4", NamedTextColor.YELLOW));
+
+                    if (level < 4) {
+                        JobMission current = AventurierMissions.getMission(level + 1);
+                        if (current != null) {
+                            sender.sendMessage(Component.empty());
+                            sender.sendMessage(Component.text("✦ En cours : " + current.getTitle(), NamedTextColor.GOLD, TextDecoration.BOLD));
+                            for (JobMission.Requirement req : current.getRequirements()) {
+                                int p = jobManager.getRequirementProgress(target, pj, level + 1, req.key());
+                                NamedTextColor col = (p >= req.requiredAmount()) ? NamedTextColor.GREEN : NamedTextColor.WHITE;
+                                sender.sendMessage(Component.text("  • " + req.displayName() + " : " + p + " / " + req.requiredAmount(), col));
+                            }
+                            sender.sendMessage(Component.text("✦ Récompense : ", NamedTextColor.AQUA)
+                                    .append(Component.text(current.getRewardDescription(), NamedTextColor.GRAY)));
+                        }
+                    } else {
+                        sender.sendMessage(Component.text("★ Félicitations ! Toutes les missions de l'Aventurier sont accomplies !", NamedTextColor.GREEN, TextDecoration.BOLD));
+                    }
+
+                    if (level >= 1) {
+                        sender.sendMessage(Component.empty());
+                        sender.sendMessage(Component.text("✦ Récompenses débloquées :", NamedTextColor.GOLD, TextDecoration.BOLD));
+                        sender.sendMessage(Component.text("  • Meilleurs loots dans les coffres de structures + /sethome & /home", NamedTextColor.YELLOW));
+                        if (level >= 2) {
+                            sender.sendMessage(Component.text("  • Perle Infinie (aucun dégât de chute) + Boussole Antique de Découverte", NamedTextColor.YELLOW));
+                        }
+                        if (level >= 3) {
+                            sender.sendMessage(Component.text("  • Élytres Incassables + Fusée Infinie de vol", NamedTextColor.YELLOW));
+                        }
+                        if (level >= 4) {
+                            sender.sendMessage(Component.text("  • Grappin d'Exploration + Commande /enderchest (/ec) + /sethome 2 & /home 2", NamedTextColor.YELLOW));
                         }
                     }
                 }

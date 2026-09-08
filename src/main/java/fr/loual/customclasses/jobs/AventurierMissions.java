@@ -37,6 +37,18 @@ public class AventurierMissions {
                             new JobMission.Requirement("ELYTRA", "Élytres", Material.ELYTRA, 3),
                             new JobMission.Requirement("SPONGE", "Éponges", Material.SPONGE, 8)
                     )
+            ),
+
+            // Mission 4
+            new JobMission(
+                    4,
+                    "Mission 4 : L'Explorateur Légendaire des Mondes",
+                    "Grappin d'Exploration (projection dynamique) + Commande /enderchest (/ec) + Déblocage du 2e Home (/sethome 2 & /home 2) !",
+                    List.of(
+                            new JobMission.Requirement("TOTEM_OF_UNDYING", "Totems d'Immortalité", Material.TOTEM_OF_UNDYING, 4),
+                            new JobMission.Requirement("SHULKER_SHELL", "Carapaces de Shulker", Material.SHULKER_SHELL, 16),
+                            new JobMission.Requirement("HEART_OF_THE_SEA", "Cœurs de la Mer", Material.HEART_OF_THE_SEA, 2)
+                    )
             )
     );
 

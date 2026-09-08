@@ -60,6 +60,8 @@ import fr.loual.customminerals.items.Cuprite;
 import org.bukkit.generator.structure.Structure;
 import org.bukkit.event.block.BlockDropItemEvent;
 import org.bukkit.entity.Item;
+import org.bukkit.entity.FishHook;
+import org.bukkit.event.player.PlayerFishEvent;
 import org.bukkit.inventory.meta.CompassMeta;
 import fr.loual.customclasses.jobs.MineurPouchManager;
 import java.util.Iterator;
@@ -85,6 +87,7 @@ public class JobListener implements Listener {
     // Aventurier
     private final Map<UUID, Long> discoveryCompassCooldowns = new HashMap<>();
     private final Map<UUID, Long> pearlCooldowns = new HashMap<>();
+    private final Map<UUID, Long> grapplingCooldowns = new HashMap<>();
     private final NamespacedKey chestBoostKey;
     private final NamespacedKey noFallPearlKey;
 
@@ -481,6 +484,10 @@ public class JobListener implements Listener {
                 if (level >= 2) {
                     extraCount++;
                 }
+                // Récompense Mission 4 : 1 niveau de Fortune supplémentaire ultime (+2 au total)
+                if (level >= 4) {
+                    extraCount++;
+                }
 
                 if (extraCount > 0) {
                     ItemStack dropStack = extraDrop.clone();
@@ -494,13 +501,14 @@ public class JobListener implements Listener {
             }
         }
 
-        // 2. Récompense Mission 2 : 5% de chance de drop de la Cuprite sur les minerais
-        if (level >= 2) {
-            if (Math.random() <= 0.05) {
+        // 2. Récompense Mission 3 : 5% de chance de drop de la Cuprite sur les minerais (8% à la Mission 4)
+        if (level >= 3) {
+            double chance = (level >= 4) ? 0.08 : 0.05;
+            if (Math.random() <= chance) {
                 block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), Cuprite.create(plugin, 1));
                 block.getWorld().spawnParticle(Particle.TOTEM_OF_UNDYING, block.getLocation().add(0.5, 0.5, 0.5), 10, 0.3, 0.3, 0.3, 0.1);
                 player.playSound(block.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_RESONATE, 0.9f, 1.5f);
-                player.sendActionBar(Component.text("✦ [Mineur M2] Cuprite découverte !", NamedTextColor.GOLD, TextDecoration.BOLD));
+                player.sendActionBar(Component.text("✦ [Mineur M" + level + "] Cuprite découverte !", NamedTextColor.GOLD, TextDecoration.BOLD));
             }
         }
     }
@@ -1580,6 +1588,16 @@ public class JobListener implements Listener {
                 );
                 player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
             }
+        } else if (cmd.equals("enderchest") || cmd.equals("ec")) {
+            boolean isAventurierM4 = jobManager.getPlayerJob(player) == PlayerJob.AVENTURIER && jobManager.getJobLevel(player, PlayerJob.AVENTURIER) >= 4;
+            if (!isAventurierM4) {
+                event.setCancelled(true);
+                player.sendMessage(
+                        Component.text("[Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                                .append(Component.text("Vous devez être Aventurier de niveau 4 pour utiliser /" + parts[0] + " !", NamedTextColor.RED))
+                );
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+            }
         }
     }
 
@@ -1810,6 +1828,67 @@ public class JobListener implements Listener {
 
     @EventHandler
     public void onJobPlayerQuit(PlayerQuitEvent event) {
-        MineurPouchManager.savePouch(event.getPlayer());
+        Player player = event.getPlayer();
+        MineurPouchManager.savePouch(player);
+        grapplingCooldowns.remove(player.getUniqueId());
+        fallImmunity.remove(player.getUniqueId());
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onPlayerFish(PlayerFishEvent event) {
+        Player player = event.getPlayer();
+        ItemStack rod = player.getInventory().getItemInMainHand();
+        if (!CustomJobItems.isJobItem(rod, CustomJobItems.ID_AVENTURIER_GRAPPLING_HOOK)) {
+            rod = player.getInventory().getItemInOffHand();
+            if (!CustomJobItems.isJobItem(rod, CustomJobItems.ID_AVENTURIER_GRAPPLING_HOOK)) return;
+        }
+
+        if (jobManager.getPlayerJob(player) != PlayerJob.AVENTURIER || jobManager.getJobLevel(player, PlayerJob.AVENTURIER) < 4) {
+            player.sendMessage(Component.text("[Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                    .append(Component.text("Vous devez être Aventurier de niveau 4 pour utiliser le Grappin d'Exploration !", NamedTextColor.RED)));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            event.setCancelled(true);
+            return;
+        }
+
+        PlayerFishEvent.State state = event.getState();
+        if (state == PlayerFishEvent.State.IN_GROUND || state == PlayerFishEvent.State.CAUGHT_ENTITY || state == PlayerFishEvent.State.REEL_IN) {
+            FishHook hook = event.getHook();
+            if (hook == null) return;
+
+            long now = System.currentTimeMillis();
+            Long last = grapplingCooldowns.get(player.getUniqueId());
+            if (last != null && now - last < 1500L) {
+                return;
+            }
+
+            Location hookLoc = hook.getLocation();
+            Location playerLoc = player.getLocation();
+            double distance = hookLoc.distance(playerLoc);
+
+            if (distance > 1.8) {
+                grapplingCooldowns.put(player.getUniqueId(), now);
+                player.setCooldown(Material.FISHING_ROD, 35);
+
+                org.bukkit.util.Vector dir = hookLoc.toVector().subtract(playerLoc.toVector());
+                dir.normalize();
+
+                double speed = Math.min(2.4, 0.9 + distance * 0.08);
+                org.bukkit.util.Vector velocity = dir.multiply(speed);
+                velocity.setY(Math.min(1.4, velocity.getY() + 0.35));
+
+                player.setVelocity(velocity);
+
+                player.getWorld().spawnParticle(Particle.CLOUD, playerLoc.clone().add(0, 0.5, 0), 20, 0.3, 0.3, 0.3, 0.08);
+                player.getWorld().spawnParticle(Particle.SWEEP_ATTACK, playerLoc.clone().add(0, 1.0, 0), 2, 0.2, 0.2, 0.2, 0.01);
+                player.playSound(playerLoc, Sound.ENTITY_WIND_CHARGE_WIND_BURST, 1.0f, 1.2f);
+                player.playSound(playerLoc, Sound.ENTITY_FISHING_BOBBER_RETRIEVE, 1.0f, 1.4f);
+
+                fallImmunity.add(player.getUniqueId());
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    fallImmunity.remove(player.getUniqueId());
+                }, 100L); // 5 secondes de protection
+            }
+        }
     }
 }

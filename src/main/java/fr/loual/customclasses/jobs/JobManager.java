@@ -33,6 +33,7 @@ public class JobManager {
     private final NamespacedKey structKey;
     private final NamespacedKey biomesKey;
     private final NamespacedKey homeKey;
+    private final NamespacedKey home2Key;
     private final Map<UUID, PlayerJob> cache = new HashMap<>();
 
     public JobManager(NewAdventurePlugin plugin) {
@@ -43,6 +44,7 @@ public class JobManager {
         this.structKey = new NamespacedKey(plugin, "aventurier_structures");
         this.biomesKey = new NamespacedKey(plugin, "aventurier_biomes");
         this.homeKey = new NamespacedKey(plugin, "aventurier_home");
+        this.home2Key = new NamespacedKey(plugin, "aventurier_home_2");
     }
 
     public PlayerJob getPlayerJob(Player player) {
@@ -80,6 +82,7 @@ public class JobManager {
         player.getPersistentDataContainer().remove(structKey);
         player.getPersistentDataContainer().remove(biomesKey);
         player.getPersistentDataContainer().remove(homeKey);
+        player.getPersistentDataContainer().remove(home2Key);
         setNightVisionEnabled(player, false);
         setJumpBoostEnabled(player, false);
         applyJobEffects(player);
@@ -243,7 +246,7 @@ public class JobManager {
      */
     public void tickLayerEffects() {
         for (Player player : plugin.getServer().getOnlinePlayers()) {
-            if (getPlayerJob(player) == PlayerJob.MINEUR && getJobLevel(player, PlayerJob.MINEUR) >= 3) {
+            if (getPlayerJob(player) == PlayerJob.MINEUR && getJobLevel(player, PlayerJob.MINEUR) >= 4) {
                 if (player.getLocation().getY() <= 30.0) {
                     player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 50, 0, false, false, true));
                     player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 50, 0, false, false, true));
@@ -331,11 +334,20 @@ public class JobManager {
             case AMETHYST_SHARD, AMETHYST_BLOCK -> "AMETHYST";
             case SCULK_SENSOR -> "SCULK_SENSOR";
             case SPAWNER -> "SPAWNER";
+            case ANCIENT_DEBRIS, NETHERITE_SCRAP, NETHERITE_INGOT, NETHERITE_BLOCK -> "ANCIENT_DEBRIS";
+            case ECHO_SHARD -> "ECHO_SHARD";
 
             // Aventurier
             case ENCHANTED_GOLDEN_APPLE -> "ENCHANTED_GOLDEN_APPLE";
             case ELYTRA -> "ELYTRA";
             case SPONGE, WET_SPONGE -> "SPONGE";
+            case TOTEM_OF_UNDYING -> "TOTEM_OF_UNDYING";
+            case SHULKER_SHELL, SHULKER_BOX, BLACK_SHULKER_BOX, BLUE_SHULKER_BOX, BROWN_SHULKER_BOX,
+                 CYAN_SHULKER_BOX, GRAY_SHULKER_BOX, GREEN_SHULKER_BOX, LIGHT_BLUE_SHULKER_BOX,
+                 LIGHT_GRAY_SHULKER_BOX, LIME_SHULKER_BOX, MAGENTA_SHULKER_BOX, ORANGE_SHULKER_BOX,
+                 PINK_SHULKER_BOX, PURPLE_SHULKER_BOX, RED_SHULKER_BOX, WHITE_SHULKER_BOX,
+                 YELLOW_SHULKER_BOX -> "SHULKER_SHELL";
+            case HEART_OF_THE_SEA -> "HEART_OF_THE_SEA";
             default -> null;
         };
     }
@@ -437,6 +449,14 @@ public class JobManager {
                 case "SPAWNER" -> {
                     if (type == Material.SPAWNER) count += item.getAmount();
                 }
+                case "ANCIENT_DEBRIS" -> {
+                    if (type == Material.ANCIENT_DEBRIS || type == Material.NETHERITE_SCRAP) count += item.getAmount();
+                    else if (type == Material.NETHERITE_INGOT) count += item.getAmount() * 4;
+                    else if (type == Material.NETHERITE_BLOCK) count += item.getAmount() * 36;
+                }
+                case "ECHO_SHARD" -> {
+                    if (type == Material.ECHO_SHARD) count += item.getAmount();
+                }
 
                 // --- ARCHITECTE ---
                 case "WOOD" -> {
@@ -526,6 +546,16 @@ public class JobManager {
                 }
                 case "SPONGE" -> {
                     if (type == Material.SPONGE || type == Material.WET_SPONGE) count += item.getAmount();
+                }
+                case "TOTEM_OF_UNDYING" -> {
+                    if (type == Material.TOTEM_OF_UNDYING) count += item.getAmount();
+                }
+                case "SHULKER_SHELL" -> {
+                    if (type == Material.SHULKER_SHELL) count += item.getAmount();
+                    else if (type.name().endsWith("SHULKER_BOX")) count += item.getAmount() * 2;
+                }
+                case "HEART_OF_THE_SEA" -> {
+                    if (type == Material.HEART_OF_THE_SEA) count += item.getAmount();
                 }
                 default -> {}
             }
@@ -641,11 +671,14 @@ public class JobManager {
                             .append(Component.text("Effet Célérité I permanent + /nv pour activer la Vision Nocturne !", NamedTextColor.YELLOW)));
                 } else if (missionNumber == 2) {
                     player.sendMessage(Component.text("✦ Récompenses Mineur M2 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
-                            .append(Component.text("Sacoche de Minage aspirante reçue + 5% de chance de drop de Cuprite + Fortune supplémentaire (+1) !", NamedTextColor.YELLOW)));
+                            .append(Component.text("Sacoche de Minage aspirante reçue + Fortune supplémentaire (+1) garanti !", NamedTextColor.YELLOW)));
                     giveOrDropItem(player, CustomJobItems.getMineurOrePouch());
                 } else if (missionNumber == 3) {
                     player.sendMessage(Component.text("✦ Récompenses Mineur M3 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
-                            .append(Component.text("Célérité II permanent + Régénération, Résistance & Résistance au Feu sous la couche 30 !", NamedTextColor.YELLOW)));
+                            .append(Component.text("Célérité II permanent + 5% de chance de drop de Cuprite supplémentaire sur tous les minerais !", NamedTextColor.YELLOW)));
+                } else if (missionNumber == 4) {
+                    player.sendMessage(Component.text("✦ Récompenses Suprêmes Mineur M4 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("Bénédiction sous la couche Y=30 (Regen, Résistance, Feu) + Fortune ultime (+2 au total) !", NamedTextColor.YELLOW)));
                 }
             } else if (job == PlayerJob.ARCHITECTE) {
                 if (missionNumber == 1) {
@@ -683,6 +716,10 @@ public class JobManager {
                             .append(Component.text("Élytres Incassables + Fusée Infinie reçues pour explorer sans limites !", NamedTextColor.YELLOW)));
                     giveOrDropItem(player, CustomJobItems.getAventurierUnbreakableElytra());
                     giveOrDropItem(player, CustomJobItems.getAventurierInfiniteFirework());
+                } else if (missionNumber == 4) {
+                    player.sendMessage(Component.text("✦ Récompenses Légendaires Aventurier M4 : ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("Grappin d'Exploration reçu + Commande /enderchest (/ec) + Déblocage de /sethome 2 !", NamedTextColor.YELLOW)));
+                    giveOrDropItem(player, CustomJobItems.getAventurierGrapplingHook());
                 }
             }
 
@@ -743,15 +780,21 @@ public class JobManager {
         return false;
     }
 
-    public void setHomeLocation(Player player, org.bukkit.Location loc) {
+    public void setHomeLocation(Player player, int slot, org.bukkit.Location loc) {
         if (player == null || loc == null || loc.getWorld() == null) return;
+        NamespacedKey targetKey = (slot == 2) ? home2Key : homeKey;
         String val = loc.getWorld().getName() + ";" + loc.getX() + ";" + loc.getY() + ";" + loc.getZ() + ";" + loc.getYaw() + ";" + loc.getPitch();
-        player.getPersistentDataContainer().set(homeKey, PersistentDataType.STRING, val);
+        player.getPersistentDataContainer().set(targetKey, PersistentDataType.STRING, val);
     }
 
-    public org.bukkit.Location getHomeLocation(Player player) {
+    public void setHomeLocation(Player player, org.bukkit.Location loc) {
+        setHomeLocation(player, 1, loc);
+    }
+
+    public org.bukkit.Location getHomeLocation(Player player, int slot) {
         if (player == null) return null;
-        String val = player.getPersistentDataContainer().get(homeKey, PersistentDataType.STRING);
+        NamespacedKey targetKey = (slot == 2) ? home2Key : homeKey;
+        String val = player.getPersistentDataContainer().get(targetKey, PersistentDataType.STRING);
         if (val == null || val.isBlank()) return null;
         String[] parts = val.split(";");
         if (parts.length < 6) return null;
@@ -767,6 +810,10 @@ public class JobManager {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    public org.bukkit.Location getHomeLocation(Player player) {
+        return getHomeLocation(player, 1);
     }
 
     public void giveOrDropItem(Player player, org.bukkit.inventory.ItemStack item) {

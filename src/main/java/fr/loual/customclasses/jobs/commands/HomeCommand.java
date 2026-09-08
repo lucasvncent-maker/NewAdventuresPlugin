@@ -47,24 +47,45 @@ public class HomeCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        int slot = 1;
+        if (args.length > 0) {
+            if (args[0].equals("2")) {
+                slot = 2;
+            } else if (args[0].equals("1")) {
+                slot = 1;
+            }
+        }
+
+        if (slot == 2) {
+            boolean isAventurierM4 = jobManager.getPlayerJob(player) == PlayerJob.AVENTURIER && jobManager.getJobLevel(player, PlayerJob.AVENTURIER) >= 4;
+            if (!isAventurierM4) {
+                player.sendMessage(
+                        Component.text("[Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                                .append(Component.text("Vous devez être Aventurier de niveau 4 pour utiliser le 2e Home (/sethome 2 & /home 2) !", NamedTextColor.RED))
+                );
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                return true;
+            }
+        }
+
         if (label.equalsIgnoreCase("sethome") || label.equalsIgnoreCase("set_home") || label.equalsIgnoreCase("sh")) {
-            jobManager.setHomeLocation(player, player.getLocation());
+            jobManager.setHomeLocation(player, slot, player.getLocation());
             player.playSound(player.getLocation(), Sound.BLOCK_RESPAWN_ANCHOR_SET_SPAWN, 1.0f, 1.2f);
             player.getWorld().spawnParticle(Particle.PORTAL, player.getLocation().clone().add(0, 1, 0), 30, 0.4, 0.5, 0.4, 0.1);
             player.sendMessage(
                     Component.text("[Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)
-                            .append(Component.text("✦ Point de Home défini avec succès à votre position actuelle !", NamedTextColor.GREEN, TextDecoration.BOLD))
+                            .append(Component.text("✦ Point de Home #" + slot + " défini avec succès à votre position actuelle !", NamedTextColor.GREEN, TextDecoration.BOLD))
             );
             return true;
         }
 
         // Commande /home
-        Location home = jobManager.getHomeLocation(player);
+        Location home = jobManager.getHomeLocation(player, slot);
         if (home == null) {
             player.sendMessage(
                     Component.text("[Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)
-                            .append(Component.text("Vous n'avez pas encore défini de point de Home ! Utilisez ", NamedTextColor.RED))
-                            .append(Component.text("/sethome", NamedTextColor.YELLOW, TextDecoration.BOLD))
+                            .append(Component.text("Vous n'avez pas encore défini de point de Home #" + slot + " ! Utilisez ", NamedTextColor.RED))
+                            .append(Component.text("/sethome " + slot, NamedTextColor.YELLOW, TextDecoration.BOLD))
                             .append(Component.text(" d'abord.", NamedTextColor.RED))
             );
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
@@ -78,13 +99,20 @@ public class HomeCommand implements CommandExecutor, TabCompleter {
         player.playSound(home, Sound.ITEM_CHORUS_FRUIT_TELEPORT, 1.0f, 1.2f);
         player.sendMessage(
                 Component.text("[Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)
-                        .append(Component.text("✦ Téléportation à votre Home réussie !", NamedTextColor.GREEN, TextDecoration.BOLD))
+                        .append(Component.text("✦ Téléportation à votre Home #" + slot + " réussie !", NamedTextColor.GREEN, TextDecoration.BOLD))
         );
         return true;
     }
 
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+        if (args.length == 1 && sender instanceof Player player) {
+            boolean isM4 = jobManager.getPlayerJob(player) == PlayerJob.AVENTURIER && jobManager.getJobLevel(player, PlayerJob.AVENTURIER) >= 4;
+            if (isM4) {
+                return List.of("1", "2");
+            }
+            return List.of("1");
+        }
         return Collections.emptyList();
     }
 }

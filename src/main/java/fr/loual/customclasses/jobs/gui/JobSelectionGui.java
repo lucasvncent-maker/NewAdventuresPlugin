@@ -99,8 +99,8 @@ public class JobSelectionGui {
         } else if (currentJob == PlayerJob.MINEUR) {
             int completedLevel = jobManager.getJobLevel(player, PlayerJob.MINEUR);
 
-            int[] missionSlots = { 20, 22, 24 };
-            for (int i = 0; i < 3; i++) {
+            int[] missionSlots = { 19, 21, 23, 25 };
+            for (int i = 0; i < 4; i++) {
                 JobMission mission = MineurMissions.getMission(i + 1);
                 if (mission != null) {
                     ItemStack missionItem = createMissionItem(player, jobManager, PlayerJob.MINEUR, mission, completedLevel);
@@ -116,8 +116,9 @@ public class JobSelectionGui {
                 infoMeta.lore(List.of(
                         Component.text("Passif : 25% de chance de bonus Fortune sur les minerais", NamedTextColor.YELLOW),
                         Component.text("M1 : Célérité I permanent + Commande /nv pour la Vision Nocturne", NamedTextColor.GRAY),
-                        Component.text("M2 : 5% de drop de Cuprite + 1 Fortune supplémentaire garanti", NamedTextColor.GRAY),
-                        Component.text("M3 : Célérité II + Bénédiction sous la couche Y=30 (Regen, Résistance, Feu)", NamedTextColor.GRAY)
+                        Component.text("M2 : Sacoche de Minage aspirante + 1 Fortune supplémentaire garanti", NamedTextColor.GRAY),
+                        Component.text("M3 : Célérité II permanent + 5% de drop de Cuprite sur les minerais", NamedTextColor.GRAY),
+                        Component.text("M4 : Bénédiction sous la couche Y=30 (Regen, Résistance, Feu) + Fortune +2 total !", NamedTextColor.GRAY)
                 ));
                 minerInfo.setItemMeta(infoMeta);
             }
@@ -157,8 +158,8 @@ public class JobSelectionGui {
         } else if (currentJob == PlayerJob.AVENTURIER) {
             int completedLevel = jobManager.getJobLevel(player, PlayerJob.AVENTURIER);
 
-            int[] missionSlots = { 20, 22, 24 };
-            for (int i = 0; i < 3; i++) {
+            int[] missionSlots = { 19, 21, 23, 25 };
+            for (int i = 0; i < 4; i++) {
                 JobMission mission = AventurierMissions.getMission(i + 1);
                 if (mission != null) {
                     ItemStack missionItem = createMissionItem(player, jobManager, PlayerJob.AVENTURIER, mission, completedLevel);
@@ -174,8 +175,9 @@ public class JobSelectionGui {
                 infoMeta.lore(List.of(
                         Component.text("Passif : Vitesse I permanente + Trésors rares dans les coffres de structures", NamedTextColor.YELLOW),
                         Component.text("M1 : 5 structures Overworld ➔ Meilleurs butins + /sethome & /home", NamedTextColor.GRAY),
-                        Component.text("M2 : 5 biomes du Nether ➔ Perle Infinie (infinie & sans dégât de chute)", NamedTextColor.GRAY),
-                        Component.text("M3 : 3 Pommes Cheat, 3 Élytres, 8 Éponges ➔ Élytres Incassables + Fusée Infinie !", NamedTextColor.GRAY)
+                        Component.text("M2 : 5 biomes du Nether ➔ Perle Infinie + Boussole Antique de Découverte", NamedTextColor.GRAY),
+                        Component.text("M3 : 3 Pommes Cheat, 3 Élytres, 8 Éponges ➔ Élytres Incassables + Fusée Infinie", NamedTextColor.GRAY),
+                        Component.text("M4 : 4 Totems, 16 Shulkers, 2 Cœurs de la Mer ➔ Grappin + /ec + /sethome 2 !", NamedTextColor.GRAY)
                 ));
                 advInfo.setItemMeta(infoMeta);
             }

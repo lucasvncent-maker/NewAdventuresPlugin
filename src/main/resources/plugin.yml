@@ -52,6 +52,10 @@ commands:
     description: Se teleporter a votre point de Home (Aventurier M1)
     usage: /home
     aliases: [h]
+  enderchest:
+    description: Ouvrir son coffre de l'End a distance (Aventurier M4)
+    usage: /enderchest
+    aliases: [ec]
   chlorine:
     description: Joue la musique Chlorine de Twenty One Pilots
     usage: /chlorine [play|stop]

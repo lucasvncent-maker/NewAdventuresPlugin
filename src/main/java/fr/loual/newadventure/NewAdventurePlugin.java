@@ -6,6 +6,7 @@ import fr.loual.customclasses.jobs.JobManager;
 import fr.loual.customclasses.jobs.JobRecipes;
 import fr.loual.customclasses.jobs.commands.CraftCommand;
 import fr.loual.customclasses.jobs.commands.JobCommand;
+import fr.loual.customclasses.jobs.commands.EnderChestCommand;
 import fr.loual.customclasses.jobs.commands.HomeCommand;
 import fr.loual.customclasses.jobs.commands.JumpBoostCommand;
 import fr.loual.customclasses.jobs.commands.NightVisionCommand;
@@ -149,6 +150,12 @@ public final class NewAdventurePlugin extends JavaPlugin {
         if (cmdHome != null) {
             cmdHome.setExecutor(homeCommand);
             cmdHome.setTabCompleter(homeCommand);
+        }
+        PluginCommand cmdEc = getCommand("enderchest");
+        if (cmdEc != null) {
+            EnderChestCommand ecCommand = new EnderChestCommand(this);
+            cmdEc.setExecutor(ecCommand);
+            cmdEc.setTabCompleter(ecCommand);
         }
 
         // 9. Tâche périodique pour les auras sous la couche Y=30 (Mineur M3) et l'armure de l'Architecte
