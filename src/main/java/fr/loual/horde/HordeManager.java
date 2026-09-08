@@ -867,8 +867,8 @@ public class HordeManager {
             // 1. Arme Légendaire du Boss
             inv.setItem(13, HordeItems.getTitanSoulSlicer());
 
-            // 2. Cuprites
-            inv.setItem(11, Cuprite.create(plugin, 12));
+            // 2. Cuprites (6 Lingots)
+            inv.setItem(11, Cuprite.create(plugin, 6));
 
             // 3. Débris Antiques
             inv.setItem(15, new ItemStack(Material.ANCIENT_DEBRIS, 2));
