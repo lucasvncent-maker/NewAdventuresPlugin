@@ -73,19 +73,20 @@ public class ChlorineCommand implements CommandExecutor, TabCompleter, Listener 
             return true;
         }
 
-        boolean studioOnly = false;
-        boolean noteblockOnly = false;
+        boolean askedStudio = false;
         if (args.length > 0) {
             if (args[0].equalsIgnoreCase("studio") || args[0].equalsIgnoreCase("real") || args[0].equalsIgnoreCase("original")) {
-                studioOnly = true;
-            } else if (args[0].equalsIgnoreCase("noteblock") || args[0].equalsIgnoreCase("nb")) {
-                noteblockOnly = true;
+                askedStudio = true;
+                player.sendMessage(Component.text("[♫] ", NamedTextColor.AQUA, TextDecoration.BOLD)
+                        .append(Component.text("Note : La version studio requiert un pack de ressources avec ", NamedTextColor.GRAY))
+                        .append(Component.text("chlorine.ogg", NamedTextColor.YELLOW))
+                        .append(Component.text(". La version NoteBlock intégrée est lancée en accompagnement !", NamedTextColor.GRAY)));
             }
         }
 
         // Si déjà en train de jouer, relance depuis le début
         stopMusic(player);
-        startMusic(player, !studioOnly, !noteblockOnly);
+        startMusic(player, true, askedStudio);
         return true;
     }
 
@@ -104,9 +105,7 @@ public class ChlorineCommand implements CommandExecutor, TabCompleter, Listener 
                         .append(Component.newline())
                         .append(Component.text(" Tapez ", NamedTextColor.GRAY))
                         .append(Component.text("/chlorine stop", NamedTextColor.YELLOW, TextDecoration.UNDERLINED))
-                        .append(Component.text(" pour arrêter | ", NamedTextColor.GRAY))
-                        .append(Component.text("/chlorine studio", NamedTextColor.AQUA))
-                        .append(Component.text(" pour la version studio .ogg.", NamedTextColor.GRAY))
+                        .append(Component.text(" pour arrêter la musique à tout moment.", NamedTextColor.GRAY))
                         .append(Component.newline())
                         .append(Component.text("------------------------------------------------", NamedTextColor.DARK_AQUA))
         );
