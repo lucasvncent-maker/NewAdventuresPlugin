@@ -98,21 +98,14 @@ public class BlackjackGui {
         if (game.getMode() == BlackjackGame.Mode.CLASSIC) {
             inv.setItem(BUTTON_MODE_SWITCH, createItem(
                     Material.GOLD_INGOT,
-                    Component.text("Mode : Standard (Objets)", NamedTextColor.GOLD, TextDecoration.BOLD),
-                    "§7Pariez n'importe quel objet de votre inventaire.",
-                    "§aVictoire standard : §fLe double (x2) !",
-                    "§6Blackjack naturel : §ePayé 3 pour 1 (x3) !",
-                    "",
-                    "§d➤ Cliquer pour passer en Mode Défi Cuprite"
+                    Component.text("Mode : Standard", NamedTextColor.GOLD, TextDecoration.BOLD),
+                    "§7Misez vos items (x2, BJ x3)"
             ));
         } else if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
             ItemStack copper = createItem(
                     Material.RAW_COPPER,
                     Component.text("Mode : Défi Cuprite", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD),
-                    "§7Mission spéciale du Croupier !",
-                    "§7Multipliez vos jetons pour remporter de la Cuprite.",
-                    "",
-                    "§c➤ Cliquer pour passer en Mode Mission Horde"
+                    "§7Objectif : 400 ou 800 jetons pour la Cuprite"
             );
             ItemMeta meta = copper.getItemMeta();
             if (meta != null) {
@@ -123,12 +116,8 @@ public class BlackjackGui {
         } else {
             ItemStack redstone = createItem(
                     Material.REDSTONE,
-                    Component.text("Mode : Mission Horde (Sang)", NamedTextColor.DARK_RED, TextDecoration.BOLD),
-                    "§7Mission interdite du Croupier !",
-                    "§7Déposez 1 Lingot de Cuprite pour 100 Jetons de Sang.",
-                    "§cMultipliez vos jetons par 3 (300) pour invoquer la Horde !",
-                    "",
-                    "§a➤ Cliquer pour repasser en Mode Standard"
+                    Component.text("Mode : Mission Horde", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                    "§7Objectif : 300 jetons (x3) pour l'Invasion"
             );
             ItemMeta meta = redstone.getItemMeta();
             if (meta != null) {
@@ -143,70 +132,44 @@ public class BlackjackGui {
         ItemStack dealerHeader;
         if (game.getState() == BlackjackGame.State.BETTING) {
             if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
-                if (game.getChallengeChips() <= 0) {
-                    dealerHeader = createItem(Material.PLAYER_HEAD,
-                            Component.text("♠ Croupier - Mission Cuprite ♠", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD),
-                            "§7\"Relevez le défi du casino !\"",
-                            "§7Déposez le droit d'entrée au centre pour débuter."
-                    );
-                } else {
-                    dealerHeader = createItem(Material.PLAYER_HEAD,
-                            Component.text("♠ Croupier - Mission Cuprite ♠", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD),
-                            "§7\"Objectif : 400 (x4) ou 800 (x8) jetons !\"",
-                            "§7Sélectionnez votre mise et lancez la main."
-                    );
-                }
+                dealerHeader = createItem(Material.PLAYER_HEAD,
+                        Component.text("♠ Croupier - Défi Cuprite ♠", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD),
+                        "§7Objectifs : 400 (x4) ou 800 (x8) jetons"
+                );
             } else if (game.getMode() == BlackjackGame.Mode.HORDE) {
-                if (game.getHordeChips() <= 0) {
-                    dealerHeader = createItem(Material.PLAYER_HEAD,
-                            Component.text("♠ Croupier - Mission Horde ♠", NamedTextColor.DARK_RED, TextDecoration.BOLD),
-                            "§7\"Oserez-vous réveiller la Horde ?\"",
-                            "§7Déposez 1 Lingot de Cuprite au centre pour débuter."
-                    );
-                } else {
-                    dealerHeader = createItem(Material.PLAYER_HEAD,
-                            Component.text("♠ Croupier - Mission Horde ♠", NamedTextColor.DARK_RED, TextDecoration.BOLD),
-                            "§7\"Objectif : 300 jetons (x3) pour l'Invasion !\"",
-                            "§7Sélectionnez votre mise de sang et jouez."
-                    );
-                }
+                dealerHeader = createItem(Material.PLAYER_HEAD,
+                        Component.text("♠ Croupier - Mission Horde ♠", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                        "§7Objectif : 300 jetons (x3) pour l'Invasion"
+                );
             } else {
                 dealerHeader = createItem(Material.PLAYER_HEAD,
-                        Component.text("♠ Croupier du Casino ♠", NamedTextColor.GOLD, TextDecoration.BOLD),
-                        "§7Le croupier tire jusqu'à §e17§7.",
-                        "§7Déposez votre mise pour commencer !"
+                        Component.text("♠ Croupier ♠", NamedTextColor.GOLD, TextDecoration.BOLD),
+                        "§7Le croupier tire jusqu'à 17"
                 );
             }
         } else if (game.getState() == BlackjackGame.State.DEALING) {
             dealerHeader = createItem(Material.PLAYER_HEAD,
-                    Component.text("♠ Distribution des Cartes... ♠", NamedTextColor.YELLOW, TextDecoration.BOLD),
-                    "§7Le croupier distribue une à une les cartes.",
-                    "§7Veuillez patienter..."
+                    Component.text("♠ Distribution... ♠", NamedTextColor.YELLOW, TextDecoration.BOLD)
             );
             dealerHeader.setAmount(1);
         } else if (game.getState() == BlackjackGame.State.PLAYING) {
             int visibleScore = game.getDealerHand().isEmpty() ? 0 : game.getDealerHand().get(0).getValue();
             dealerHeader = createItem(Material.GOLD_INGOT,
-                    Component.text("♠ Croupier - Score visible : " + visibleScore + " + ? ♠", NamedTextColor.GOLD, TextDecoration.BOLD),
-                    "§7Une carte est encore masquée.",
-                    "§7Elle sera révélée lorsque vous ferez §cRester (Stand)§7."
+                    Component.text("♠ Croupier : §e" + visibleScore + " + ? ♠", NamedTextColor.GOLD, TextDecoration.BOLD)
             );
             dealerHeader.setAmount(Math.max(1, Math.min(64, visibleScore)));
         } else if (game.getState() == BlackjackGame.State.DEALER_TURN) {
             int currentScore = BlackjackGame.calculateScore(game.getDealerHand());
             dealerHeader = createItem(Material.GOLD_BLOCK,
-                    Component.text("♠ Croupier en jeu - Score : §e" + currentScore + " ♠", NamedTextColor.GOLD, TextDecoration.BOLD),
-                    "§7Le croupier tire ses cartes une à une...",
-                    "§7Il s'arrête dès qu'il atteint 17 ou plus."
+                    Component.text("♠ Croupier : §e" + currentScore + " ♠", NamedTextColor.GOLD, TextDecoration.BOLD)
             );
             dealerHeader.setAmount(Math.max(1, Math.min(64, currentScore)));
         } else {
             int totalScore = BlackjackGame.calculateScore(game.getDealerHand());
-            String scoreText = totalScore > 21 ? "§c" + totalScore + " (BUST)" : "§a" + totalScore;
+            String scoreText = totalScore > 21 ? "§c" + totalScore + " (Bust)" : "§a" + totalScore;
             Material mat = totalScore > 21 ? Material.REDSTONE_BLOCK : Material.GOLD_BLOCK;
             dealerHeader = createItem(mat,
-                    Component.text("♠ Croupier - Score final : ", NamedTextColor.GOLD, TextDecoration.BOLD).append(Component.text(scoreText)),
-                    "§7Fin de la manche."
+                    Component.text("♠ Croupier : ", NamedTextColor.GOLD, TextDecoration.BOLD).append(Component.text(scoreText))
             );
             dealerHeader.setAmount(Math.max(1, Math.min(64, totalScore)));
         }
@@ -215,7 +178,7 @@ public class BlackjackGui {
         // Affichage des cartes du croupier
         if (game.getState() == BlackjackGame.State.BETTING) {
             for (int slot : DEALER_CARD_SLOTS) {
-                inv.setItem(slot, createItem(Material.GRAY_STAINED_GLASS_PANE, Component.text("§8[ Emplacement Croupier ]")));
+                inv.setItem(slot, createItem(Material.GRAY_STAINED_GLASS_PANE, Component.text(" ")));
             }
         } else {
             List<Card> dealerHand = game.getDealerHand();
@@ -240,36 +203,31 @@ public class BlackjackGui {
             if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
                 if (game.getChallengeChips() <= 0) {
                     playerHeader = createItem(Material.RAW_COPPER,
-                            Component.text("✦ Inscription au Défi Cuprite ✦", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD),
-                            "§7Aucune session active.",
-                            "§7Déposez votre droit d'entrée au centre !"
+                            Component.text("✦ Défi Cuprite ✦", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD),
+                            "§7Déposez le droit d'entrée au centre"
                     );
                 } else {
                     playerHeader = createItem(Material.RAW_COPPER,
-                            Component.text("✦ Solde : §a§l" + game.getChallengeChips() + " Jetons ✦", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD),
-                            "§7Palier x4 : §6400 Jetons §7(1 Cuprite)",
-                            "§7Palier x8 : §d800 Jetons §7(3 Cuprites)"
+                            Component.text("✦ Solde : §a" + game.getChallengeChips() + " Jetons ✦", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD),
+                            "§7Paliers : §6400 §8| §d800"
                     );
                 }
             } else if (game.getMode() == BlackjackGame.Mode.HORDE) {
                 if (game.getHordeChips() <= 0) {
                     playerHeader = createItem(Material.REDSTONE,
-                            Component.text("✦ Inscription Mission Horde ✦", NamedTextColor.DARK_RED, TextDecoration.BOLD),
-                            "§7Aucune session active.",
-                            "§7Déposez 1 Lingot de Cuprite au centre !"
+                            Component.text("✦ Mission Horde ✦", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                            "§7Déposez 1 Cuprite au centre"
                     );
                 } else {
                     playerHeader = createItem(Material.REDSTONE,
-                            Component.text("✦ Solde : §c§l" + game.getHordeChips() + " Jetons de Sang ✦", NamedTextColor.DARK_RED, TextDecoration.BOLD),
-                            "§7Multiplicateur visé : §cx3 (300 Jetons)",
-                            "§cAtteindre 300 jetons déclenche l'invasion !"
+                            Component.text("✦ Solde : §c" + game.getHordeChips() + " Jetons de Sang ✦", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                            "§7Objectif Horde : §c300 (x3)"
                     );
                 }
             } else {
                 playerHeader = createItem(Material.NETHER_STAR,
                         Component.text("✦ Votre Main ✦", NamedTextColor.AQUA, TextDecoration.BOLD),
-                        "§7Placez l'item que vous souhaitez parier",
-                        "§7dans le slot doré au milieu de la table !"
+                        "§7Déposez un item au centre"
                 );
             }
         } else {
@@ -277,8 +235,7 @@ public class BlackjackGui {
             String scoreColor = playerScore > 21 ? "§c" : (playerScore == 21 ? "§6" : "§a");
             Material mat = playerScore == 21 ? Material.NETHER_STAR : (playerScore > 21 ? Material.REDSTONE_BLOCK : Material.EMERALD);
             playerHeader = createItem(mat,
-                    Component.text("✦ Score du Joueur : " + scoreColor + playerScore + " / 21 ✦", NamedTextColor.AQUA, TextDecoration.BOLD),
-                    playerScore == 21 ? "§6§l✦ BLACKJACK ! ✦" : (playerScore > 21 ? "§c§lVous avez sauté (Bust) !" : "§7Objectif : Se rapprocher de 21 sans dépasser.")
+                    Component.text("✦ Score : " + scoreColor + playerScore + " / 21 ✦", NamedTextColor.AQUA, TextDecoration.BOLD)
             );
             playerHeader.setAmount(Math.max(1, Math.min(64, playerScore)));
         }
@@ -287,7 +244,7 @@ public class BlackjackGui {
         // Affichage des cartes et du centre
         if (game.getState() == BlackjackGame.State.BETTING) {
             for (int slot : PLAYER_CARD_SLOTS) {
-                inv.setItem(slot, createItem(Material.GRAY_STAINED_GLASS_PANE, Component.text("§8[ Emplacement Joueur ]")));
+                inv.setItem(slot, createItem(Material.GRAY_STAINED_GLASS_PANE, Component.text(" ")));
             }
 
             boolean isDeposit = (game.getMode() == BlackjackGame.Mode.CLASSIC)
@@ -297,34 +254,27 @@ public class BlackjackGui {
             if (isDeposit) {
                 // Cadre doré autour du slot de dépôt (Slot 22)
                 for (int slot : new int[]{ 13, 21, 23, 31 }) {
-                    String borderText = (game.getMode() == BlackjackGame.Mode.CLASSIC)
-                            ? "§e↓ DÉPOSEZ VOTRE MISE ICI ↓"
-                            : "§e↓ DÉPOSEZ LE DROIT D'ENTRÉE ICI ↓";
-                    inv.setItem(slot, createItem(Material.YELLOW_STAINED_GLASS_PANE, Component.text(borderText, NamedTextColor.YELLOW, TextDecoration.BOLD)));
+                    inv.setItem(slot, createItem(Material.YELLOW_STAINED_GLASS_PANE, Component.text("§e↓ Dépôt ↓", NamedTextColor.YELLOW, TextDecoration.BOLD)));
                 }
 
                 if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
-                    // Bannière des règles sur slot 18
                     inv.setItem(SLOT_CHALLENGE_STATUS, createItem(Material.BOOK,
-                            Component.text("§6§lRègles du Défi Cuprite"),
-                            "§e• Droit d'entrée : §f" + BlackjackGame.getEntryCostDescription(game.getPlayer()),
-                            "§e• Départ : §a100 Jetons de défi",
-                            "§e• Palier x4 (400 jetons) : §61 Lingot de Cuprite",
-                            "§e• Palier x8 (800 jetons) : §d3 Lingots de Cuprite !",
-                            "§c• Faillite (0 jeton) : Mise d'entrée perdue !"
+                            Component.text("§6§lRègles Défi Cuprite"),
+                            "§e• Entrée : §f" + BlackjackGame.getEntryCostDescription(game.getPlayer()),
+                            "§e• Départ : §a100 Jetons",
+                            "§e• Palier 1 (x4) : §6400 Jetons §7(1 Cuprite)",
+                            "§e• Palier 2 (x8) : §d800 Jetons §7(3 Cuprites)"
                     ));
                     for (int s : new int[]{ 19, 20, 24 }) {
                         inv.setItem(s, createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" ")));
                     }
                 } else if (game.getMode() == BlackjackGame.Mode.HORDE) {
-                    // Bannière des règles Horde sur slot 18
                     inv.setItem(SLOT_CHALLENGE_STATUS, createItem(Material.BOOK,
-                            Component.text("§4§lRègles de la Mission Horde"),
-                            "§c• Droit d'entrée : §f1 Lingot de Cuprite",
+                            Component.text("§4§lRègles Mission Horde"),
+                            "§c• Entrée : §f1 Lingot de Cuprite",
                             "§c• Départ : §4100 Jetons de Sang",
-                            "§c• Objectif x3 (300 jetons) : §4§lDÉCLENCHE L'INVASION !",
-                            "§7  Affrontez 4 vagues et le Boss Colossal !",
-                            "§c• Faillite (0 jeton) : Cuprite perdue !"
+                            "§c• Objectif (x3) : §4300 Jetons §7(Invasion)",
+                            "§c• 4 Vagues & Boss Titan Putréfié"
                     ));
                     for (int s : new int[]{ 19, 20, 24 }) {
                         inv.setItem(s, createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" ")));
@@ -338,69 +288,49 @@ public class BlackjackGui {
                     inv.setItem(BET_SLOT, null);
                 }
             } else if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
-                // Mode CHALLENGE avec session active : 2 boutons pour ajuster la mise (+10 / -10)
                 inv.setItem(SLOT_CHALLENGE_STATUS, createItem(Material.EXPERIENCE_BOTTLE,
-                        Component.text("✦ Progression Mission ✦", NamedTextColor.YELLOW, TextDecoration.BOLD),
-                        "§7Solde actuel : §a§l" + game.getChallengeChips() + " Jetons",
-                        "§7Palier x4 : §6400 Jetons §7(§61 Cuprite§7)",
-                        "§7Palier x8 : §d800 Jetons §7(§d3 Cuprites§7)"
+                        Component.text("✦ Progression ✦", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                        "§7Solde : §a" + game.getChallengeChips() + " Jetons",
+                        "§7Paliers : §6400 §8| §d800"
                 ));
 
                 // Bouton Diminuer de 10 (Slot 21)
                 inv.setItem(BUTTON_CHALLENGE_BET_DECREASE, createItem(Material.RED_DYE,
-                        Component.text("−10 Jetons", NamedTextColor.RED, TextDecoration.BOLD),
-                        "§7Diminuer la mise de §c10 Jetons§7.",
-                        "§7Mise minimale : §f" + Math.min(10, game.getChallengeChips()) + " Jetons",
-                        "",
-                        "§c➤ Cliquer pour réduire la mise"
+                        Component.text("−10 Jetons", NamedTextColor.RED, TextDecoration.BOLD)
                 ));
 
                 // Mise sélectionnée au centre (Slot 22)
                 ItemStack curBet = createItem(Material.SUNFLOWER,
-                        Component.text("Mise sélectionnée : §6§l" + game.getChallengeBet() + " Jetons", NamedTextColor.YELLOW, TextDecoration.BOLD),
-                        "§7Solde restant si défaite : §f" + (game.getChallengeChips() - game.getChallengeBet()) + " Jetons",
-                        "§7Victoire normale : §a+" + (game.getChallengeBet() * 2) + " Jetons (x2)",
-                        "§6Blackjack naturel (x3) : §e+" + (game.getChallengeBet() * 3) + " Jetons"
+                        Component.text("Mise : §6" + game.getChallengeBet() + " Jetons", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                        "§aVictoire : +" + (game.getChallengeBet() * 2) + " §8| §6BJ : +" + (game.getChallengeBet() * 3)
                 );
                 curBet.setAmount(Math.max(1, Math.min(64, game.getChallengeBet())));
                 inv.setItem(BET_SLOT, curBet);
 
                 // Bouton Augmenter de 10 (Slot 23)
                 inv.setItem(BUTTON_CHALLENGE_BET_INCREASE, createItem(Material.LIME_DYE,
-                        Component.text("+10 Jetons", NamedTextColor.GREEN, TextDecoration.BOLD),
-                        "§7Augmenter la mise de §a10 Jetons§7.",
-                        "§7Mise maximale : §f" + game.getChallengeChips() + " Jetons",
-                        "",
-                        "§a➤ Cliquer pour augmenter la mise"
+                        Component.text("+10 Jetons", NamedTextColor.GREEN, TextDecoration.BOLD)
                 ));
 
                 for (int s : new int[]{ 13, 19, 20, 24, 25, 31 }) {
                     inv.setItem(s, createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" ")));
                 }
             } else {
-                // Mode HORDE avec session active : 2 boutons pour ajuster la mise (+10 / -10)
                 inv.setItem(SLOT_CHALLENGE_STATUS, createItem(Material.EXPERIENCE_BOTTLE,
-                        Component.text("✦ Progression Horde ✦", NamedTextColor.DARK_RED, TextDecoration.BOLD),
-                        "§7Solde actuel : §c§l" + game.getHordeChips() + " Jetons de Sang",
-                        "§7Objectif x3 : §4§l300 Jetons de Sang",
-                        "§cAtteindre 300 jetons déclenche l'invasion !"
+                        Component.text("✦ Progression ✦", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                        "§7Solde : §c" + game.getHordeChips() + " Jetons de Sang",
+                        "§7Objectif : §4300 Jetons (x3)"
                 ));
 
                 // Bouton Diminuer de 10 (Slot 21)
                 inv.setItem(BUTTON_CHALLENGE_BET_DECREASE, createItem(Material.RED_DYE,
-                        Component.text("−10 Jetons de Sang", NamedTextColor.RED, TextDecoration.BOLD),
-                        "§7Diminuer la mise de §c10 Jetons de Sang§7.",
-                        "§7Mise minimale : §f" + Math.min(10, game.getHordeChips()) + " Jetons",
-                        "",
-                        "§c➤ Cliquer pour réduire la mise"
+                        Component.text("−10 Jetons", NamedTextColor.RED, TextDecoration.BOLD)
                 ));
 
                 // Mise sélectionnée au centre (Slot 22)
                 ItemStack curBet = createItem(Material.REDSTONE,
-                        Component.text("Mise sélectionnée : §c§l" + game.getHordeBet() + " Jetons de Sang", NamedTextColor.DARK_RED, TextDecoration.BOLD),
-                        "§7Solde restant si défaite : §f" + (game.getHordeChips() - game.getHordeBet()) + " Jetons",
-                        "§7Victoire normale : §a+" + (game.getHordeBet() * 2) + " Jetons (x2)",
-                        "§6Blackjack naturel (x3) : §e+" + (game.getHordeBet() * 3) + " Jetons"
+                        Component.text("Mise : §c" + game.getHordeBet() + " Jetons", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                        "§aVictoire : +" + (game.getHordeBet() * 2) + " §8| §cBJ : +" + (game.getHordeBet() * 3)
                 );
                 ItemMeta curMeta = curBet.getItemMeta();
                 if (curMeta != null) {
@@ -412,11 +342,7 @@ public class BlackjackGui {
 
                 // Bouton Augmenter de 10 (Slot 23)
                 inv.setItem(BUTTON_CHALLENGE_BET_INCREASE, createItem(Material.LIME_DYE,
-                        Component.text("+10 Jetons de Sang", NamedTextColor.GREEN, TextDecoration.BOLD),
-                        "§7Augmenter la mise de §a10 Jetons de Sang§7.",
-                        "§7Mise maximale : §f" + game.getHordeChips() + " Jetons",
-                        "",
-                        "§a➤ Cliquer pour augmenter la mise"
+                        Component.text("+10 Jetons", NamedTextColor.GREEN, TextDecoration.BOLD)
                 ));
 
                 for (int s : new int[]{ 13, 19, 20, 24, 25, 31 }) {
@@ -442,13 +368,9 @@ public class BlackjackGui {
                 && game.getChallengeChips() >= BlackjackGame.CHALLENGE_PALIER_1 
                 && (game.getState() == BlackjackGame.State.BETTING || game.getState() == BlackjackGame.State.GAME_OVER)) {
             ItemStack cashout = createItem(Material.RAW_COPPER,
-                    Component.text("✦ ENCAISSER (Palier x4) ✦", NamedTextColor.GOLD, TextDecoration.BOLD),
-                    "§aVous avez atteint au moins 400 jetons !",
-                    "§7Solde actuel : §e" + game.getChallengeChips() + " Jetons",
-                    "§7Récompense garantie : §61 Lingot de Cuprite",
-                    "",
-                    "§a➤ Cliquez pour sécuriser 1 Cuprite et terminer la mission",
-                    "§7(Ou continuez à jouer pour viser les 800 jetons et 3 Cuprites !)"
+                    Component.text("✦ Encaisser 1 Cuprite ✦", NamedTextColor.GOLD, TextDecoration.BOLD),
+                    "§7Palier x4 atteint (§e" + game.getChallengeChips() + " jetons§7)",
+                    "§6Récompense : §f1 Lingot de Cuprite"
             );
             ItemMeta meta = cashout.getItemMeta();
             if (meta != null) {
@@ -473,25 +395,20 @@ public class BlackjackGui {
                     ItemStack startBtn = new ItemStack(Material.LIME_CONCRETE);
                     ItemMeta startMeta = startBtn.getItemMeta();
                     if (startMeta != null) {
-                        startMeta.displayName(Component.text("✔ Valider la mise & Distribuer", NamedTextColor.GREEN, TextDecoration.BOLD));
+                        startMeta.displayName(Component.text("✔ Distribuer", NamedTextColor.GREEN, TextDecoration.BOLD));
                         List<Component> lore = new ArrayList<>();
                         lore.add(Component.text("Mise : ", NamedTextColor.YELLOW)
                                 .append(Component.text(betInSlot.getAmount() + "x ", NamedTextColor.WHITE))
                                 .append(itemNameComp));
-                        lore.add(Component.text("Victoire standard : Le double (x2) !", NamedTextColor.GREEN));
-                        lore.add(Component.text("Blackjack (21 naturel) : Payé 3 pour 1 (x3) !", NamedTextColor.GOLD));
-                        lore.add(Component.text("Défaite : Votre mise est perdue.", NamedTextColor.RED));
-                        lore.add(Component.empty());
-                        lore.add(Component.text("➤ Cliquez pour lancer la partie !", NamedTextColor.GREEN));
+                        lore.add(Component.text("§7Victoire : §ax2 §8| §6Blackjack : §ex3"));
                         startMeta.lore(lore);
                         startBtn.setItemMeta(startMeta);
                     }
                     inv.setItem(BUTTON_START_BET, startBtn);
                 } else {
                     inv.setItem(BUTTON_START_BET, createItem(Material.GRAY_CONCRETE,
-                            Component.text("En attente de mise...", NamedTextColor.GRAY, TextDecoration.BOLD),
-                            "§7Déposez un item de votre inventaire",
-                            "§7dans le slot central pour activer ce bouton."
+                            Component.text("En attente d'une mise...", NamedTextColor.GRAY, TextDecoration.BOLD),
+                            "§7Déposez votre mise au centre."
                     ));
                 }
             } else if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
@@ -502,32 +419,23 @@ public class BlackjackGui {
                     boolean valid = BlackjackGame.isValidEntryItem(deposit, env);
 
                     if (valid) {
-                        String costName = (deposit.getType() == Material.DRAGON_HEAD) ? "1x Tête de Dragon" : (BlackjackGame.GILDED_BLACKSTONE_COST + "x Pierres Noires Dorées");
+                        String costName = (deposit.getType() == Material.DRAGON_HEAD) ? "1x Tête de Dragon" : (BlackjackGame.GILDED_BLACKSTONE_COST + "x Pierres Dorées");
                         inv.setItem(BUTTON_START_BET, createItem(Material.LIME_CONCRETE,
-                                Component.text("✔ Valider & Démarrer la Mission", NamedTextColor.GREEN, TextDecoration.BOLD),
+                                Component.text("✔ Démarrer le Défi", NamedTextColor.GREEN, TextDecoration.BOLD),
                                 "§eEntrée : §f" + costName,
-                                "§7Capital initial : §a100 Jetons de défi",
-                                "§7Palier x4 (400 jetons) : §61 Lingot de Cuprite",
-                                "§7Palier x8 (800 jetons) : §d3 Lingots de Cuprite !",
-                                "",
-                                "§a➤ Cliquez pour payer et démarrer la session !"
+                                "§7Capital : §a100 Jetons §8(Palier: 400 | Jackpot: 800)"
                         ));
                     } else {
                         inv.setItem(BUTTON_START_BET, createItem(Material.GRAY_CONCRETE,
-                                Component.text("En attente du droit d'entrée...", NamedTextColor.GRAY, TextDecoration.BOLD),
-                                "§7Déposez " + BlackjackGame.getEntryCostDescription(game.getPlayer()),
-                                "§7dans le slot central doré pour activer l'entrée."
+                                Component.text("Droit d'entrée requis", NamedTextColor.GRAY, TextDecoration.BOLD),
+                                "§7Déposez " + BlackjackGame.getEntryCostDescription(game.getPlayer())
                         ));
                     }
                 } else {
                     inv.setItem(BUTTON_START_BET, createItem(Material.LIME_CONCRETE,
-                            Component.text("✔ Valider la mise & Distribuer", NamedTextColor.GREEN, TextDecoration.BOLD),
+                            Component.text("✔ Distribuer", NamedTextColor.GREEN, TextDecoration.BOLD),
                             "§eMise : §f" + game.getChallengeBet() + " Jetons",
-                            "§7Victoire : §a+" + (game.getChallengeBet() * 2) + " Jetons (x2)",
-                            "§6Blackjack (21 naturel) : §e+" + (game.getChallengeBet() * 3) + " Jetons (x3)",
-                            "§cDéfaite : §7Perte de vos " + game.getChallengeBet() + " Jetons.",
-                            "",
-                            "§a➤ Cliquez pour lancer la manche !"
+                            "§7Victoire : §ax2 §8| §6Blackjack : §ex3"
                     ));
                 }
             } else {
@@ -539,59 +447,48 @@ public class BlackjackGui {
 
                     if (valid) {
                         inv.setItem(BUTTON_START_BET, createItem(Material.LIME_CONCRETE,
-                                Component.text("✔ Valider & Invoquer la Horde", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                                Component.text("✔ Démarrer la Mission Horde", NamedTextColor.DARK_RED, TextDecoration.BOLD),
                                 "§eEntrée : §f1x Lingot de Cuprite",
-                                "§7Capital initial : §c100 Jetons de Sang",
-                                "§7Objectif : §4§l300 Jetons de Sang (x3)",
-                                "§cDéclenche l'Invasion Zombie et le Boss !",
-                                "",
-                                "§a➤ Cliquez pour payer et démarrer la session !"
+                                "§7Capital : §c100 Jetons §8(Objectif Invasion : 300)"
                         ));
                     } else {
                         inv.setItem(BUTTON_START_BET, createItem(Material.GRAY_CONCRETE,
-                                Component.text("En attente du Lingot de Cuprite...", NamedTextColor.GRAY, TextDecoration.BOLD),
-                                "§7Déposez §61 Lingot de Cuprite",
-                                "§7dans le slot central pour débuter la mission."
+                                Component.text("Lingot de Cuprite requis", NamedTextColor.GRAY, TextDecoration.BOLD),
+                                "§7Déposez §61 Lingot de Cuprite §7au centre."
                         ));
                     }
                 } else {
                     inv.setItem(BUTTON_START_BET, createItem(Material.LIME_CONCRETE,
-                            Component.text("✔ Valider la mise & Distribuer", NamedTextColor.GREEN, TextDecoration.BOLD),
+                            Component.text("✔ Distribuer", NamedTextColor.GREEN, TextDecoration.BOLD),
                             "§eMise : §c" + game.getHordeBet() + " Jetons de Sang",
-                            "§7Victoire : §a+" + (game.getHordeBet() * 2) + " Jetons (x2)",
-                            "§6Blackjack (21 naturel) : §e+" + (game.getHordeBet() * 3) + " Jetons (x3)",
-                            "§cDéfaite : §7Perte de vos " + game.getHordeBet() + " Jetons.",
-                            "",
-                            "§a➤ Cliquez pour lancer la manche !"
+                            "§7Victoire : §ax2 §8| §6Blackjack : §ex3"
                     ));
                 }
             }
 
             inv.setItem(BUTTON_QUIT, createItem(Material.BARRIER,
-                    Component.text("Quitter la table", NamedTextColor.RED, TextDecoration.BOLD),
-                    "§7Ferme le casino et sauvegarde vos jetons."
+                    Component.text("Quitter", NamedTextColor.RED, TextDecoration.BOLD),
+                    "§7Fermer et sauvegarder vos jetons."
             ));
 
         } else if (game.getState() == BlackjackGame.State.DEALING) {
             inv.setItem(BUTTON_HIT, createItem(Material.GRAY_CONCRETE,
-                    Component.text("Distribution en cours...", NamedTextColor.YELLOW, TextDecoration.BOLD),
-                    "§7Le croupier distribue les cartes une à une...",
+                    Component.text("Distribution...", NamedTextColor.YELLOW, TextDecoration.BOLD),
                     "§7Veuillez patienter."
             ));
             inv.setItem(BUTTON_STAND, createItem(Material.GRAY_CONCRETE,
-                    Component.text("Distribution en cours...", NamedTextColor.YELLOW, TextDecoration.BOLD),
-                    "§7Le croupier distribue les cartes une à une...",
+                    Component.text("Distribution...", NamedTextColor.YELLOW, TextDecoration.BOLD),
                     "§7Veuillez patienter."
             ));
 
         } else if (game.getState() == BlackjackGame.State.DEALER_TURN) {
             inv.setItem(BUTTON_HIT, createItem(Material.GRAY_CONCRETE,
                     Component.text("Tour du Croupier...", NamedTextColor.GOLD, TextDecoration.BOLD),
-                    "§7Le croupier tire ses cartes une à une..."
+                    "§7Le croupier tire ses cartes."
             ));
             inv.setItem(BUTTON_STAND, createItem(Material.GRAY_CONCRETE,
                     Component.text("Tour du Croupier...", NamedTextColor.GOLD, TextDecoration.BOLD),
-                    "§7Le croupier s'arrête à 17 ou plus."
+                    "§7Arrêt à 17 ou plus."
             ));
 
         } else if (game.getState() == BlackjackGame.State.PLAYING) {
@@ -599,10 +496,8 @@ public class BlackjackGui {
 
             // Bouton Tirer (Hit - Slot 47)
             ItemStack hitBtn = createItem(Material.LIME_CONCRETE,
-                    Component.text("➤ TIRER (Hit)  §e[" + pScore + "/21]", NamedTextColor.GREEN, TextDecoration.BOLD),
-                    "§7Prendre une carte supplémentaire.",
-                    "§7Votre score actuel : §e" + pScore + "§7/21",
-                    "§cAttention si votre score dépasse 21 !"
+                    Component.text("➤ Tirer  §e[" + pScore + "]", NamedTextColor.GREEN, TextDecoration.BOLD),
+                    "§7Prendre une carte supplémentaire."
             );
             hitBtn.setAmount(Math.max(1, Math.min(64, pScore)));
             inv.setItem(BUTTON_HIT, hitBtn);
@@ -612,20 +507,14 @@ public class BlackjackGui {
                 boolean canDouble = game.canDoubleDown();
                 if (canDouble) {
                     ItemStack doubleBtn = createItem(Material.GOLD_BLOCK,
-                            Component.text("✦ DOUBLER (Double Down) ✦", NamedTextColor.GOLD, TextDecoration.BOLD),
-                            "§7Double votre mise pour cette manche.",
-                            "§eVous ne recevrez qu'1 seule carte supplémentaire !",
-                            "§7Puis le croupier jouera immédiatement.",
-                            "",
-                            "§a➤ Cliquez pour doubler votre mise !"
+                            Component.text("✦ Doubler", NamedTextColor.GOLD, TextDecoration.BOLD),
+                            "§7Double la mise pour 1 seule carte."
                     );
                     inv.setItem(BUTTON_DOUBLE, doubleBtn);
                 } else {
                     ItemStack doubleBtn = createItem(Material.GRAY_CONCRETE,
-                            Component.text("✦ DOUBLER (Double Down) ✦", NamedTextColor.GRAY, TextDecoration.BOLD),
-                            "§7Double la mise actuelle pour 1 seule carte.",
-                            "",
-                            "§cRessources insuffisantes pour doubler."
+                            Component.text("✦ Doubler", NamedTextColor.GRAY, TextDecoration.BOLD),
+                            "§cSolde insuffisant."
                     );
                     inv.setItem(BUTTON_DOUBLE, doubleBtn);
                 }
@@ -641,10 +530,8 @@ public class BlackjackGui {
                     ItemMeta meta = betDisplay.getItemMeta();
                     if (meta != null) {
                         List<Component> lore = new ArrayList<>();
-                        lore.add(Component.text("§6Mise actuelle en jeu : §e" + bet.getAmount() + "x"));
-                        lore.add(Component.text("§aVictoire standard = Double (x2)"));
-                        lore.add(Component.text("§6Blackjack (21 naturel) = Triple (3:1 / x3)"));
-                        lore.add(Component.text("§cDéfaite = Mise perdue"));
+                        lore.add(Component.text("§6Mise en jeu : §e" + bet.getAmount() + "x"));
+                        lore.add(Component.text("§7Victoire : §ax2 §8| §6Blackjack : §ex3"));
                         meta.lore(lore);
                         betDisplay.setItemMeta(meta);
                     }
@@ -652,19 +539,15 @@ public class BlackjackGui {
                 }
             } else if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
                 ItemStack betDisplay = createItem(Material.SUNFLOWER,
-                        Component.text("Mise en jeu : §6§l" + game.getActiveChallengeBet() + " Jetons", NamedTextColor.YELLOW, TextDecoration.BOLD),
-                        "§aVictoire standard : +" + (game.getActiveChallengeBet() * 2) + " Jetons",
-                        "§6Blackjack naturel : +" + (game.getActiveChallengeBet() * 3) + " Jetons",
-                        "§cDéfaite : Perte de la mise"
+                        Component.text("Mise en jeu : §6" + game.getActiveChallengeBet() + " Jetons", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                        "§7Victoire : §ax2 §8| §6Blackjack : §ex3"
                 );
                 betDisplay.setAmount(Math.max(1, Math.min(64, game.getActiveChallengeBet())));
                 inv.setItem(49, betDisplay);
             } else {
                 ItemStack betDisplay = createItem(Material.REDSTONE,
-                        Component.text("Mise en jeu : §c§l" + game.getActiveHordeBet() + " Jetons de Sang", NamedTextColor.DARK_RED, TextDecoration.BOLD),
-                        "§aVictoire standard : +" + (game.getActiveHordeBet() * 2) + " Jetons",
-                        "§6Blackjack naturel : +" + (game.getActiveHordeBet() * 3) + " Jetons",
-                        "§cDéfaite : Perte de la mise"
+                        Component.text("Mise en jeu : §c" + game.getActiveHordeBet() + " Jetons de Sang", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                        "§7Victoire : §ax2 §8| §6Blackjack : §ex3"
                 );
                 ItemMeta meta = betDisplay.getItemMeta();
                 if (meta != null) {
@@ -677,9 +560,8 @@ public class BlackjackGui {
 
             // Bouton Rester (Stand - Slot 51)
             ItemStack standBtn = createItem(Material.RED_CONCRETE,
-                    Component.text("■ RESTER (Stand)  §e[Garder " + pScore + "]", NamedTextColor.RED, TextDecoration.BOLD),
-                    "§7Garder votre score actuel de §e" + pScore + "§7.",
-                    "§7Le croupier jouera ensuite sa main !"
+                    Component.text("■ Rester  §e[" + pScore + "]", NamedTextColor.RED, TextDecoration.BOLD),
+                    "§7Garder votre main."
             );
             standBtn.setAmount(Math.max(1, Math.min(64, pScore)));
             inv.setItem(BUTTON_STAND, standBtn);
@@ -688,52 +570,41 @@ public class BlackjackGui {
             // Résultat au centre (Slot 49)
             if (game.getMode() == BlackjackGame.Mode.CHALLENGE && game.isJackpotWon()) {
                 inv.setItem(49, createItem(Material.TOTEM_OF_UNDYING,
-                        Component.text("✦ JACKPOT X8 ATTEINT ! ✦", NamedTextColor.GOLD, TextDecoration.BOLD),
-                        "§aFélicitations ! Vous avez atteint 800+ jetons !",
-                        "§63 Lingots de Cuprite vous ont été remis !",
-                        "§7La mission est un triomphe !"
+                        Component.text("✦ Jackpot x8 Atteint ! ✦", NamedTextColor.GOLD, TextDecoration.BOLD),
+                        "§aObjectif 800 jetons atteint !",
+                        "§63 Lingots de Cuprite §areçus !"
                 ));
             } else if (game.getMode() == BlackjackGame.Mode.CHALLENGE && game.getChallengeChips() <= 0) {
                 inv.setItem(49, createItem(Material.REDSTONE_BLOCK,
-                        Component.text("✘ FAILLITE TOTALE ✘", NamedTextColor.DARK_RED, TextDecoration.BOLD),
-                        "§cVos jetons sont tombés à zéro.",
-                        "§7Votre mise d'entrée est définitivement perdue.",
-                        "§7Repayez l'entrée pour recommencer."
+                        Component.text("✘ Faillite ✘", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                        "§c0 jeton restant."
                 ));
             } else if (game.getMode() == BlackjackGame.Mode.HORDE && game.getHordeChips() <= 0) {
                 inv.setItem(49, createItem(Material.REDSTONE_BLOCK,
-                        Component.text("✘ FAILLITE TOTALE ✘", NamedTextColor.DARK_RED, TextDecoration.BOLD),
-                        "§cVos jetons de sang sont tombés à zéro.",
-                        "§7Votre Lingot de Cuprite est définitivement perdu.",
-                        "§7Repayez l'entrée pour recommencer."
+                        Component.text("✘ Faillite ✘", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                        "§c0 jeton de sang restant."
                 ));
             } else {
                 switch (game.getResult()) {
                     case PLAYER_BLACKJACK -> inv.setItem(49, createItem(Material.TOTEM_OF_UNDYING,
-                            Component.text("✦ BLACKJACK NATUREL ! ✦", NamedTextColor.GOLD, TextDecoration.BOLD),
-                            "§aFélicitations ! Vous avez fait 21 dès la distribution.",
-                            "§6Payé 3 pour 1 : Votre mise a été triplée (x3) !"
+                            Component.text("✦ Blackjack Naturel ! ✦", NamedTextColor.GOLD, TextDecoration.BOLD),
+                            "§aMise triplée (x3) !"
                     ));
                     case FIVE_CARD_CHARLIE -> inv.setItem(49, createItem(Material.TOTEM_OF_UNDYING,
-                            Component.text("✦ FIVE-CARD CHARLIE ! ✦", NamedTextColor.GOLD, TextDecoration.BOLD),
-                            "§aExploit ! 5 cartes tirées sans dépasser 21 !",
-                            "§6Victoire immédiate (x2) remportée !",
-                            "§7La main du croupier a été battue d'office."
+                            Component.text("✦ 5-Card Charlie ! ✦", NamedTextColor.GOLD, TextDecoration.BOLD),
+                            "§a5 cartes sans dépasser 21 (x2) !"
                     ));
                     case PLAYER_WIN, DEALER_BUST -> inv.setItem(49, createItem(Material.EMERALD_BLOCK,
-                            Component.text("✔ VICTOIRE ! ✔", NamedTextColor.GREEN, TextDecoration.BOLD),
-                            "§aVous remportez la manche !",
-                            "§6Votre mise a été doublée !"
+                            Component.text("✔ Victoire ! ✔", NamedTextColor.GREEN, TextDecoration.BOLD),
+                            "§aMise doublée (x2) !"
                     ));
                     case PUSH -> inv.setItem(49, createItem(Material.GOLD_BLOCK,
-                            Component.text("═ ÉGALITÉ (PUSH) ═", NamedTextColor.YELLOW, TextDecoration.BOLD),
-                            "§eMême score que le croupier.",
-                            "§fVotre mise initiale vous a été restituée."
+                            Component.text("═ Égalité ═", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                            "§eMise restituée."
                     ));
                     case PLAYER_BUST, DEALER_WIN -> inv.setItem(49, createItem(Material.REDSTONE_BLOCK,
-                            Component.text("✘ DÉFAITE ! ✘", NamedTextColor.RED, TextDecoration.BOLD),
-                            "§cLe casino a remporté la manche.",
-                            "§7Votre mise a été conservée par la maison."
+                            Component.text("✘ Défaite ✘", NamedTextColor.RED, TextDecoration.BOLD),
+                            "§cMise perdue."
                     ));
                     default -> {}
                 }
@@ -742,45 +613,39 @@ public class BlackjackGui {
             // Bouton Rejouer (Slot 48)
             if (game.getMode() == BlackjackGame.Mode.CLASSIC) {
                 inv.setItem(BUTTON_REPLAY, createItem(Material.GOLD_INGOT,
-                        Component.text("♠ Rejouer une partie ♠", NamedTextColor.YELLOW, TextDecoration.BOLD),
-                        "§7Remiser un item pour une nouvelle manche !"
+                        Component.text("♠ Rejouer", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                        "§7Nouvelle manche."
                 ));
             } else if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
                 if (game.getChallengeChips() > 0) {
                     inv.setItem(BUTTON_REPLAY, createItem(Material.GOLD_INGOT,
-                            Component.text("♠ Manche suivante ♠", NamedTextColor.YELLOW, TextDecoration.BOLD),
-                            "§7Solde restant : §a" + game.getChallengeChips() + " Jetons",
-                            "",
-                            "§e➤ Cliquez pour relancer une manche !"
+                            Component.text("♠ Manche suivante", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                            "§7Solde : §a" + game.getChallengeChips() + " Jetons"
                     ));
                 } else {
                     inv.setItem(BUTTON_REPLAY, createItem(Material.BARRIER,
                             Component.text("Session terminée", NamedTextColor.RED, TextDecoration.BOLD),
-                            "§7Votre session s'est terminée.",
-                            "§e➤ Cliquez pour réinitialiser la table."
+                            "§7Réinitialiser la table."
                     ));
                 }
             } else {
                 if (game.getHordeChips() > 0) {
                     inv.setItem(BUTTON_REPLAY, createItem(Material.REDSTONE,
-                            Component.text("♠ Manche suivante ♠", NamedTextColor.DARK_RED, TextDecoration.BOLD),
-                            "§7Solde restant : §c" + game.getHordeChips() + " Jetons de Sang",
-                            "",
-                            "§e➤ Cliquez pour relancer une manche !"
+                            Component.text("♠ Manche suivante", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                            "§7Solde : §c" + game.getHordeChips() + " Jetons de Sang"
                     ));
                 } else {
                     inv.setItem(BUTTON_REPLAY, createItem(Material.BARRIER,
                             Component.text("Session terminée", NamedTextColor.RED, TextDecoration.BOLD),
-                            "§7Votre session s'est terminée.",
-                            "§e➤ Cliquez pour réinitialiser la table."
+                            "§7Réinitialiser la table."
                     ));
                 }
             }
 
             // Bouton Quitter
             inv.setItem(BUTTON_QUIT, createItem(Material.BARRIER,
-                    Component.text("Fermer la table", NamedTextColor.RED, TextDecoration.BOLD),
-                    "§7Quitter le casino."
+                    Component.text("Quitter", NamedTextColor.RED, TextDecoration.BOLD),
+                    "§7Fermer la table."
             ));
         }
     }

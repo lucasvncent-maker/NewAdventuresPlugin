@@ -111,15 +111,23 @@ public class BlackjackListener implements Listener {
                     return;
                 }
 
-                // Restituer tout item posé dans BET_SLOT avant de basculer
-                ItemStack betSlotItem = topInv.getItem(BlackjackGui.BET_SLOT);
-                if (betSlotItem != null && !betSlotItem.getType().isAir() && !isDecorativePane(betSlotItem.getType())) {
-                    topInv.setItem(BlackjackGui.BET_SLOT, null);
-                    HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(betSlotItem);
-                    for (ItemStack rem : leftover.values()) {
-                        player.getWorld().dropItemNaturally(player.getLocation(), rem);
+                // Restituer uniquement un véritable item posé en phase de dépôt avant de basculer
+                boolean isCurrentDepositPhase = game.getState() == BlackjackGame.State.BETTING 
+                        && (game.getMode() == BlackjackGame.Mode.CLASSIC 
+                            || (game.getMode() == BlackjackGame.Mode.CHALLENGE && game.getChallengeChips() <= 0)
+                            || (game.getMode() == BlackjackGame.Mode.HORDE && game.getHordeChips() <= 0));
+
+                if (isCurrentDepositPhase) {
+                    ItemStack betSlotItem = topInv.getItem(BlackjackGui.BET_SLOT);
+                    if (betSlotItem != null && !betSlotItem.getType().isAir() && !isDecorativePane(betSlotItem.getType())) {
+                        topInv.setItem(BlackjackGui.BET_SLOT, null);
+                        HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(betSlotItem);
+                        for (ItemStack rem : leftover.values()) {
+                            player.getWorld().dropItemNaturally(player.getLocation(), rem);
+                        }
                     }
                 }
+                topInv.setItem(BlackjackGui.BET_SLOT, null);
 
                 if (game.getMode() == BlackjackGame.Mode.CLASSIC) {
                     game.setMode(BlackjackGame.Mode.CHALLENGE);
