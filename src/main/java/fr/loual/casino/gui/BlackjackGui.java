@@ -284,7 +284,9 @@ public class BlackjackGui {
                 ItemStack currentBetInSlot = inv.getItem(BET_SLOT);
                 if (currentBetInSlot != null && (currentBetInSlot.getType() == Material.GREEN_STAINED_GLASS_PANE 
                         || currentBetInSlot.getType() == Material.BLACK_STAINED_GLASS_PANE 
-                        || currentBetInSlot.getType() == Material.YELLOW_STAINED_GLASS_PANE)) {
+                        || currentBetInSlot.getType() == Material.YELLOW_STAINED_GLASS_PANE
+                        || currentBetInSlot.getType() == Material.SUNFLOWER
+                        || currentBetInSlot.getType() == Material.REDSTONE)) {
                     inv.setItem(BET_SLOT, null);
                 }
             } else if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
@@ -610,34 +612,45 @@ public class BlackjackGui {
                 }
             }
 
-            // Bouton Rejouer (Slot 48)
+            // Bouton Rejouer / Menu Principal (Slot 48)
+            boolean isDefeat = game.getResult() == BlackjackGame.Result.PLAYER_BUST || game.getResult() == BlackjackGame.Result.DEALER_WIN;
+
             if (game.getMode() == BlackjackGame.Mode.CLASSIC) {
-                inv.setItem(BUTTON_REPLAY, createItem(Material.GOLD_INGOT,
-                        Component.text("♠ Rejouer", NamedTextColor.YELLOW, TextDecoration.BOLD),
-                        "§7Nouvelle manche."
-                ));
+                if (isDefeat) {
+                    inv.setItem(BUTTON_REPLAY, createItem(Material.BARRIER,
+                            Component.text("Accueil (Standard)", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                            "§7Défaite. Revenir à l'accueil."
+                    ));
+                } else {
+                    inv.setItem(BUTTON_REPLAY, createItem(Material.GOLD_INGOT,
+                            Component.text("♠ Nouvelle mise", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                            "§7Remiser un item."
+                    ));
+                }
             } else if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
-                if (game.getChallengeChips() > 0) {
+                if (!isDefeat && game.getChallengeChips() > 0 && !game.isJackpotWon()) {
                     inv.setItem(BUTTON_REPLAY, createItem(Material.GOLD_INGOT,
                             Component.text("♠ Manche suivante", NamedTextColor.YELLOW, TextDecoration.BOLD),
                             "§7Solde : §a" + game.getChallengeChips() + " Jetons"
                     ));
                 } else {
                     inv.setItem(BUTTON_REPLAY, createItem(Material.BARRIER,
-                            Component.text("Session terminée", NamedTextColor.RED, TextDecoration.BOLD),
-                            "§7Réinitialiser la table."
+                            Component.text("Menu Principal", NamedTextColor.RED, TextDecoration.BOLD),
+                            "§7Session terminée.",
+                            "§7Revenir au mode Standard."
                     ));
                 }
             } else {
-                if (game.getHordeChips() > 0) {
+                if (!isDefeat && game.getHordeChips() > 0) {
                     inv.setItem(BUTTON_REPLAY, createItem(Material.REDSTONE,
                             Component.text("♠ Manche suivante", NamedTextColor.DARK_RED, TextDecoration.BOLD),
                             "§7Solde : §c" + game.getHordeChips() + " Jetons de Sang"
                     ));
                 } else {
                     inv.setItem(BUTTON_REPLAY, createItem(Material.BARRIER,
-                            Component.text("Session terminée", NamedTextColor.RED, TextDecoration.BOLD),
-                            "§7Réinitialiser la table."
+                            Component.text("Menu Principal", NamedTextColor.RED, TextDecoration.BOLD),
+                            "§7Session terminée.",
+                            "§7Revenir au mode Standard."
                     ));
                 }
             }

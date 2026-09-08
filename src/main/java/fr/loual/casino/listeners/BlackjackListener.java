@@ -65,8 +65,11 @@ public class BlackjackListener implements Listener {
                 game.setMode(BlackjackGame.Mode.HORDE);
             } else if (game.getChallengeChips() > 0) {
                 game.setMode(BlackjackGame.Mode.CHALLENGE);
+            } else {
+                game.setMode(BlackjackGame.Mode.CLASSIC);
             }
             if (game.getState() == BlackjackGame.State.GAME_OVER) {
+                game.setMode(BlackjackGame.Mode.CLASSIC);
                 game.resetToBetting();
             }
 
@@ -380,12 +383,22 @@ public class BlackjackListener implements Listener {
 
             } else if (game.getState() == BlackjackGame.State.GAME_OVER) {
                 if (rawSlot == BlackjackGui.BUTTON_REPLAY) {
-                    game.resetToBetting();
-                    if (game.getMode() == BlackjackGame.Mode.CLASSIC) {
+                    boolean isGameOverDefeatOrEnded = (game.getResult() == BlackjackGame.Result.PLAYER_BUST || game.getResult() == BlackjackGame.Result.DEALER_WIN)
+                            || (game.getMode() == BlackjackGame.Mode.CHALLENGE && (game.getChallengeChips() <= 0 || game.isJackpotWon()))
+                            || (game.getMode() == BlackjackGame.Mode.HORDE && game.getHordeChips() <= 0);
+
+                    if (isGameOverDefeatOrEnded) {
+                        game.setMode(BlackjackGame.Mode.CLASSIC);
+                        game.resetToBetting();
                         topInv.setItem(BlackjackGui.BET_SLOT, null);
+                        BlackjackGui.render(topInv, game);
+                        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.0f);
+                    } else {
+                        game.resetToBetting();
+                        topInv.setItem(BlackjackGui.BET_SLOT, null);
+                        BlackjackGui.render(topInv, game);
+                        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.2f);
                     }
-                    BlackjackGui.render(topInv, game);
-                    player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.8f, 1.2f);
                 } else if (rawSlot == BlackjackGui.BUTTON_QUIT) {
                     player.closeInventory();
                 }
@@ -481,6 +494,14 @@ public class BlackjackListener implements Listener {
             // Anti-triche : si le joueur ferme pendant qu'il joue pour fuir un mauvais tirage,
             // la main est automatiquement résolue avec 'stand'.
             game.standAnimated(plugin, () -> {});
+        } else if (game.getState() == BlackjackGame.State.GAME_OVER) {
+            boolean isDefeatOrEnded = (game.getResult() == BlackjackGame.Result.PLAYER_BUST || game.getResult() == BlackjackGame.Result.DEALER_WIN)
+                    || (game.getMode() == BlackjackGame.Mode.CHALLENGE && (game.getChallengeChips() <= 0 || game.isJackpotWon()))
+                    || (game.getMode() == BlackjackGame.Mode.HORDE && game.getHordeChips() <= 0);
+            if (isDefeatOrEnded) {
+                game.setMode(BlackjackGame.Mode.CLASSIC);
+                game.resetToBetting();
+            }
         }
     }
 

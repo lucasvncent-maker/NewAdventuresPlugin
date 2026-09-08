@@ -420,6 +420,7 @@ public class BlackjackGame {
                 default -> {}
             }
         } else if (mode == Mode.CHALLENGE) {
+            if (activeChallengeBet <= 0) return;
             // Mode CHALLENGE
             switch (result) {
                 case PLAYER_BLACKJACK -> {
@@ -453,9 +454,11 @@ public class BlackjackGame {
                 }
                 case PLAYER_BUST, DEALER_WIN -> {
                     String reason = (result == Result.PLAYER_BUST) ? "Vous avez dépassé 21 (Bust) !" : "Le croupier l'emporte.";
-                    targetPlayer.sendMessage(Component.text("✘ DÉFAITE ! " + reason + " Perte de " + activeChallengeBet + " Jetons. (Solde: " + challengeChips + ")", NamedTextColor.RED, TextDecoration.BOLD));
+                    targetPlayer.sendMessage(Component.text("✘ DÉFAITE ! " + reason + " Fin de la session de défi.", NamedTextColor.RED, TextDecoration.BOLD));
                     targetPlayer.playSound(loc, Sound.ENTITY_VILLAGER_NO, 1.0f, 0.9f);
                     targetPlayer.playSound(loc, Sound.BLOCK_ANVIL_LAND, 0.5f, 0.6f);
+                    challengeChips = 0;
+                    saveChallengeToPdc(currentPlugin);
                 }
                 default -> {}
             }
@@ -508,6 +511,7 @@ public class BlackjackGame {
                 }
             }
         } else {
+            if (activeHordeBet <= 0) return;
             // Mode HORDE
             switch (result) {
                 case PLAYER_BLACKJACK -> {
@@ -541,9 +545,11 @@ public class BlackjackGame {
                 }
                 case PLAYER_BUST, DEALER_WIN -> {
                     String reason = (result == Result.PLAYER_BUST) ? "Vous avez dépassé 21 (Bust) !" : "Le croupier l'emporte.";
-                    targetPlayer.sendMessage(Component.text("✘ DÉFAITE ! " + reason + " Perte de " + activeHordeBet + " Jetons de Sang. (Solde: " + hordeChips + ")", NamedTextColor.DARK_RED, TextDecoration.BOLD));
+                    targetPlayer.sendMessage(Component.text("✘ DÉFAITE ! " + reason + " Votre Lingot de Cuprite est perdu.", NamedTextColor.DARK_RED, TextDecoration.BOLD));
                     targetPlayer.playSound(loc, Sound.ENTITY_VILLAGER_NO, 1.0f, 0.9f);
                     targetPlayer.playSound(loc, Sound.BLOCK_ANVIL_LAND, 0.5f, 0.6f);
+                    hordeChips = 0;
+                    saveHordeToPdc(currentPlugin);
                 }
                 default -> {}
             }
@@ -607,6 +613,7 @@ public class BlackjackGame {
 
         challengeChips = 0;
         saveChallengeToPdc(currentPlugin);
+        this.mode = Mode.CLASSIC;
         resetToBetting();
         return true;
     }
@@ -803,11 +810,15 @@ public class BlackjackGame {
             this.challengeBet = this.challengeChips;
         } else if (this.challengeChips > 0 && this.challengeBet <= 0) {
             this.challengeBet = Math.min(10, this.challengeChips);
+        } else if (this.challengeChips <= 0) {
+            this.challengeBet = 10;
         }
         if (this.hordeChips > 0 && this.hordeBet > this.hordeChips) {
             this.hordeBet = this.hordeChips;
         } else if (this.hordeChips > 0 && this.hordeBet <= 0) {
             this.hordeBet = Math.min(10, this.hordeChips);
+        } else if (this.hordeChips <= 0) {
+            this.hordeBet = 10;
         }
     }
 
