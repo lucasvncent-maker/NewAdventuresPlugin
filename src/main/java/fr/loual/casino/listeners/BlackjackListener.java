@@ -60,7 +60,10 @@ public class BlackjackListener implements Listener {
 
             BlackjackGame game = activeSessions.computeIfAbsent(player.getUniqueId(), id -> new BlackjackGame(player, plugin));
             game.loadChallengeFromPdc(plugin);
-            if (game.getChallengeChips() > 0) {
+            game.loadHordeFromPdc(plugin);
+            if (game.getHordeChips() > 0) {
+                game.setMode(BlackjackGame.Mode.HORDE);
+            } else if (game.getChallengeChips() > 0) {
                 game.setMode(BlackjackGame.Mode.CHALLENGE);
             }
             if (game.getState() == BlackjackGame.State.GAME_OVER) {
@@ -123,6 +126,11 @@ public class BlackjackListener implements Listener {
                     game.loadChallengeFromPdc(plugin);
                     player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.3f);
                     player.sendMessage(Component.text("♠ Passage en Mode Défi Cuprite !", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
+                } else if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
+                    game.setMode(BlackjackGame.Mode.HORDE);
+                    game.loadHordeFromPdc(plugin);
+                    player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 0.8f);
+                    player.sendMessage(Component.text("♠ Passage en Mode Mission Horde (Sang) !", NamedTextColor.DARK_RED, TextDecoration.BOLD));
                 } else {
                     game.setMode(BlackjackGame.Mode.CLASSIC);
                     player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
@@ -144,9 +152,11 @@ public class BlackjackListener implements Listener {
                 }
             }
 
-            // Phase BETTING avec slot central de dépôt libre (Mode Classique OU Défi sans session active)
+            // Phase BETTING avec slot central de dépôt libre (Mode Classique OU Défi/Horde sans session active)
             boolean isDepositPhase = game.getState() == BlackjackGame.State.BETTING 
-                    && (game.getMode() == BlackjackGame.Mode.CLASSIC || game.getChallengeChips() <= 0);
+                    && (game.getMode() == BlackjackGame.Mode.CLASSIC 
+                        || (game.getMode() == BlackjackGame.Mode.CHALLENGE && game.getChallengeChips() <= 0)
+                        || (game.getMode() == BlackjackGame.Mode.HORDE && game.getHordeChips() <= 0));
 
             if (isDepositPhase && rawSlot == BlackjackGui.BET_SLOT) {
                 ItemStack cursor = event.getCursor();
@@ -190,7 +200,7 @@ public class BlackjackListener implements Listener {
                     } else if (rawSlot == BlackjackGui.BUTTON_QUIT) {
                         player.closeInventory();
                     }
-                } else {
+                } else if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
                     // Mode CHALLENGE
                     if (game.getChallengeChips() <= 0) {
                         // Clic sur Valider l'entrée (Slot 49)
@@ -259,6 +269,73 @@ public class BlackjackListener implements Listener {
                             player.closeInventory();
                         }
                     }
+                } else {
+                    // Mode HORDE
+                    if (game.getHordeChips() <= 0) {
+                        // Clic sur Valider l'entrée (Slot 49)
+                        if (rawSlot == BlackjackGui.BUTTON_START_BET) {
+                            ItemStack deposit = topInv.getItem(BlackjackGui.BET_SLOT);
+                            if (BlackjackGame.isValidHordeEntryItem(plugin, deposit)) {
+                                int remainder = deposit.getAmount() - 1;
+
+                                topInv.setItem(BlackjackGui.BET_SLOT, null);
+                                if (remainder > 0) {
+                                    ItemStack left = deposit.clone();
+                                    left.setAmount(remainder);
+                                    HashMap<Integer, ItemStack> notAdded = player.getInventory().addItem(left);
+                                    for (ItemStack rem : notAdded.values()) {
+                                        player.getWorld().dropItemNaturally(player.getLocation(), rem);
+                                    }
+                                }
+
+                                game.setHordeChips(BlackjackGame.HORDE_START_CHIPS);
+                                game.setHordeBet(10);
+                                game.saveHordeToPdc(plugin);
+                                player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
+                                player.playSound(player.getLocation(), Sound.ENTITY_WITHER_SPAWN, 0.8f, 1.2f);
+                                player.sendMessage(Component.text("✦ MISSION HORDE ACTIVÉE ! ✦ Vous recevez 100 Jetons de Sang. Atteignez 300 jetons (x3) pour invoquer la Horde !", NamedTextColor.DARK_RED, TextDecoration.BOLD));
+                                BlackjackGui.render(topInv, game);
+                            } else {
+                                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                                player.sendMessage(Component.text("§cDéposez 1 Lingot de Cuprite au centre pour débuter la mission horde !"));
+                            }
+                        } else if (rawSlot == BlackjackGui.BUTTON_QUIT) {
+                            player.closeInventory();
+                        }
+                    } else {
+                        // Session active : 2 boutons pour ajuster la mise (+10 / -10)
+                        if (rawSlot == BlackjackGui.BUTTON_CHALLENGE_BET_DECREASE) {
+                            int oldBet = game.getHordeBet();
+                            game.adjustHordeBet(-10);
+                            if (game.getHordeBet() != oldBet) {
+                                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 0.9f);
+                            } else {
+                                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                            }
+                            BlackjackGui.render(topInv, game);
+                        } else if (rawSlot == BlackjackGui.BUTTON_CHALLENGE_BET_INCREASE) {
+                            int oldBet = game.getHordeBet();
+                            game.adjustHordeBet(10);
+                            if (game.getHordeBet() != oldBet) {
+                                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.4f);
+                            } else {
+                                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                            }
+                            BlackjackGui.render(topInv, game);
+                        } else if (rawSlot == BlackjackGui.BUTTON_START_BET) {
+                            int bet = game.getHordeBet();
+                            if (bet > 0 && bet <= game.getHordeChips()) {
+                                game.startHordeHand(plugin, bet, () -> {
+                                    if (player.getOpenInventory().getTopInventory().getHolder() instanceof BlackjackGuiHolder) {
+                                        BlackjackGui.render(topInv, game);
+                                    }
+                                });
+                                player.playSound(player.getLocation(), Sound.ITEM_ARMOR_EQUIP_GENERIC, 1.0f, 1.2f);
+                            }
+                        } else if (rawSlot == BlackjackGui.BUTTON_QUIT) {
+                            player.closeInventory();
+                        }
+                    }
                 }
 
             } else if (game.getState() == BlackjackGame.State.PLAYING) {
@@ -279,8 +356,10 @@ public class BlackjackListener implements Listener {
                         player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
                         if (game.getMode() == BlackjackGame.Mode.CLASSIC) {
                             player.sendMessage(Component.text("§cVous n'avez pas assez d'items dans votre inventaire pour doubler votre mise !"));
-                        } else {
+                        } else if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
                             player.sendMessage(Component.text("§cVous n'avez pas assez de jetons pour doubler votre mise (" + game.getActiveChallengeBet() + " requis) !"));
+                        } else {
+                            player.sendMessage(Component.text("§cVous n'avez pas assez de jetons de sang pour doubler votre mise (" + game.getActiveHordeBet() + " requis) !"));
                         }
                     }
                 } else if (rawSlot == BlackjackGui.BUTTON_STAND) {
@@ -309,7 +388,9 @@ public class BlackjackListener implements Listener {
             if (event.isShiftClick()) {
                 event.setCancelled(true);
                 boolean isDepositPhase = game.getState() == BlackjackGame.State.BETTING 
-                        && (game.getMode() == BlackjackGame.Mode.CLASSIC || game.getChallengeChips() <= 0);
+                        && (game.getMode() == BlackjackGame.Mode.CLASSIC 
+                            || (game.getMode() == BlackjackGame.Mode.CHALLENGE && game.getChallengeChips() <= 0)
+                            || (game.getMode() == BlackjackGame.Mode.HORDE && game.getHordeChips() <= 0));
 
                 if (isDepositPhase) {
                     ItemStack current = event.getCurrentItem();
@@ -342,7 +423,9 @@ public class BlackjackListener implements Listener {
 
         BlackjackGame game = holder.getGame();
         boolean isDepositPhase = game.getState() == BlackjackGame.State.BETTING 
-                && (game.getMode() == BlackjackGame.Mode.CLASSIC || game.getChallengeChips() <= 0);
+                && (game.getMode() == BlackjackGame.Mode.CLASSIC 
+                    || (game.getMode() == BlackjackGame.Mode.CHALLENGE && game.getChallengeChips() <= 0)
+                    || (game.getMode() == BlackjackGame.Mode.HORDE && game.getHordeChips() <= 0));
 
         for (int slot : event.getRawSlots()) {
             if (slot < event.getView().getTopInventory().getSize()) {
@@ -370,7 +453,9 @@ public class BlackjackListener implements Listener {
 
         BlackjackGame game = holder.getGame();
         boolean isDepositPhase = game.getState() == BlackjackGame.State.BETTING 
-                && (game.getMode() == BlackjackGame.Mode.CLASSIC || game.getChallengeChips() <= 0);
+                && (game.getMode() == BlackjackGame.Mode.CLASSIC 
+                    || (game.getMode() == BlackjackGame.Mode.CHALLENGE && game.getChallengeChips() <= 0)
+                    || (game.getMode() == BlackjackGame.Mode.HORDE && game.getHordeChips() <= 0));
 
         // Si le joueur ferme en phase de dépôt : lui restituer l'item posé dans le slot central
         if (isDepositPhase) {

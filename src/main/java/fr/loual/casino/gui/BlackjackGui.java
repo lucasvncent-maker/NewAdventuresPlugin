@@ -56,7 +56,9 @@ public class BlackjackGui {
         ItemStack darkFelt = createItem(Material.BLACK_STAINED_GLASS_PANE, Component.text(" "));
 
         boolean isDepositSlot = game.getState() == BlackjackGame.State.BETTING 
-                && (game.getMode() == BlackjackGame.Mode.CLASSIC || game.getChallengeChips() <= 0);
+                && (game.getMode() == BlackjackGame.Mode.CLASSIC 
+                    || (game.getMode() == BlackjackGame.Mode.CHALLENGE && game.getChallengeChips() <= 0)
+                    || (game.getMode() == BlackjackGame.Mode.HORDE && game.getHordeChips() <= 0));
 
         for (int i = 0; i < 54; i++) {
             if (i == BET_SLOT && isDepositSlot) {
@@ -103,14 +105,14 @@ public class BlackjackGui {
                     "",
                     "§d➤ Cliquer pour passer en Mode Défi Cuprite"
             ));
-        } else {
+        } else if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
             ItemStack copper = createItem(
                     Material.RAW_COPPER,
                     Component.text("Mode : Défi Cuprite", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD),
                     "§7Mission spéciale du Croupier !",
                     "§7Multipliez vos jetons pour remporter de la Cuprite.",
                     "",
-                    "§a➤ Cliquer pour repasser en Mode Standard"
+                    "§c➤ Cliquer pour passer en Mode Mission Horde"
             );
             ItemMeta meta = copper.getItemMeta();
             if (meta != null) {
@@ -118,6 +120,22 @@ public class BlackjackGui {
                 copper.setItemMeta(meta);
             }
             inv.setItem(BUTTON_MODE_SWITCH, copper);
+        } else {
+            ItemStack redstone = createItem(
+                    Material.REDSTONE,
+                    Component.text("Mode : Mission Horde (Sang)", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                    "§7Mission interdite du Croupier !",
+                    "§7Déposez 1 Lingot de Cuprite pour 100 Jetons de Sang.",
+                    "§cMultipliez vos jetons par 3 (300) pour invoquer la Horde !",
+                    "",
+                    "§a➤ Cliquer pour repasser en Mode Standard"
+            );
+            ItemMeta meta = redstone.getItemMeta();
+            if (meta != null) {
+                meta.setEnchantmentGlintOverride(true);
+                redstone.setItemMeta(meta);
+            }
+            inv.setItem(BUTTON_MODE_SWITCH, redstone);
         }
     }
 
@@ -136,6 +154,20 @@ public class BlackjackGui {
                             Component.text("♠ Croupier - Mission Cuprite ♠", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD),
                             "§7\"Objectif : 400 (x4) ou 800 (x8) jetons !\"",
                             "§7Sélectionnez votre mise et lancez la main."
+                    );
+                }
+            } else if (game.getMode() == BlackjackGame.Mode.HORDE) {
+                if (game.getHordeChips() <= 0) {
+                    dealerHeader = createItem(Material.PLAYER_HEAD,
+                            Component.text("♠ Croupier - Mission Horde ♠", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                            "§7\"Oserez-vous réveiller la Horde ?\"",
+                            "§7Déposez 1 Lingot de Cuprite au centre pour débuter."
+                    );
+                } else {
+                    dealerHeader = createItem(Material.PLAYER_HEAD,
+                            Component.text("♠ Croupier - Mission Horde ♠", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                            "§7\"Objectif : 300 jetons (x3) pour l'Invasion !\"",
+                            "§7Sélectionnez votre mise de sang et jouez."
                     );
                 }
             } else {
@@ -219,6 +251,20 @@ public class BlackjackGui {
                             "§7Palier x8 : §d800 Jetons §7(3 Cuprites)"
                     );
                 }
+            } else if (game.getMode() == BlackjackGame.Mode.HORDE) {
+                if (game.getHordeChips() <= 0) {
+                    playerHeader = createItem(Material.REDSTONE,
+                            Component.text("✦ Inscription Mission Horde ✦", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                            "§7Aucune session active.",
+                            "§7Déposez 1 Lingot de Cuprite au centre !"
+                    );
+                } else {
+                    playerHeader = createItem(Material.REDSTONE,
+                            Component.text("✦ Solde : §c§l" + game.getHordeChips() + " Jetons de Sang ✦", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                            "§7Multiplicateur visé : §cx3 (300 Jetons)",
+                            "§cAtteindre 300 jetons déclenche l'invasion !"
+                    );
+                }
             } else {
                 playerHeader = createItem(Material.NETHER_STAR,
                         Component.text("✦ Votre Main ✦", NamedTextColor.AQUA, TextDecoration.BOLD),
@@ -244,7 +290,11 @@ public class BlackjackGui {
                 inv.setItem(slot, createItem(Material.GRAY_STAINED_GLASS_PANE, Component.text("§8[ Emplacement Joueur ]")));
             }
 
-            if (game.getMode() == BlackjackGame.Mode.CLASSIC || game.getChallengeChips() <= 0) {
+            boolean isDeposit = (game.getMode() == BlackjackGame.Mode.CLASSIC)
+                    || (game.getMode() == BlackjackGame.Mode.CHALLENGE && game.getChallengeChips() <= 0)
+                    || (game.getMode() == BlackjackGame.Mode.HORDE && game.getHordeChips() <= 0);
+
+            if (isDeposit) {
                 // Cadre doré autour du slot de dépôt (Slot 22)
                 for (int slot : new int[]{ 13, 21, 23, 31 }) {
                     String borderText = (game.getMode() == BlackjackGame.Mode.CLASSIC)
@@ -266,6 +316,19 @@ public class BlackjackGui {
                     for (int s : new int[]{ 19, 20, 24 }) {
                         inv.setItem(s, createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" ")));
                     }
+                } else if (game.getMode() == BlackjackGame.Mode.HORDE) {
+                    // Bannière des règles Horde sur slot 18
+                    inv.setItem(SLOT_CHALLENGE_STATUS, createItem(Material.BOOK,
+                            Component.text("§4§lRègles de la Mission Horde"),
+                            "§c• Droit d'entrée : §f1 Lingot de Cuprite",
+                            "§c• Départ : §4100 Jetons de Sang",
+                            "§c• Objectif x3 (300 jetons) : §4§lDÉCLENCHE L'INVASION !",
+                            "§7  Affrontez 4 vagues et le Boss Colossal !",
+                            "§c• Faillite (0 jeton) : Cuprite perdue !"
+                    ));
+                    for (int s : new int[]{ 19, 20, 24 }) {
+                        inv.setItem(s, createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" ")));
+                    }
                 }
 
                 ItemStack currentBetInSlot = inv.getItem(BET_SLOT);
@@ -274,7 +337,7 @@ public class BlackjackGui {
                         || currentBetInSlot.getType() == Material.YELLOW_STAINED_GLASS_PANE)) {
                     inv.setItem(BET_SLOT, null);
                 }
-            } else {
+            } else if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
                 // Mode CHALLENGE avec session active : 2 boutons pour ajuster la mise (+10 / -10)
                 inv.setItem(SLOT_CHALLENGE_STATUS, createItem(Material.EXPERIENCE_BOTTLE,
                         Component.text("✦ Progression Mission ✦", NamedTextColor.YELLOW, TextDecoration.BOLD),
@@ -307,6 +370,51 @@ public class BlackjackGui {
                         Component.text("+10 Jetons", NamedTextColor.GREEN, TextDecoration.BOLD),
                         "§7Augmenter la mise de §a10 Jetons§7.",
                         "§7Mise maximale : §f" + game.getChallengeChips() + " Jetons",
+                        "",
+                        "§a➤ Cliquer pour augmenter la mise"
+                ));
+
+                for (int s : new int[]{ 13, 19, 20, 24, 25, 31 }) {
+                    inv.setItem(s, createItem(Material.GREEN_STAINED_GLASS_PANE, Component.text(" ")));
+                }
+            } else {
+                // Mode HORDE avec session active : 2 boutons pour ajuster la mise (+10 / -10)
+                inv.setItem(SLOT_CHALLENGE_STATUS, createItem(Material.EXPERIENCE_BOTTLE,
+                        Component.text("✦ Progression Horde ✦", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                        "§7Solde actuel : §c§l" + game.getHordeChips() + " Jetons de Sang",
+                        "§7Objectif x3 : §4§l300 Jetons de Sang",
+                        "§cAtteindre 300 jetons déclenche l'invasion !"
+                ));
+
+                // Bouton Diminuer de 10 (Slot 21)
+                inv.setItem(BUTTON_CHALLENGE_BET_DECREASE, createItem(Material.RED_DYE,
+                        Component.text("−10 Jetons de Sang", NamedTextColor.RED, TextDecoration.BOLD),
+                        "§7Diminuer la mise de §c10 Jetons de Sang§7.",
+                        "§7Mise minimale : §f" + Math.min(10, game.getHordeChips()) + " Jetons",
+                        "",
+                        "§c➤ Cliquer pour réduire la mise"
+                ));
+
+                // Mise sélectionnée au centre (Slot 22)
+                ItemStack curBet = createItem(Material.REDSTONE,
+                        Component.text("Mise sélectionnée : §c§l" + game.getHordeBet() + " Jetons de Sang", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                        "§7Solde restant si défaite : §f" + (game.getHordeChips() - game.getHordeBet()) + " Jetons",
+                        "§7Victoire normale : §a+" + (game.getHordeBet() * 2) + " Jetons (x2)",
+                        "§6Blackjack naturel (x3) : §e+" + (game.getHordeBet() * 3) + " Jetons"
+                );
+                ItemMeta curMeta = curBet.getItemMeta();
+                if (curMeta != null) {
+                    curMeta.setEnchantmentGlintOverride(true);
+                    curBet.setItemMeta(curMeta);
+                }
+                curBet.setAmount(Math.max(1, Math.min(64, game.getHordeBet())));
+                inv.setItem(BET_SLOT, curBet);
+
+                // Bouton Augmenter de 10 (Slot 23)
+                inv.setItem(BUTTON_CHALLENGE_BET_INCREASE, createItem(Material.LIME_DYE,
+                        Component.text("+10 Jetons de Sang", NamedTextColor.GREEN, TextDecoration.BOLD),
+                        "§7Augmenter la mise de §a10 Jetons de Sang§7.",
+                        "§7Mise maximale : §f" + game.getHordeChips() + " Jetons",
                         "",
                         "§a➤ Cliquer pour augmenter la mise"
                 ));
@@ -386,7 +494,7 @@ public class BlackjackGui {
                             "§7dans le slot central pour activer ce bouton."
                     ));
                 }
-            } else {
+            } else if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
                 // Mode CHALLENGE
                 if (game.getChallengeChips() <= 0) {
                     ItemStack deposit = inv.getItem(BET_SLOT);
@@ -418,6 +526,41 @@ public class BlackjackGui {
                             "§7Victoire : §a+" + (game.getChallengeBet() * 2) + " Jetons (x2)",
                             "§6Blackjack (21 naturel) : §e+" + (game.getChallengeBet() * 3) + " Jetons (x3)",
                             "§cDéfaite : §7Perte de vos " + game.getChallengeBet() + " Jetons.",
+                            "",
+                            "§a➤ Cliquez pour lancer la manche !"
+                    ));
+                }
+            } else {
+                // Mode HORDE
+                if (game.getHordeChips() <= 0) {
+                    ItemStack deposit = inv.getItem(BET_SLOT);
+                    org.bukkit.plugin.Plugin currentPlugin = Bukkit.getPluginManager().getPlugin("NewAdventurePlugin");
+                    boolean valid = BlackjackGame.isValidHordeEntryItem(currentPlugin, deposit);
+
+                    if (valid) {
+                        inv.setItem(BUTTON_START_BET, createItem(Material.LIME_CONCRETE,
+                                Component.text("✔ Valider & Invoquer la Horde", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                                "§eEntrée : §f1x Lingot de Cuprite",
+                                "§7Capital initial : §c100 Jetons de Sang",
+                                "§7Objectif : §4§l300 Jetons de Sang (x3)",
+                                "§cDéclenche l'Invasion Zombie et le Boss !",
+                                "",
+                                "§a➤ Cliquez pour payer et démarrer la session !"
+                        ));
+                    } else {
+                        inv.setItem(BUTTON_START_BET, createItem(Material.GRAY_CONCRETE,
+                                Component.text("En attente du Lingot de Cuprite...", NamedTextColor.GRAY, TextDecoration.BOLD),
+                                "§7Déposez §61 Lingot de Cuprite",
+                                "§7dans le slot central pour débuter la mission."
+                        ));
+                    }
+                } else {
+                    inv.setItem(BUTTON_START_BET, createItem(Material.LIME_CONCRETE,
+                            Component.text("✔ Valider la mise & Distribuer", NamedTextColor.GREEN, TextDecoration.BOLD),
+                            "§eMise : §c" + game.getHordeBet() + " Jetons de Sang",
+                            "§7Victoire : §a+" + (game.getHordeBet() * 2) + " Jetons (x2)",
+                            "§6Blackjack (21 naturel) : §e+" + (game.getHordeBet() * 3) + " Jetons (x3)",
+                            "§cDéfaite : §7Perte de vos " + game.getHordeBet() + " Jetons.",
                             "",
                             "§a➤ Cliquez pour lancer la manche !"
                     ));
@@ -507,7 +650,7 @@ public class BlackjackGui {
                     }
                     inv.setItem(49, betDisplay);
                 }
-            } else {
+            } else if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
                 ItemStack betDisplay = createItem(Material.SUNFLOWER,
                         Component.text("Mise en jeu : §6§l" + game.getActiveChallengeBet() + " Jetons", NamedTextColor.YELLOW, TextDecoration.BOLD),
                         "§aVictoire standard : +" + (game.getActiveChallengeBet() * 2) + " Jetons",
@@ -515,6 +658,20 @@ public class BlackjackGui {
                         "§cDéfaite : Perte de la mise"
                 );
                 betDisplay.setAmount(Math.max(1, Math.min(64, game.getActiveChallengeBet())));
+                inv.setItem(49, betDisplay);
+            } else {
+                ItemStack betDisplay = createItem(Material.REDSTONE,
+                        Component.text("Mise en jeu : §c§l" + game.getActiveHordeBet() + " Jetons de Sang", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                        "§aVictoire standard : +" + (game.getActiveHordeBet() * 2) + " Jetons",
+                        "§6Blackjack naturel : +" + (game.getActiveHordeBet() * 3) + " Jetons",
+                        "§cDéfaite : Perte de la mise"
+                );
+                ItemMeta meta = betDisplay.getItemMeta();
+                if (meta != null) {
+                    meta.setEnchantmentGlintOverride(true);
+                    betDisplay.setItemMeta(meta);
+                }
+                betDisplay.setAmount(Math.max(1, Math.min(64, game.getActiveHordeBet())));
                 inv.setItem(49, betDisplay);
             }
 
@@ -541,6 +698,13 @@ public class BlackjackGui {
                         Component.text("✘ FAILLITE TOTALE ✘", NamedTextColor.DARK_RED, TextDecoration.BOLD),
                         "§cVos jetons sont tombés à zéro.",
                         "§7Votre mise d'entrée est définitivement perdue.",
+                        "§7Repayez l'entrée pour recommencer."
+                ));
+            } else if (game.getMode() == BlackjackGame.Mode.HORDE && game.getHordeChips() <= 0) {
+                inv.setItem(49, createItem(Material.REDSTONE_BLOCK,
+                        Component.text("✘ FAILLITE TOTALE ✘", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                        "§cVos jetons de sang sont tombés à zéro.",
+                        "§7Votre Lingot de Cuprite est définitivement perdu.",
                         "§7Repayez l'entrée pour recommencer."
                 ));
             } else {
@@ -581,11 +745,26 @@ public class BlackjackGui {
                         Component.text("♠ Rejouer une partie ♠", NamedTextColor.YELLOW, TextDecoration.BOLD),
                         "§7Remiser un item pour une nouvelle manche !"
                 ));
-            } else {
+            } else if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
                 if (game.getChallengeChips() > 0) {
                     inv.setItem(BUTTON_REPLAY, createItem(Material.GOLD_INGOT,
                             Component.text("♠ Manche suivante ♠", NamedTextColor.YELLOW, TextDecoration.BOLD),
                             "§7Solde restant : §a" + game.getChallengeChips() + " Jetons",
+                            "",
+                            "§e➤ Cliquez pour relancer une manche !"
+                    ));
+                } else {
+                    inv.setItem(BUTTON_REPLAY, createItem(Material.BARRIER,
+                            Component.text("Session terminée", NamedTextColor.RED, TextDecoration.BOLD),
+                            "§7Votre session s'est terminée.",
+                            "§e➤ Cliquez pour réinitialiser la table."
+                    ));
+                }
+            } else {
+                if (game.getHordeChips() > 0) {
+                    inv.setItem(BUTTON_REPLAY, createItem(Material.REDSTONE,
+                            Component.text("♠ Manche suivante ♠", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                            "§7Solde restant : §c" + game.getHordeChips() + " Jetons de Sang",
                             "",
                             "§e➤ Cliquez pour relancer une manche !"
                     ));
@@ -607,9 +786,14 @@ public class BlackjackGui {
     }
 
     private static void renderActionBar(BlackjackGame game) {
-        if (game.getMode() == BlackjackGame.Mode.CHALLENGE && game.getState() == BlackjackGame.State.BETTING) {
-            game.getPlayer().sendActionBar(Component.text("§d[Défi Cuprite] §fSolde : §a§l" + game.getChallengeChips() + " Jetons §8| §fObjectifs : §6400 (x4) §8- §d800 (x8)"));
-            return;
+        if (game.getState() == BlackjackGame.State.BETTING) {
+            if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
+                game.getPlayer().sendActionBar(Component.text("§d[Défi Cuprite] §fSolde : §a§l" + game.getChallengeChips() + " Jetons §8| §fObjectifs : §6400 (x4) §8- §d800 (x8)"));
+                return;
+            } else if (game.getMode() == BlackjackGame.Mode.HORDE) {
+                game.getPlayer().sendActionBar(Component.text("§4[Mission Horde] §fSolde : §c§l" + game.getHordeChips() + " Jetons de Sang §8| §fObjectif : §c§l300 (x3 pour l'Invasion)"));
+                return;
+            }
         }
 
         if (game.getState() == BlackjackGame.State.DEALING) {
@@ -630,7 +814,12 @@ public class BlackjackGui {
                 int dScore = BlackjackGame.calculateScore(game.getDealerHand());
                 dText = (dScore > 21 ? "§c" : "§e") + dScore + (dScore > 21 ? " §c(Bust)" : "");
             }
-            String suffix = (game.getMode() == BlackjackGame.Mode.CHALLENGE) ? " §8| §dJetons: §a§l" + game.getChallengeChips() : "";
+            String suffix = "";
+            if (game.getMode() == BlackjackGame.Mode.CHALLENGE) {
+                suffix = " §8| §dJetons: §a§l" + game.getChallengeChips();
+            } else if (game.getMode() == BlackjackGame.Mode.HORDE) {
+                suffix = " §8| §4Jetons Sang: §c§l" + game.getHordeChips();
+            }
             game.getPlayer().sendActionBar(Component.text("§f✦ Votre Score : " + pColor + "§l" + pScore + " §8| §fCroupier : " + dText + " ✦" + suffix));
         }
     }

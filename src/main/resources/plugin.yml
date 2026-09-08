@@ -60,6 +60,10 @@ commands:
     description: Joue la musique Chlorine de Twenty One Pilots
     usage: /chlorine [play|stop]
     aliases: [top, ned]
+  horde:
+    description: Gerer l'invasion de la Horde et les Boss
+    usage: /horde [start|stop|status]
+    permission: horde.admin
 
 permissions:
   customminerals.admin:
@@ -67,4 +71,7 @@ permissions:
     default: op
   casino.admin:
     description: Permet de faire apparaitre ou supprimer des croupiers de casino
+    default: op
+  horde.admin:
+    description: Permet de declencher ou stopper les hordes de boss
     default: op

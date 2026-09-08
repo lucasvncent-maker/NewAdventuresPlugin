@@ -27,6 +27,9 @@ import fr.loual.casino.spawner.VillageCroupierSpawner;
 import fr.loual.casino.stats.CasinoStatsManager;
 import fr.loual.customminerals.recipes.RecipeManager;
 import fr.loual.newadventure.commands.ChlorineCommand;
+import fr.loual.horde.HordeManager;
+import fr.loual.horde.HordeListener;
+import fr.loual.horde.commands.HordeCommand;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginManager;
@@ -47,6 +50,7 @@ public final class NewAdventurePlugin extends JavaPlugin {
     private JobManager jobManager;
     private RecipeManager mineralRecipeManager;
     private CasinoStatsManager casinoStatsManager;
+    private HordeManager hordeManager;
 
     @Override
     public void onEnable() {
@@ -190,6 +194,16 @@ public final class NewAdventurePlugin extends JavaPlugin {
             cmdChlorine.setTabCompleter(chlorineCommand);
         }
 
+        // 9quater. Système d'invasion de Horde & Boss
+        this.hordeManager = new HordeManager(this);
+        pm.registerEvents(new HordeListener(this, hordeManager), this);
+        HordeCommand hordeCommand = new HordeCommand(this, hordeManager);
+        PluginCommand cmdHorde = getCommand("horde");
+        if (cmdHorde != null) {
+            cmdHorde.setExecutor(hordeCommand);
+            cmdHorde.setTabCompleter(hordeCommand);
+        }
+
         // 10. Export du resource pack au format .zip
         exportResourcePackZip();
 
@@ -204,7 +218,14 @@ public final class NewAdventurePlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (hordeManager != null) {
+            hordeManager.cleanup();
+        }
         getLogger().info("newAdventurePlugin a été désactivé.");
+    }
+
+    public HordeManager getHordeManager() {
+        return hordeManager;
     }
 
     public ClassManager getClassManager() {

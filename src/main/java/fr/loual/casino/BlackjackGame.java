@@ -32,7 +32,8 @@ public class BlackjackGame {
 
     public enum Mode {
         CLASSIC,
-        CHALLENGE
+        CHALLENGE,
+        HORDE
     }
 
     public enum State {
@@ -57,6 +58,8 @@ public class BlackjackGame {
     public static final int CHALLENGE_START_CHIPS = 100;
     public static final int CHALLENGE_PALIER_1 = 400; // x4 -> 1 Cuprite
     public static final int CHALLENGE_PALIER_2 = 800; // x8 -> 3 Cuprites
+    public static final int HORDE_START_CHIPS = 100;
+    public static final int HORDE_TARGET_CHIPS = 300; // x3 -> Déclenchement de la Horde !
     public static final int GILDED_BLACKSTONE_COST = 8;
     public static final NamespacedKey HARMLESS_FIREWORK_KEY = new NamespacedKey("casino", "harmless_firework");
 
@@ -78,6 +81,11 @@ public class BlackjackGame {
     private int challengeBet = 10;
     private int activeChallengeBet = 0;
     private boolean jackpotWon = false;
+
+    // Données du Mode Mission Horde (Jetons de Sang)
+    private int hordeChips = 0;
+    private int hordeBet = 10;
+    private int activeHordeBet = 0;
 
     public BlackjackGame(Player player) {
         this(player, null);
@@ -144,6 +152,27 @@ public class BlackjackGame {
         this.challengeChips -= betChips;
         this.jackpotWon = false;
         saveChallengeToPdc(plugin);
+
+        this.betItem = null;
+        this.playerHand.clear();
+        this.dealerHand.clear();
+        this.deck.resetAndShuffle();
+        this.state = State.DEALING;
+        this.result = Result.NONE;
+        this.paidOut = false;
+        onUpdate.run();
+
+        runDealingAnimation(plugin, onUpdate);
+    }
+
+    public void startHordeHand(Plugin plugin, int betChips, Runnable onUpdate) {
+        if (betChips <= 0 || betChips > hordeChips) return;
+
+        cancelCurrentTask();
+        this.activeHordeBet = betChips;
+        this.hordeChips -= betChips;
+        this.jackpotWon = false;
+        saveHordeToPdc(plugin);
 
         this.betItem = null;
         this.playerHand.clear();
@@ -245,8 +274,10 @@ public class BlackjackGame {
             ItemStack check = betItem.clone();
             check.setAmount(1);
             return player.getInventory().containsAtLeast(check, betItem.getAmount());
-        } else {
+        } else if (mode == Mode.CHALLENGE) {
             return challengeChips >= activeChallengeBet;
+        } else {
+            return hordeChips >= activeHordeBet;
         }
     }
 
@@ -262,10 +293,14 @@ public class BlackjackGame {
                 return false;
             }
             betItem.setAmount(betItem.getAmount() * 2);
-        } else {
+        } else if (mode == Mode.CHALLENGE) {
             challengeChips -= activeChallengeBet;
             activeChallengeBet *= 2;
             saveChallengeToPdc(plugin);
+        } else {
+            hordeChips -= activeHordeBet;
+            activeHordeBet *= 2;
+            saveHordeToPdc(plugin);
         }
 
         // 2. Sons d'activation
@@ -384,7 +419,7 @@ public class BlackjackGame {
                 }
                 default -> {}
             }
-        } else {
+        } else if (mode == Mode.CHALLENGE) {
             // Mode CHALLENGE
             switch (result) {
                 case PLAYER_BLACKJACK -> {
@@ -470,6 +505,80 @@ public class BlackjackGame {
                 }
                 if (challengeBet > challengeChips) {
                     challengeBet = challengeChips;
+                }
+            }
+        } else {
+            // Mode HORDE
+            switch (result) {
+                case PLAYER_BLACKJACK -> {
+                    int winnings = activeHordeBet * 3;
+                    hordeChips += winnings;
+                    targetPlayer.sendMessage(Component.text("✦ BLACKJACK NATUREL ! ✦ Payé 3 pour 1 ! +" + winnings + " Jetons de Sang (Solde: " + hordeChips + ")", NamedTextColor.RED, TextDecoration.BOLD));
+                    targetPlayer.playSound(loc, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.1f);
+                    targetPlayer.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.3f);
+                    targetPlayer.spawnParticle(Particle.TOTEM_OF_UNDYING, loc.clone().add(0, 1, 0), 35, 0.5, 0.5, 0.5, 0.2);
+                }
+                case FIVE_CARD_CHARLIE -> {
+                    int winnings = activeHordeBet * 2;
+                    hordeChips += winnings;
+                    targetPlayer.sendMessage(Component.text("✦ FIVE-CARD CHARLIE ! ✦ 5 cartes sans sauter ! +" + winnings + " Jetons de Sang (Solde: " + hordeChips + ")", NamedTextColor.RED, TextDecoration.BOLD));
+                    targetPlayer.playSound(loc, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.2f);
+                    targetPlayer.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
+                    targetPlayer.spawnParticle(Particle.TOTEM_OF_UNDYING, loc.clone().add(0, 1, 0), 40, 0.5, 0.5, 0.5, 0.2);
+                }
+                case PLAYER_WIN, DEALER_BUST -> {
+                    int winnings = activeHordeBet * 2;
+                    hordeChips += winnings;
+                    String reason = (result == Result.DEALER_BUST) ? "Le croupier a sauté (Bust) !" : "Votre score l'emporte !";
+                    targetPlayer.sendMessage(Component.text("✔ VICTOIRE ! " + reason + " +" + winnings + " Jetons de Sang (Solde: " + hordeChips + ")", NamedTextColor.GREEN, TextDecoration.BOLD));
+                    targetPlayer.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+                    targetPlayer.spawnParticle(Particle.HAPPY_VILLAGER, loc.clone().add(0, 1, 0), 25, 0.4, 0.4, 0.4, 0.05);
+                }
+                case PUSH -> {
+                    hordeChips += activeHordeBet;
+                    targetPlayer.sendMessage(Component.text("═ ÉGALITÉ (PUSH) ! Mise de " + activeHordeBet + " Jetons de Sang restituée. (Solde: " + hordeChips + ")", NamedTextColor.YELLOW, TextDecoration.BOLD));
+                    targetPlayer.playSound(loc, Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.0f);
+                }
+                case PLAYER_BUST, DEALER_WIN -> {
+                    String reason = (result == Result.PLAYER_BUST) ? "Vous avez dépassé 21 (Bust) !" : "Le croupier l'emporte.";
+                    targetPlayer.sendMessage(Component.text("✘ DÉFAITE ! " + reason + " Perte de " + activeHordeBet + " Jetons de Sang. (Solde: " + hordeChips + ")", NamedTextColor.DARK_RED, TextDecoration.BOLD));
+                    targetPlayer.playSound(loc, Sound.ENTITY_VILLAGER_NO, 1.0f, 0.9f);
+                    targetPlayer.playSound(loc, Sound.BLOCK_ANVIL_LAND, 0.5f, 0.6f);
+                }
+                default -> {}
+            }
+
+            if (hordeChips >= HORDE_TARGET_CHIPS) {
+                targetPlayer.sendMessage(Component.text("☠ OBJECTIF ATTEINT (300 JETONS DE SANG) ! LA HORDE SE RÉVEILLE ! ☠", NamedTextColor.DARK_RED, TextDecoration.BOLD));
+                targetPlayer.showTitle(Title.title(
+                        Component.text("☠ INVASION DE LA HORDE ☠", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                        Component.text("Le Titan Putréfié et son armée attaquent !", NamedTextColor.RED)
+                ));
+                targetPlayer.playSound(loc, Sound.ENTITY_WITHER_SPAWN, 1.0f, 0.8f);
+                targetPlayer.playSound(loc, Sound.ENTITY_ENDER_DRAGON_GROWL, 1.0f, 0.9f);
+                hordeChips = 0;
+                saveHordeToPdc(currentPlugin);
+
+                if (currentPlugin instanceof NewAdventurePlugin nap && nap.getHordeManager() != null) {
+                    Bukkit.getScheduler().runTaskLater(currentPlugin, () -> {
+                        targetPlayer.closeInventory();
+                        nap.getHordeManager().startHorde(targetPlayer, targetPlayer.getLocation());
+                    }, 30L);
+                }
+            } else if (hordeChips <= 0) {
+                hordeChips = 0;
+                saveHordeToPdc(currentPlugin);
+                targetPlayer.showTitle(Title.title(
+                        Component.text("✘ FAILLITE ✘", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                        Component.text("Lingot de Cuprite perdu.", NamedTextColor.RED)
+                ));
+                targetPlayer.sendMessage(Component.text("✘ FAILLITE TOTALE ! ✘ Vos jetons de sang sont tombés à zéro. Votre Cuprite est perdue.", NamedTextColor.DARK_RED, TextDecoration.BOLD));
+                targetPlayer.playSound(loc, Sound.ENTITY_VILLAGER_NO, 1.0f, 0.8f);
+                targetPlayer.playSound(loc, Sound.BLOCK_ANVIL_LAND, 0.7f, 0.5f);
+            } else {
+                saveHordeToPdc(currentPlugin);
+                if (hordeBet > hordeChips) {
+                    hordeBet = hordeChips;
                 }
             }
         }
@@ -627,6 +736,11 @@ public class BlackjackGame {
         }
     }
 
+    public static boolean isValidHordeEntryItem(Plugin plugin, ItemStack item) {
+        if (item == null || item.getType().isAir()) return false;
+        return Cuprite.isCuprite(plugin, item) && item.getAmount() >= 1;
+    }
+
     public void loadChallengeFromPdc(Plugin plugin) {
         if (plugin == null) return;
         NamespacedKey key = new NamespacedKey(plugin, "casino_challenge_chips");
@@ -642,6 +756,26 @@ public class BlackjackGame {
         NamespacedKey key = new NamespacedKey(plugin, "casino_challenge_chips");
         if (challengeChips > 0) {
             player.getPersistentDataContainer().set(key, PersistentDataType.INTEGER, challengeChips);
+        } else {
+            player.getPersistentDataContainer().remove(key);
+        }
+    }
+
+    public void loadHordeFromPdc(Plugin plugin) {
+        if (plugin == null) return;
+        NamespacedKey key = new NamespacedKey(plugin, "casino_horde_chips");
+        Integer chips = player.getPersistentDataContainer().get(key, PersistentDataType.INTEGER);
+        this.hordeChips = (chips != null && chips > 0) ? chips : 0;
+        if (this.hordeChips > 0 && (this.hordeBet > this.hordeChips || this.hordeBet <= 0)) {
+            this.hordeBet = Math.min(10, this.hordeChips);
+        }
+    }
+
+    public void saveHordeToPdc(Plugin plugin) {
+        if (plugin == null) return;
+        NamespacedKey key = new NamespacedKey(plugin, "casino_horde_chips");
+        if (hordeChips > 0) {
+            player.getPersistentDataContainer().set(key, PersistentDataType.INTEGER, hordeChips);
         } else {
             player.getPersistentDataContainer().remove(key);
         }
@@ -663,11 +797,17 @@ public class BlackjackGame {
         this.betItem = null;
         this.paidOut = false;
         this.activeChallengeBet = 0;
+        this.activeHordeBet = 0;
         this.jackpotWon = false;
         if (this.challengeChips > 0 && this.challengeBet > this.challengeChips) {
             this.challengeBet = this.challengeChips;
         } else if (this.challengeChips > 0 && this.challengeBet <= 0) {
             this.challengeBet = Math.min(10, this.challengeChips);
+        }
+        if (this.hordeChips > 0 && this.hordeBet > this.hordeChips) {
+            this.hordeBet = this.hordeChips;
+        } else if (this.hordeChips > 0 && this.hordeBet <= 0) {
+            this.hordeBet = Math.min(10, this.hordeChips);
         }
     }
 
@@ -690,6 +830,20 @@ public class BlackjackGame {
         this.challengeBet = Math.max(1, Math.min(challengeChips, amount));
     }
 
+    public void adjustHordeBet(int delta) {
+        if (state != State.BETTING) return;
+        int minBet = Math.min(10, hordeChips);
+        int newBet = this.hordeBet + delta;
+        if (newBet < minBet) newBet = minBet;
+        if (newBet > hordeChips) newBet = hordeChips;
+        this.hordeBet = newBet;
+    }
+
+    public void setHordeBet(int amount) {
+        if (state != State.BETTING) return;
+        this.hordeBet = Math.max(1, Math.min(hordeChips, amount));
+    }
+
     public Mode getMode() { return mode; }
     public void setMode(Mode mode) { this.mode = mode; }
     public int getChallengeChips() { return challengeChips; }
@@ -697,6 +851,11 @@ public class BlackjackGame {
     public int getChallengeBet() { return challengeBet; }
     public int getActiveChallengeBet() { return activeChallengeBet; }
     public boolean isJackpotWon() { return jackpotWon; }
+
+    public int getHordeChips() { return hordeChips; }
+    public void setHordeChips(int hordeChips) { this.hordeChips = hordeChips; }
+    public int getHordeBet() { return hordeBet; }
+    public int getActiveHordeBet() { return activeHordeBet; }
 
     public Player getPlayer() { return player; }
     public List<Card> getPlayerHand() { return playerHand; }
