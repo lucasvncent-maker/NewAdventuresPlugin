@@ -41,11 +41,17 @@ public class HordeManager {
     public static final NamespacedKey NECRO_KEY = new NamespacedKey("horde", "necromancer");
     public static final NamespacedKey BOSS_KEY = new NamespacedKey("horde", "boss");
 
+    public static final int ARENA_X = 10000;
+    public static final int ARENA_Y = 120;
+    public static final int ARENA_Z = 10000;
+    public static final int ARENA_RADIUS = 18;
+
     private final NewAdventurePlugin plugin;
     private State state = State.INACTIVE;
     private Location centerLocation;
     private int currentWave = 0;
     private final Set<UUID> activeMobs = new HashSet<>();
+    private final Map<UUID, Location> returnLocations = new HashMap<>();
     private LivingEntity bossEntity = null;
     private BossBar bossBar = null;
     private BukkitTask hordeTask = null;
@@ -68,6 +74,143 @@ public class HordeManager {
         return currentWave;
     }
 
+    public Location getReturnLocation(UUID uuid) {
+        return returnLocations.get(uuid);
+    }
+
+    public void removeParticipant(UUID uuid) {
+        returnLocations.remove(uuid);
+    }
+
+    public boolean isInArena(Location loc) {
+        if (loc == null || loc.getWorld() == null || centerLocation == null) return false;
+        if (!loc.getWorld().equals(centerLocation.getWorld())) return false;
+        return Math.abs(loc.getX() - ARENA_X) <= (ARENA_RADIUS + 2) &&
+                Math.abs(loc.getZ() - ARENA_Z) <= (ARENA_RADIUS + 2) &&
+                loc.getY() >= (ARENA_Y - 2) && loc.getY() <= (ARENA_Y + 20);
+    }
+
+    public void ensureArenaBuilt(World world) {
+        if (world == null) return;
+
+        Block centerFloor = world.getBlockAt(ARENA_X, ARENA_Y, ARENA_Z);
+        if (centerFloor.getType() == Material.GILDED_BLACKSTONE) {
+            return;
+        }
+
+        // Préchargement des chunks de l'arène
+        int minChunkX = (ARENA_X - ARENA_RADIUS - 1) >> 4;
+        int maxChunkX = (ARENA_X + ARENA_RADIUS + 1) >> 4;
+        int minChunkZ = (ARENA_Z - ARENA_RADIUS - 1) >> 4;
+        int maxChunkZ = (ARENA_Z + ARENA_RADIUS + 1) >> 4;
+        for (int cx = minChunkX; cx <= maxChunkX; cx++) {
+            for (int cz = minChunkZ; cz <= maxChunkZ; cz++) {
+                world.getChunkAt(cx, cz).load(true);
+            }
+        }
+
+        // Construction du sol et de l'enceinte
+        for (int dx = -ARENA_RADIUS; dx <= ARENA_RADIUS; dx++) {
+            for (int dz = -ARENA_RADIUS; dz <= ARENA_RADIUS; dz++) {
+                int x = ARENA_X + dx;
+                int z = ARENA_Z + dz;
+
+                // Sol à ARENA_Y
+                Block floorBlock = world.getBlockAt(x, ARENA_Y, z);
+                if (dx == 0 && dz == 0) {
+                    floorBlock.setType(Material.GILDED_BLACKSTONE);
+                } else if (Math.abs(dx) % 6 == 0 && Math.abs(dz) % 6 == 0) {
+                    floorBlock.setType(Material.SEA_LANTERN);
+                } else if ((Math.abs(dx) + Math.abs(dz)) % 4 == 0) {
+                    floorBlock.setType(Material.GILDED_BLACKSTONE);
+                } else {
+                    floorBlock.setType(Material.POLISHED_BLACKSTONE_BRICKS);
+                }
+
+                // Dégagement intérieur et murs d'enceinte (Y = ARENA_Y + 1 à ARENA_Y + 8)
+                boolean isPerimeter = Math.abs(dx) == ARENA_RADIUS || Math.abs(dz) == ARENA_RADIUS;
+                for (int dy = 1; dy <= 8; dy++) {
+                    Block block = world.getBlockAt(x, ARENA_Y + dy, z);
+                    if (isPerimeter) {
+                        if (dy <= 7) {
+                            if ((dy == 3 || dy == 4) && Math.abs(dx) % 3 != 0 && Math.abs(dz) % 3 != 0) {
+                                block.setType(Material.IRON_BARS);
+                            } else {
+                                block.setType(Material.POLISHED_BLACKSTONE_BRICKS);
+                            }
+                        } else {
+                            block.setType(Material.AIR);
+                        }
+                    } else {
+                        block.setType(Material.AIR);
+                    }
+                }
+            }
+        }
+    }
+
+    public boolean joinArena(Player player) {
+        if (!isHordeActive()) {
+            player.sendMessage(Component.text("Aucune invasion de la Horde n'est active pour le moment.", NamedTextColor.RED));
+            return false;
+        }
+        if (isInArena(player.getLocation())) {
+            player.sendMessage(Component.text("Vous êtes déjà dans l'Arène !", NamedTextColor.YELLOW));
+            return false;
+        }
+        returnLocations.put(player.getUniqueId(), player.getLocation().clone());
+        player.teleport(centerLocation);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 100, 4));
+        player.playSound(centerLocation, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+        player.sendMessage(Component.text("✦ Vous rejoignez l'Arène des Damnés ! Combattez pour votre survie !", NamedTextColor.GOLD, TextDecoration.BOLD));
+        return true;
+    }
+
+    public boolean leaveArena(Player player) {
+        Location ret = returnLocations.remove(player.getUniqueId());
+        if (ret != null) {
+            player.teleport(ret);
+            player.sendMessage(Component.text("✦ Vous avez quitté l'Arène et êtes retourné à votre point de départ.", NamedTextColor.YELLOW));
+            player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+            return true;
+        } else if (isInArena(player.getLocation())) {
+            Location spawn = player.getWorld().getSpawnLocation();
+            player.teleport(spawn);
+            player.sendMessage(Component.text("✦ Vous avez quitté l'Arène.", NamedTextColor.YELLOW));
+            player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+            return true;
+        }
+        return false;
+    }
+
+    public void teleportParticipantsBack() {
+        for (Map.Entry<UUID, Location> entry : returnLocations.entrySet()) {
+            Player p = Bukkit.getPlayer(entry.getKey());
+            if (p != null && p.isOnline()) {
+                p.teleport(entry.getValue());
+                p.sendMessage(Component.text("✦ Vous avez été retéléporté à votre position d'origine.", NamedTextColor.GREEN));
+                p.playSound(p.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+            }
+        }
+        returnLocations.clear();
+    }
+
+    public void handleHordeDefeat() {
+        this.state = State.DEFEAT;
+        Bukkit.broadcast(Component.empty());
+        Bukkit.broadcast(Component.text("☠ =================================================== ☠", NamedTextColor.DARK_RED, TextDecoration.BOLD));
+        Bukkit.broadcast(Component.text("✦ DÉFAITE : LA HORDE DES DAMNÉS A TRIOMPHÉ ! ✦", NamedTextColor.RED, TextDecoration.BOLD));
+        Bukkit.broadcast(Component.text("Tous les combattants ont succombé dans l'Arène...", NamedTextColor.GRAY));
+        Bukkit.broadcast(Component.text("☠ =================================================== ☠", NamedTextColor.DARK_RED, TextDecoration.BOLD));
+        Bukkit.broadcast(Component.empty());
+
+        if (centerLocation != null && centerLocation.getWorld() != null) {
+            centerLocation.getWorld().setStorm(false);
+            centerLocation.getWorld().setThundering(false);
+        }
+        cleanUp();
+    }
+
     public void startHorde(Player initiator, Location location) {
         if (isHordeActive()) {
             if (initiator != null) {
@@ -76,15 +219,36 @@ public class HordeManager {
             return;
         }
 
-        this.centerLocation = (location != null) ? location.clone() : ((initiator != null) ? initiator.getLocation().clone() : null);
-        if (this.centerLocation == null || this.centerLocation.getWorld() == null) return;
+        World world = (initiator != null) ? initiator.getWorld() : ((location != null && location.getWorld() != null) ? location.getWorld() : Bukkit.getWorlds().get(0));
+        if (world == null) return;
 
+        ensureArenaBuilt(world);
+
+        this.centerLocation = new Location(world, ARENA_X + 0.5, ARENA_Y + 1.0, ARENA_Z + 0.5, 0f, 0f);
         this.state = State.STARTING;
         this.currentWave = 0;
         this.activeMobs.clear();
         this.bossEntity = null;
+        this.returnLocations.clear();
 
-        World world = centerLocation.getWorld();
+        // Téléportation de l'initiateur et des compagnons proches
+        if (initiator != null && initiator.isOnline()) {
+            Location orig = initiator.getLocation().clone();
+            returnLocations.put(initiator.getUniqueId(), orig);
+
+            for (Player near : orig.getWorld().getPlayers()) {
+                if (!near.equals(initiator) && near.getLocation().distance(orig) <= 8.0) {
+                    returnLocations.put(near.getUniqueId(), near.getLocation().clone());
+                    near.teleport(centerLocation);
+                    near.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 100, 4));
+                    near.sendMessage(Component.text("✦ Vous avez été entraîné dans l'Arène avec " + initiator.getName() + " !", NamedTextColor.GOLD));
+                }
+            }
+
+            initiator.teleport(centerLocation);
+            initiator.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 100, 4));
+        }
+
         world.setStorm(true);
         world.setThundering(true);
         world.setWeatherDuration(20 * 60 * 15); // 15 min d'orage
@@ -94,20 +258,22 @@ public class HordeManager {
         Bukkit.broadcast(Component.empty());
         Bukkit.broadcast(Component.text("☠ =================================================== ☠", NamedTextColor.DARK_RED, TextDecoration.BOLD));
         Bukkit.broadcast(Component.text("✦ ALERTE DU CASINO : L'INVASION DE LA HORDE A DÉBUTÉ ! ✦", NamedTextColor.RED, TextDecoration.BOLD));
-        Bukkit.broadcast(Component.text("L'armée des morts-vivants déferle suite au pari suprême de ", NamedTextColor.GOLD)
+        Bukkit.broadcast(Component.text("L'armée des morts-vivants déferle suite au défi de ", NamedTextColor.GOLD)
                 .append(Component.text(initiatorName, NamedTextColor.YELLOW, TextDecoration.BOLD))
                 .append(Component.text(" !", NamedTextColor.GOLD)));
-        Bukkit.broadcast(Component.text("Rejoignez la zone pour repousser les 4 vagues et terrasser le Titan Putréfié !", NamedTextColor.YELLOW));
+        Bukkit.broadcast(Component.text("Les combattants sont téléportés dans l'Arène des Damnés ! Tapez ", NamedTextColor.YELLOW)
+                .append(Component.text("/horde join", NamedTextColor.AQUA, TextDecoration.BOLD))
+                .append(Component.text(" pour prêter main-forte !", NamedTextColor.YELLOW)));
         Bukkit.broadcast(Component.text("☠ =================================================== ☠", NamedTextColor.DARK_RED, TextDecoration.BOLD));
         Bukkit.broadcast(Component.empty());
 
         // Sons et effets
         for (Player p : world.getPlayers()) {
-            if (p.getLocation().distance(centerLocation) <= 80) {
+            if (isInArena(p.getLocation())) {
                 p.playSound(centerLocation, Sound.EVENT_RAID_HORN, SoundCategory.HOSTILE, 2.0f, 0.8f);
                 p.playSound(p.getLocation(), Sound.ENTITY_WITHER_SPAWN, 1.0f, 0.8f);
                 p.showTitle(Title.title(
-                        Component.text("☠ LA HORDE DES DAMNÉS ☠", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                        Component.text("☠ L'ARÈNE DES DAMNÉS ☠", NamedTextColor.DARK_RED, TextDecoration.BOLD),
                         Component.text("Préparez-vous au combat...", NamedTextColor.GOLD),
                         Title.Times.times(Duration.ofMillis(500), Duration.ofSeconds(3), Duration.ofSeconds(1))
                 ));
@@ -159,20 +325,36 @@ public class HordeManager {
 
         // 1. Mise à jour de la visibilité de la BossBar
         for (Player p : Bukkit.getOnlinePlayers()) {
-            if (p.getWorld().equals(world) && p.getLocation().distance(centerLocation) <= 80) {
+            if (isInArena(p.getLocation())) {
                 p.showBossBar(bossBar);
             } else {
                 p.hideBossBar(bossBar);
             }
         }
 
-        // 2. Nettoyage des entités mortes ou invalides
+        // 2. Vérifier si des combattants vivants sont encore présents dans l'Arène
+        if (state == State.WAVE_IN_PROGRESS || state == State.WAVE_CLEARED) {
+            boolean anyPlayerAlive = false;
+            for (Player p : world.getPlayers()) {
+                if (isInArena(p.getLocation()) && !p.isDead() && p.getGameMode() != GameMode.SPECTATOR) {
+                    anyPlayerAlive = true;
+                    break;
+                }
+            }
+
+            if (!anyPlayerAlive) {
+                handleHordeDefeat();
+                return;
+            }
+        }
+
+        // 3. Nettoyage des entités mortes ou invalides
         activeMobs.removeIf(uuid -> {
             Entity e = Bukkit.getEntity(uuid);
             return e == null || e.isDead() || !e.isValid();
         });
 
-        // 3. Gestion de la vague en cours
+        // 4. Gestion de la vague en cours
         if (state == State.WAVE_IN_PROGRESS) {
             if (currentWave < 4) {
                 int remaining = activeMobs.size();
@@ -299,7 +481,7 @@ public class HordeManager {
         bossBar.name(Component.text("✔ Vague " + currentWave + " terrassée ! Préparation de la suite...", NamedTextColor.GREEN, TextDecoration.BOLD));
 
         for (Player p : world.getPlayers()) {
-            if (p.getLocation().distance(centerLocation) <= 80) {
+            if (isInArena(p.getLocation())) {
                 p.sendMessage(Component.text("✦ [Horde] ", NamedTextColor.GOLD, TextDecoration.BOLD)
                         .append(Component.text("La vague " + currentWave + " a été repoussée avec succès !", NamedTextColor.GREEN)));
             }
@@ -346,7 +528,7 @@ public class HordeManager {
                 // Vague 1 : 14 Éclaireurs
                 totalWaveMobs = 14;
                 for (int i = 0; i < totalWaveMobs; i++) {
-                    Location loc = getRandomSpawnLocation(14.0, 22.0);
+                    Location loc = getRandomSpawnLocation(8.0, 15.0);
                     Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
                     setupScout(z);
                     activeMobs.add(z.getUniqueId());
@@ -356,13 +538,13 @@ public class HordeManager {
                 // Vague 2 : 8 Briseurs de Siège + 4 Kamikazes
                 totalWaveMobs = 12;
                 for (int i = 0; i < 8; i++) {
-                    Location loc = getRandomSpawnLocation(14.0, 22.0);
+                    Location loc = getRandomSpawnLocation(8.0, 15.0);
                     Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
                     setupBreaker(z);
                     activeMobs.add(z.getUniqueId());
                 }
                 for (int i = 0; i < 4; i++) {
-                    Location loc = getRandomSpawnLocation(16.0, 24.0);
+                    Location loc = getRandomSpawnLocation(9.0, 15.0);
                     Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
                     setupKamikaze(z);
                     activeMobs.add(z.getUniqueId());
@@ -372,13 +554,13 @@ public class HordeManager {
                 // Vague 3 : 7 Gardes d'Élite + 3 Nécromanciens
                 totalWaveMobs = 10;
                 for (int i = 0; i < 7; i++) {
-                    Location loc = getRandomSpawnLocation(14.0, 22.0);
+                    Location loc = getRandomSpawnLocation(8.0, 15.0);
                     Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
                     setupElite(z);
                     activeMobs.add(z.getUniqueId());
                 }
                 for (int i = 0; i < 3; i++) {
-                    Location loc = getRandomSpawnLocation(16.0, 24.0);
+                    Location loc = getRandomSpawnLocation(9.0, 15.0);
                     Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
                     setupNecromancer(z);
                     activeMobs.add(z.getUniqueId());
@@ -453,11 +635,14 @@ public class HordeManager {
     private void spawnMinion(Location loc) {
         World world = loc.getWorld();
         if (world == null) return;
-        Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
+        double xCoord = Math.max(ARENA_X - ARENA_RADIUS + 2, Math.min(ARENA_X + ARENA_RADIUS - 2, loc.getX()));
+        double zCoord = Math.max(ARENA_Z - ARENA_RADIUS + 2, Math.min(ARENA_Z + ARENA_RADIUS - 2, loc.getZ()));
+        Location spawnLoc = new Location(world, xCoord, ARENA_Y + 1.0, zCoord);
+        Zombie z = (Zombie) world.spawnEntity(spawnLoc, EntityType.ZOMBIE);
         z.customName(Component.text("Âme Damnée", NamedTextColor.GRAY));
         z.setCustomNameVisible(false);
         z.getPersistentDataContainer().set(MOB_KEY, PersistentDataType.STRING, "minion");
-        world.spawnParticle(Particle.BLOCK, loc, 15, 0.4, 0.2, 0.4, Material.SOUL_SAND.createBlockData());
+        world.spawnParticle(Particle.BLOCK, spawnLoc, 15, 0.4, 0.2, 0.4, Material.SOUL_SAND.createBlockData());
     }
 
     private void setupScout(Zombie z) {
@@ -548,10 +733,10 @@ public class HordeManager {
         World world = centerLocation.getWorld();
         double angle = Math.random() * Math.PI * 2;
         double dist = minRadius + Math.random() * (maxRadius - minRadius);
+        dist = Math.min(dist, ARENA_RADIUS - 2.0);
         double x = centerLocation.getX() + Math.cos(angle) * dist;
         double z = centerLocation.getZ() + Math.sin(angle) * dist;
-        int y = world.getHighestBlockYAt((int) x, (int) z);
-        return new Location(world, x, y + 1, z);
+        return new Location(world, x, ARENA_Y + 1.0, z);
     }
 
     private Player findNearestPlayer(Location loc, double radius) {
@@ -579,6 +764,7 @@ public class HordeManager {
             Bukkit.broadcast(Component.text("★ =================================================== ★", NamedTextColor.GOLD, TextDecoration.BOLD));
             Bukkit.broadcast(Component.text("✦ VICTOIRE ÉPIQUE : LA HORDE DES DAMNÉS A ÉTÉ ÉLIMINÉE ! ✦", NamedTextColor.GREEN, TextDecoration.BOLD));
             Bukkit.broadcast(Component.text("Le Titan Putréfié est tombé. Le Coffre Ancestral du Triomphe est apparu !", NamedTextColor.YELLOW));
+            Bukkit.broadcast(Component.text("Vous disposez de 45 secondes pour piller le coffre avant d'être retéléporté (ou tapez /horde leave) !", NamedTextColor.GOLD));
             Bukkit.broadcast(Component.text("★ =================================================== ★", NamedTextColor.GOLD, TextDecoration.BOLD));
             Bukkit.broadcast(Component.empty());
 
@@ -610,8 +796,15 @@ public class HordeManager {
             }
         }
 
-        // Nettoyage après 10s
-        Bukkit.getScheduler().runTaskLater(plugin, this::cleanUp, 200L);
+        // Retéléportation et nettoyage après 45s (900 ticks)
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (state == State.VICTORY) {
+                if (centerLocation != null) {
+                    centerLocation.getBlock().setType(Material.AIR);
+                }
+                cleanUp();
+            }
+        }, 900L);
     }
 
     private void spawnRewardChest(Location loc) {
@@ -684,5 +877,7 @@ public class HordeManager {
             }
             bossBar = null;
         }
+
+        teleportParticipantsBack();
     }
 }

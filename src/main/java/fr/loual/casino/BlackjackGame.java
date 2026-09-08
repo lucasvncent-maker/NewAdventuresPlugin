@@ -236,6 +236,12 @@ public class BlackjackGame {
                             result = Result.PLAYER_BLACKJACK;
                             applyPayout(player);
                         } else {
+                            int initialScore = calculateScore(playerHand);
+                            if (initialScore == 21) {
+                                cancel();
+                                standAnimated(plugin, onUpdate);
+                                return;
+                            }
                             state = State.PLAYING;
                         }
                         onUpdate.run();
@@ -258,13 +264,20 @@ public class BlackjackGame {
             state = State.GAME_OVER;
             result = Result.PLAYER_BUST;
             applyPayout(player);
+            onUpdate.run();
+        } else if (pScore == 21) {
+            // 21 automatique : aucune décision à prendre, on reste (Stand) automatiquement !
+            onUpdate.run();
+            standAnimated(plugin, onUpdate);
         } else if (playerHand.size() >= 5) {
             // Règle du Five-Card Charlie : 5 cartes sans sauter = Victoire instantanée !
             state = State.GAME_OVER;
             result = Result.FIVE_CARD_CHARLIE;
             applyPayout(player);
+            onUpdate.run();
+        } else {
+            onUpdate.run();
         }
-        onUpdate.run();
     }
 
     public boolean canDoubleDown() {

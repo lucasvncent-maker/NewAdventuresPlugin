@@ -69,4 +69,25 @@ public class HordeListener implements Listener {
             }
         }
     }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPlayerRespawn(org.bukkit.event.player.PlayerRespawnEvent event) {
+        Player player = event.getPlayer();
+        Location returnLoc = hordeManager.getReturnLocation(player.getUniqueId());
+        if (returnLoc != null) {
+            event.setRespawnLocation(returnLoc);
+            hordeManager.removeParticipant(player.getUniqueId());
+            player.sendMessage(Component.text("✦ Vous avez péri dans l'Arène et êtes réapparu à votre point d'origine.", NamedTextColor.RED));
+        }
+    }
+
+    @EventHandler
+    public void onPlayerQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+        Player player = event.getPlayer();
+        Location returnLoc = hordeManager.getReturnLocation(player.getUniqueId());
+        if (returnLoc != null) {
+            player.teleport(returnLoc);
+            hordeManager.removeParticipant(player.getUniqueId());
+        }
+    }
 }
