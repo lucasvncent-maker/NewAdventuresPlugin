@@ -53,7 +53,15 @@ public class DeathChestListener implements Listener {
 
         // Si keepInventory est activé ou que le joueur n'a aucun drop, on ne crée pas de coffre
         Boolean keepInv = world.getGameRuleValue(GameRule.KEEP_INVENTORY);
-        if (Boolean.TRUE.equals(keepInv) || event.getDrops().isEmpty()) {
+        if (Boolean.TRUE.equals(keepInv) || event.getKeepInventory() || event.getDrops().isEmpty()) {
+            return;
+        }
+
+        // Sécurité absolue en mode Horde : le joueur conserve tout son équipement sans tombe
+        if (plugin.getHordeManager() != null && 
+                (plugin.getHordeManager().isParticipant(player.getUniqueId()) 
+                || plugin.getHordeManager().isInArena(player.getLocation()) 
+                || plugin.getHordeManager().isHordeWorld(world))) {
             return;
         }
 
