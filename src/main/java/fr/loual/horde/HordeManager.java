@@ -52,7 +52,7 @@ public class HordeManager {
     public static final int ARENA_X = 0;
     public static final int ARENA_Y = 100;
     public static final int ARENA_Z = 0;
-    public static final int ARENA_RADIUS = 18;
+    public static final int ARENA_RADIUS = 24;
 
     private static boolean arenaAlreadyGenerated = false;
 
@@ -155,7 +155,8 @@ public class HordeManager {
         if (world == null) return;
 
         Block centerFloor = world.getBlockAt(ARENA_X, ARENA_Y, ARENA_Z);
-        if (arenaAlreadyGenerated && centerFloor.getType() == Material.RESPAWN_ANCHOR) {
+        Block outerCheck = world.getBlockAt(ARENA_X + ARENA_RADIUS, ARENA_Y + 1, ARENA_Z);
+        if (arenaAlreadyGenerated && centerFloor.getType() == Material.RESPAWN_ANCHOR && outerCheck.getType() == Material.POLISHED_BLACKSTONE_BRICKS) {
             return;
         }
 
@@ -841,70 +842,70 @@ public class HordeManager {
     private void spawnWaveIngot(World world, int wave) {
         switch (wave) {
             case 1 -> {
-                // Vague 1 (Total : 16 mobs)
-                totalWaveMobs = 16;
-                spawnScouts(world, 4);
-                spawnArchers(world, 2);
+                // Vague 1 (Total : 24 mobs = 1.5x de 16)
+                totalWaveMobs = 24;
+                spawnScouts(world, 6);
+                spawnArchers(world, 3);
 
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 1) return;
                     announceReinforcements(world);
-                    spawnScouts(world, 3);
-                    spawnArchers(world, 2);
-                    spawnSpiders(world, 2);
+                    spawnScouts(world, 4);
+                    spawnArchers(world, 3);
+                    spawnSpiders(world, 3);
                 }, 140L));
 
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 1) return;
                     announceReinforcements(world);
                     spawnSpiders(world, 3);
-                    spawnArchers(world, 2);
+                    spawnKamikazes(world, 2);
                     allPacksSpawned = true;
                 }, 300L));
             }
             case 2 -> {
-                // Vague 2 (Total : 16 mobs)
-                totalWaveMobs = 16;
-                spawnBreakers(world, 3);
-                spawnArchers(world, 3);
+                // Vague 2 (Total : 24 mobs = 1.5x de 16)
+                totalWaveMobs = 24;
+                spawnBreakers(world, 5);
+                spawnArchers(world, 4);
 
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 2) return;
                     announceReinforcements(world);
-                    spawnReapers(world, 2);
-                    spawnKamikazes(world, 2);
-                    spawnBreakers(world, 1);
+                    spawnReapers(world, 3);
+                    spawnKamikazes(world, 3);
+                    spawnBreakers(world, 2);
                 }, 160L));
 
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 2) return;
                     announceReinforcements(world);
-                    spawnReapers(world, 2);
+                    spawnReapers(world, 3);
                     spawnKamikazes(world, 2);
-                    spawnBreakers(world, 1);
+                    spawnBreakers(world, 2);
                     allPacksSpawned = true;
                 }, 320L));
             }
             case 3 -> {
-                // Vague 3 (Total : 16 mobs)
-                totalWaveMobs = 16;
-                spawnElites(world, 3);
-                spawnReapers(world, 3);
+                // Vague 3 (Total : 24 mobs = 1.5x de 16)
+                totalWaveMobs = 24;
+                spawnElites(world, 5);
+                spawnReapers(world, 4);
 
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 3) return;
                     announceReinforcements(world);
-                    spawnBrutes(world, 2);
-                    spawnNecromancers(world, 2);
-                    spawnElites(world, 1);
+                    spawnBrutes(world, 3);
+                    spawnNecromancers(world, 3);
+                    spawnElites(world, 2);
                 }, 160L));
 
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 3) return;
                     announceReinforcements(world);
-                    spawnBrutes(world, 2);
+                    spawnBrutes(world, 3);
                     spawnArchers(world, 2);
-                    spawnKamikazes(world, 1);
+                    spawnKamikazes(world, 2);
                     allPacksSpawned = true;
                 }, 320L));
             }
@@ -914,76 +915,79 @@ public class HordeManager {
     private void spawnWaveBlock(World world, int wave) {
         switch (wave) {
             case 1 -> {
-                totalWaveMobs = 18;
-                // Pack 1 (t=0s) : 4 Briseurs + 2 Rôdeurs
-                spawnBreakers(world, 4);
-                spawnArchers(world, 2);
+                // Total : 27 mobs (1.5x de 18)
+                totalWaveMobs = 27;
+                // Pack 1 (t=0s) : 6 Briseurs + 3 Squelettes Pesteurs
+                spawnBreakers(world, 6);
+                spawnPlagueArchers(world, 3);
 
-                // Pack 2 (t=7s / 140 ticks) : 3 Éclaireurs + 2 Squelettes Pesteurs + 2 Zombies Vortex
+                // Pack 2 (t=7s / 140 ticks) : 4 Éclaireurs + 3 Squelettes Pesteurs + 3 Zombies Vortex
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 1) return;
                     announceReinforcements(world);
-                    spawnScouts(world, 3);
-                    spawnPlagueArchers(world, 2);
-                    spawnVortexZombies(world, 2);
+                    spawnScouts(world, 4);
+                    spawnPlagueArchers(world, 3);
+                    spawnVortexZombies(world, 3);
                 }, 140L));
 
-                // Pack 3 (t=15s / 300 ticks) : 3 Araignées + 2 Zombies Frimaires
+                // Pack 3 (t=15s / 300 ticks) : 5 Araignées + 3 Zombies Frimaires
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 1) return;
                     announceReinforcements(world);
-                    spawnSpiders(world, 3);
-                    spawnFrostZombies(world, 2);
+                    spawnSpiders(world, 5);
+                    spawnFrostZombies(world, 3);
                     allPacksSpawned = true;
                 }, 300L));
             }
             case 2 -> {
-                totalWaveMobs = 18;
-                // Pack 1 (t=0s) : 3 Faucheurs + 3 Squelettes Pesteurs
-                spawnReapers(world, 3);
-                spawnPlagueArchers(world, 3);
+                // Total : 27 mobs (1.5x de 18)
+                totalWaveMobs = 27;
+                // Pack 1 (t=0s) : 5 Faucheurs + 4 Squelettes Pesteurs
+                spawnReapers(world, 5);
+                spawnPlagueArchers(world, 4);
 
-                // Pack 2 (t=8s / 160 ticks) : 2 Bourreaux + 2 Kamikazes + 2 Zombies Vortex
+                // Pack 2 (t=8s / 160 ticks) : 3 Bourreaux + 3 Kamikazes + 3 Zombies Vortex
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 2) return;
                     announceReinforcements(world);
-                    spawnBrutes(world, 2);
-                    spawnKamikazes(world, 2);
-                    spawnVortexZombies(world, 2);
+                    spawnBrutes(world, 3);
+                    spawnKamikazes(world, 3);
+                    spawnVortexZombies(world, 3);
                 }, 160L));
 
-                // Pack 3 (t=16s / 320 ticks) : 2 Faucheurs + 2 Zombies Frimaires + 2 Kamikazes
+                // Pack 3 (t=16s / 320 ticks) : 3 Faucheurs + 3 Zombies Frimaires + 3 Kamikazes
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 2) return;
                     announceReinforcements(world);
-                    spawnReapers(world, 2);
-                    spawnFrostZombies(world, 2);
-                    spawnKamikazes(world, 2);
+                    spawnReapers(world, 3);
+                    spawnFrostZombies(world, 3);
+                    spawnKamikazes(world, 3);
                     allPacksSpawned = true;
                 }, 320L));
             }
             case 3 -> {
-                totalWaveMobs = 18;
-                // Pack 1 (t=0s) : 4 Gardes d'Élite + 2 Zombies Vortex
-                spawnElites(world, 4);
-                spawnVortexZombies(world, 2);
+                // Total : 27 mobs (1.5x de 18)
+                totalWaveMobs = 27;
+                // Pack 1 (t=0s) : 6 Gardes d'Élite + 3 Zombies Vortex
+                spawnElites(world, 6);
+                spawnVortexZombies(world, 3);
 
-                // Pack 2 (t=8s / 160 ticks) : 3 Bourreaux + 2 Nécromanciens + 2 Zombies Frimaires
+                // Pack 2 (t=8s / 160 ticks) : 4 Bourreaux + 3 Nécromanciens + 3 Zombies Frimaires
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 3) return;
                     announceReinforcements(world);
-                    spawnBrutes(world, 3);
-                    spawnNecromancers(world, 2);
-                    spawnFrostZombies(world, 2);
+                    spawnBrutes(world, 4);
+                    spawnNecromancers(world, 3);
+                    spawnFrostZombies(world, 3);
                 }, 160L));
 
-                // Pack 3 (t=16s / 320 ticks) : 2 Gardes d'Élite + 2 Squelettes Pesteurs + 1 Super-Kamikaze
+                // Pack 3 (t=16s / 320 ticks) : 3 Gardes d'Élite + 3 Squelettes Pesteurs + 2 Super-Kamikazes
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 3) return;
                     announceReinforcements(world);
-                    spawnElites(world, 2);
-                    spawnPlagueArchers(world, 2);
-                    spawnSuperKamikazes(world, 1);
+                    spawnElites(world, 3);
+                    spawnPlagueArchers(world, 3);
+                    spawnSuperKamikazes(world, 2);
                     allPacksSpawned = true;
                 }, 320L));
             }
@@ -993,76 +997,79 @@ public class HordeManager {
     private void spawnWaveReinforced(World world, int wave) {
         switch (wave) {
             case 1 -> {
-                totalWaveMobs = 20;
-                // Pack 1 (t=0s) : 4 Faucheurs + 3 Squelettes Pesteurs
-                spawnReapers(world, 4);
-                spawnPlagueArchers(world, 3);
+                // Total : 30 mobs (1.5x de 20)
+                totalWaveMobs = 30;
+                // Pack 1 (t=0s) : 6 Faucheurs + 4 Squelettes Pesteurs
+                spawnReapers(world, 6);
+                spawnPlagueArchers(world, 4);
 
-                // Pack 2 (t=7s / 140 ticks) : 3 Veuves des Tempêtes + 2 Blazes Infernaux + 2 Zombies Vortex
+                // Pack 2 (t=7s / 140 ticks) : 4 Veuves des Tempêtes + 3 Blazes Infernaux + 3 Zombies Vortex
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 1) return;
                     announceReinforcements(world);
-                    spawnStormSpiders(world, 3);
-                    spawnInfernalBlazes(world, 2);
-                    spawnVortexZombies(world, 2);
+                    spawnStormSpiders(world, 4);
+                    spawnInfernalBlazes(world, 3);
+                    spawnVortexZombies(world, 3);
                 }, 140L));
 
-                // Pack 3 (t=15s / 300 ticks) : 3 Bourreaux Démoniaques + 3 Zombies Frimaires
+                // Pack 3 (t=15s / 300 ticks) : 5 Bourreaux Démoniaques + 5 Zombies Frimaires
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 1) return;
                     announceReinforcements(world);
-                    spawnInfernalBrutes(world, 3);
-                    spawnFrostZombies(world, 3);
+                    spawnInfernalBrutes(world, 5);
+                    spawnFrostZombies(world, 5);
                     allPacksSpawned = true;
                 }, 300L));
             }
             case 2 -> {
-                totalWaveMobs = 20;
-                // Pack 1 (t=0s) : 4 Gardes d'Élite + 2 Blazes Infernaux
-                spawnElites(world, 4);
-                spawnInfernalBlazes(world, 2);
+                // Total : 30 mobs (1.5x de 20)
+                totalWaveMobs = 30;
+                // Pack 1 (t=0s) : 6 Gardes d'Élite + 3 Blazes Infernaux
+                spawnElites(world, 6);
+                spawnInfernalBlazes(world, 3);
 
-                // Pack 2 (t=8s / 160 ticks) : 3 Bourreaux Démoniaques + 2 Super-Kamikazes + 2 Zombies Vortex
+                // Pack 2 (t=8s / 160 ticks) : 4 Bourreaux Démoniaques + 4 Super-Kamikazes + 3 Zombies Vortex
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 2) return;
                     announceReinforcements(world);
-                    spawnInfernalBrutes(world, 3);
-                    spawnSuperKamikazes(world, 2);
-                    spawnVortexZombies(world, 2);
+                    spawnInfernalBrutes(world, 4);
+                    spawnSuperKamikazes(world, 4);
+                    spawnVortexZombies(world, 3);
                 }, 160L));
 
-                // Pack 3 (t=16s / 320 ticks) : 3 Veuves des Tempêtes + 2 Blazes Infernaux + 2 Squelettes Pesteurs
+                // Pack 3 (t=16s / 320 ticks) : 4 Veuves des Tempêtes + 3 Blazes Infernaux + 3 Squelettes Pesteurs
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 2) return;
                     announceReinforcements(world);
-                    spawnStormSpiders(world, 3);
-                    spawnInfernalBlazes(world, 2);
-                    spawnPlagueArchers(world, 2);
+                    spawnStormSpiders(world, 4);
+                    spawnInfernalBlazes(world, 3);
+                    spawnPlagueArchers(world, 3);
                     allPacksSpawned = true;
                 }, 320L));
             }
             case 3 -> {
-                totalWaveMobs = 20;
-                // Pack 1 (t=0s) : 4 Bourreaux Démoniaques + 3 Blazes Infernaux
-                spawnInfernalBrutes(world, 4);
-                spawnInfernalBlazes(world, 3);
+                // Total : 30 mobs (1.5x de 20)
+                totalWaveMobs = 30;
+                // Pack 1 (t=0s) : 6 Bourreaux Démoniaques + 4 Blazes Infernaux
+                spawnInfernalBrutes(world, 6);
+                spawnInfernalBlazes(world, 4);
 
-                // Pack 2 (t=8s / 160 ticks) : 3 Nécromanciens + 2 Super-Kamikazes + 2 Zombies Vortex
+                // Pack 2 (t=8s / 160 ticks) : 4 Nécromanciens + 3 Super-Kamikazes + 3 Zombies Vortex
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 3) return;
                     announceReinforcements(world);
-                    spawnNecromancers(world, 3);
-                    spawnSuperKamikazes(world, 2);
-                    spawnVortexZombies(world, 2);
+                    spawnNecromancers(world, 4);
+                    spawnSuperKamikazes(world, 3);
+                    spawnVortexZombies(world, 3);
                 }, 160L));
 
-                // Pack 3 (t=16s / 320 ticks) : 2 Bourreaux Démoniaques + 2 Veuves des Tempêtes + 2 Zombies Frimaires
+                // Pack 3 (t=16s / 320 ticks) : 4 Bourreaux Démoniaques + 3 Veuves des Tempêtes + 3 Zombies Frimaires
                 waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (state != State.WAVE_IN_PROGRESS || currentWave != 3) return;
                     announceReinforcements(world);
-                    spawnInfernalBrutes(world, 2);
-                    spawnStormSpiders(world, 2);
-                    spawnFrostZombies(world, 2);
+                    spawnInfernalBrutes(world, 4);
+                    spawnStormSpiders(world, 3);
+                    spawnFrostZombies(world, 3);
                     allPacksSpawned = true;
                 }, 320L));
             }
@@ -1132,15 +1139,15 @@ public class HordeManager {
         waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (state != State.WAVE_IN_PROGRESS || currentWave != 4) return;
             announceReinforcements(world);
-            spawnElites(world, 2);
-            spawnArchers(world, 2);
+            spawnElites(world, 3);
+            spawnArchers(world, 3);
         }, 240L));
 
         waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (state != State.WAVE_IN_PROGRESS || currentWave != 4) return;
             announceReinforcements(world);
-            spawnBrutes(world, 2);
-            spawnKamikazes(world, 2);
+            spawnBrutes(world, 3);
+            spawnKamikazes(world, 3);
         }, 520L));
     }
 
@@ -1194,17 +1201,17 @@ public class HordeManager {
         waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (state != State.WAVE_IN_PROGRESS || currentWave != 4) return;
             announceReinforcements(world);
-            spawnBrutes(world, 2);
-            spawnPlagueArchers(world, 2);
-            spawnVortexZombies(world, 1);
+            spawnBrutes(world, 3);
+            spawnPlagueArchers(world, 3);
+            spawnVortexZombies(world, 2);
         }, 240L));
 
         waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (state != State.WAVE_IN_PROGRESS || currentWave != 4) return;
             announceReinforcements(world);
-            spawnReapers(world, 2);
-            spawnKamikazes(world, 2);
-            spawnFrostZombies(world, 1);
+            spawnReapers(world, 3);
+            spawnKamikazes(world, 3);
+            spawnFrostZombies(world, 2);
         }, 520L));
     }
 
@@ -1261,17 +1268,17 @@ public class HordeManager {
         waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (state != State.WAVE_IN_PROGRESS || currentWave != 4) return;
             announceReinforcements(world);
-            spawnInfernalBlazes(world, 2);
-            spawnInfernalBrutes(world, 2);
-            spawnVortexZombies(world, 1);
+            spawnInfernalBlazes(world, 3);
+            spawnInfernalBrutes(world, 3);
+            spawnVortexZombies(world, 2);
         }, 240L));
 
         waveTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (state != State.WAVE_IN_PROGRESS || currentWave != 4) return;
             announceReinforcements(world);
-            spawnSuperKamikazes(world, 2);
-            spawnStormSpiders(world, 2);
-            spawnInfernalBlazes(world, 1);
+            spawnSuperKamikazes(world, 3);
+            spawnStormSpiders(world, 3);
+            spawnInfernalBlazes(world, 2);
         }, 520L));
     }
 
@@ -1637,7 +1644,7 @@ public class HordeManager {
 
     private void spawnScouts(World world, int count) {
         for (int i = 0; i < count; i++) {
-            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            Location loc = getDistributedSpawnLocation(i, count, 12.0, ARENA_RADIUS - 2.5);
             playSpawnEffect(loc);
             Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
             setupScout(z);
@@ -1647,7 +1654,7 @@ public class HordeManager {
 
     private void spawnArchers(World world, int count) {
         for (int i = 0; i < count; i++) {
-            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            Location loc = getDistributedSpawnLocation(i, count, 12.0, ARENA_RADIUS - 2.5);
             playSpawnEffect(loc);
             AbstractSkeleton s = (AbstractSkeleton) world.spawnEntity(loc, EntityType.SKELETON);
             setupShadowArcher(s);
@@ -1657,7 +1664,7 @@ public class HordeManager {
 
     private void spawnBreakers(World world, int count) {
         for (int i = 0; i < count; i++) {
-            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            Location loc = getDistributedSpawnLocation(i, count, 12.0, ARENA_RADIUS - 2.5);
             playSpawnEffect(loc);
             Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
             setupBreaker(z);
@@ -1667,7 +1674,7 @@ public class HordeManager {
 
     private void spawnKamikazes(World world, int count) {
         for (int i = 0; i < count; i++) {
-            Location loc = getRandomSpawnLocation(9.0, 15.0);
+            Location loc = getDistributedSpawnLocation(i, count, 12.0, ARENA_RADIUS - 2.5);
             playSpawnEffect(loc);
             Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
             setupKamikaze(z);
@@ -1677,7 +1684,7 @@ public class HordeManager {
 
     private void spawnElites(World world, int count) {
         for (int i = 0; i < count; i++) {
-            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            Location loc = getDistributedSpawnLocation(i, count, 12.0, ARENA_RADIUS - 2.5);
             playSpawnEffect(loc);
             Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
             setupElite(z);
@@ -1687,7 +1694,7 @@ public class HordeManager {
 
     private void spawnNecromancers(World world, int count) {
         for (int i = 0; i < count; i++) {
-            Location loc = getRandomSpawnLocation(9.0, 15.0);
+            Location loc = getDistributedSpawnLocation(i, count, 12.0, ARENA_RADIUS - 2.5);
             playSpawnEffect(loc);
             Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
             setupNecromancer(z);
@@ -1697,7 +1704,7 @@ public class HordeManager {
 
     private void spawnReapers(World world, int count) {
         for (int i = 0; i < count; i++) {
-            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            Location loc = getDistributedSpawnLocation(i, count, 12.0, ARENA_RADIUS - 2.5);
             playSpawnEffect(loc);
             WitherSkeleton ws = (WitherSkeleton) world.spawnEntity(loc, EntityType.WITHER_SKELETON);
             setupSoulReaper(ws);
@@ -1707,7 +1714,7 @@ public class HordeManager {
 
     private void spawnBrutes(World world, int count) {
         for (int i = 0; i < count; i++) {
-            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            Location loc = getDistributedSpawnLocation(i, count, 12.0, ARENA_RADIUS - 2.5);
             playSpawnEffect(loc);
             PiglinBrute pb = (PiglinBrute) world.spawnEntity(loc, EntityType.PIGLIN_BRUTE);
             setupEnragedBrute(pb);
@@ -1717,7 +1724,7 @@ public class HordeManager {
 
     private void spawnSpiders(World world, int count) {
         for (int i = 0; i < count; i++) {
-            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            Location loc = getDistributedSpawnLocation(i, count, 12.0, ARENA_RADIUS - 2.5);
             playSpawnEffect(loc);
             Spider spider = (Spider) world.spawnEntity(loc, EntityType.SPIDER);
             setupShadowSpider(spider);
@@ -1727,7 +1734,7 @@ public class HordeManager {
 
     private void spawnVortexZombies(World world, int count) {
         for (int i = 0; i < count; i++) {
-            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            Location loc = getDistributedSpawnLocation(i, count, 12.0, ARENA_RADIUS - 2.5);
             playSpawnEffect(loc);
             Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
             setupVortexZombie(z);
@@ -1737,7 +1744,7 @@ public class HordeManager {
 
     private void spawnFrostZombies(World world, int count) {
         for (int i = 0; i < count; i++) {
-            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            Location loc = getDistributedSpawnLocation(i, count, 12.0, ARENA_RADIUS - 2.5);
             playSpawnEffect(loc);
             Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
             setupFrostZombie(z);
@@ -1747,7 +1754,7 @@ public class HordeManager {
 
     private void spawnSuperKamikazes(World world, int count) {
         for (int i = 0; i < count; i++) {
-            Location loc = getRandomSpawnLocation(9.0, 15.0);
+            Location loc = getDistributedSpawnLocation(i, count, 12.0, ARENA_RADIUS - 2.5);
             playSpawnEffect(loc);
             Zombie z = (Zombie) world.spawnEntity(loc, EntityType.ZOMBIE);
             setupSuperKamikaze(z);
@@ -1757,7 +1764,7 @@ public class HordeManager {
 
     private void spawnInfernalBlazes(World world, int count) {
         for (int i = 0; i < count; i++) {
-            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            Location loc = getDistributedSpawnLocation(i, count, 12.0, ARENA_RADIUS - 2.5);
             playSpawnEffect(loc);
             Blaze b = (Blaze) world.spawnEntity(loc, EntityType.BLAZE);
             setupInfernalBlaze(b);
@@ -1767,7 +1774,7 @@ public class HordeManager {
 
     private void spawnPlagueArchers(World world, int count) {
         for (int i = 0; i < count; i++) {
-            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            Location loc = getDistributedSpawnLocation(i, count, 12.0, ARENA_RADIUS - 2.5);
             playSpawnEffect(loc);
             AbstractSkeleton s = (AbstractSkeleton) world.spawnEntity(loc, EntityType.SKELETON);
             setupPlagueArcher(s);
@@ -1777,7 +1784,7 @@ public class HordeManager {
 
     private void spawnInfernalBrutes(World world, int count) {
         for (int i = 0; i < count; i++) {
-            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            Location loc = getDistributedSpawnLocation(i, count, 12.0, ARENA_RADIUS - 2.5);
             playSpawnEffect(loc);
             PiglinBrute pb = (PiglinBrute) world.spawnEntity(loc, EntityType.PIGLIN_BRUTE);
             setupInfernalBrute(pb);
@@ -1787,7 +1794,7 @@ public class HordeManager {
 
     private void spawnStormSpiders(World world, int count) {
         for (int i = 0; i < count; i++) {
-            Location loc = getRandomSpawnLocation(8.0, 15.0);
+            Location loc = getDistributedSpawnLocation(i, count, 12.0, ARENA_RADIUS - 2.5);
             playSpawnEffect(loc);
             Spider spider = (Spider) world.spawnEntity(loc, EntityType.SPIDER);
             setupStormSpider(spider);
@@ -1796,10 +1803,18 @@ public class HordeManager {
     }
 
     private Location getRandomSpawnLocation(double minRadius, double maxRadius) {
+        return getDistributedSpawnLocation(0, 1, minRadius, maxRadius);
+    }
+
+    private Location getDistributedSpawnLocation(int index, int totalCount, double minRadius, double maxRadius) {
         World world = centerLocation.getWorld();
-        double angle = Math.random() * Math.PI * 2;
+        double baseAngle = (index * (2.0 * Math.PI / Math.max(1, totalCount))) + (Math.random() * 0.4);
+        double jitter = (Math.random() - 0.5) * 0.35;
+        double angle = baseAngle + jitter;
+
         double dist = minRadius + Math.random() * (maxRadius - minRadius);
-        dist = Math.min(dist, ARENA_RADIUS - 2.0);
+        dist = Math.max(minRadius, Math.min(dist, ARENA_RADIUS - 2.5));
+
         double x = centerLocation.getX() + Math.cos(angle) * dist;
         double z = centerLocation.getZ() + Math.sin(angle) * dist;
         return new Location(world, x, ARENA_Y + 1.0, z);
