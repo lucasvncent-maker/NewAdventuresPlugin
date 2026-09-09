@@ -223,9 +223,49 @@ public class HordeListener implements Listener {
     public void onPlayerJoin(org.bukkit.event.player.PlayerJoinEvent event) {
         Player player = event.getPlayer();
         if (hordeManager.isHordeWorld(player.getWorld()) && !hordeManager.isHordeActive()) {
+            if (player.getGameMode() == org.bukkit.GameMode.CREATIVE || player.hasPermission("horde.admin")) {
+                player.sendMessage(Component.text("✦ Vous êtes dans l'Arène de la Horde en mode Créatif/Admin.", NamedTextColor.AQUA));
+                return;
+            }
             World mainWorld = org.bukkit.Bukkit.getWorlds().get(0);
             player.teleport(mainWorld.getSpawnLocation());
             player.sendMessage(Component.text("✦ L'invasion de la Horde étant terminée, vous avez été téléporté au spawn.", NamedTextColor.YELLOW));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onPlayerInteract(org.bukkit.event.player.PlayerInteractEvent event) {
+        if (event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK &&
+            event.getAction() != org.bukkit.event.block.Action.LEFT_CLICK_BLOCK) {
+            return;
+        }
+        org.bukkit.block.Block block = event.getClickedBlock();
+        if (block == null) return;
+
+        if (hordeManager.isHordeWorld(block.getWorld())) {
+            // Bouton de départ au centre
+            if (block.getX() == HordeManager.ARENA_X && block.getZ() == HordeManager.ARENA_Z) {
+                if (block.getY() == HordeManager.ARENA_Y + 1 || block.getY() == HordeManager.ARENA_Y + 2) {
+                    if (hordeManager.getState() == HordeManager.State.STARTING) {
+                        event.setCancelled(true);
+                        hordeManager.triggerWaveStart(event.getPlayer());
+                    }
+                }
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onBlockBreak(org.bukkit.event.block.BlockBreakEvent event) {
+        if (hordeManager.isHordeWorld(event.getBlock().getWorld())) {
+            if (hordeManager.isHordeActive()) {
+                org.bukkit.block.Block b = event.getBlock();
+                if (b.getX() == HordeManager.ARENA_X && b.getZ() == HordeManager.ARENA_Z) {
+                    if (b.getY() == HordeManager.ARENA_Y + 1 || b.getY() == HordeManager.ARENA_Y + 2) {
+                        event.setCancelled(true);
+                    }
+                }
+            }
         }
     }
 

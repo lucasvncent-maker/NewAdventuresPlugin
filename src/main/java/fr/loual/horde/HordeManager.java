@@ -33,6 +33,7 @@ public class HordeManager {
     public enum State {
         INACTIVE,
         STARTING,
+        STARTING_COUNTDOWN,
         WAVE_IN_PROGRESS,
         WAVE_CLEARED,
         VICTORY,
@@ -47,6 +48,7 @@ public class HordeManager {
     public static final NamespacedKey FROST_KEY = new NamespacedKey("horde", "frost");
     public static final NamespacedKey SUPER_KAMIKAZE_KEY = new NamespacedKey("horde", "super_kamikaze");
     public static final NamespacedKey INFERNAL_BLAZE_KEY = new NamespacedKey("horde", "infernal_blaze");
+    public static final NamespacedKey CUSTOM_ARENA_KEY = new NamespacedKey("horde", "custom_arena");
 
     public static final String HORDE_WORLD_NAME = "horde_arena";
     public static final int ARENA_X = 0;
@@ -72,6 +74,8 @@ public class HordeManager {
     private boolean allPacksSpawned = false;
     private int totalWaveMobs = 0;
     private int bossSkillCooldown = 0;
+    private BukkitTask countdownTask = null;
+    private int countdownSeconds = 5;
 
     public HordeManager(NewAdventurePlugin plugin) {
         this.plugin = plugin;
@@ -151,8 +155,123 @@ public class HordeManager {
                 loc.getY() >= (ARENA_Y - 5) && loc.getY() <= (ARENA_Y + 30);
     }
 
+    public boolean isCustomArena() {
+        World world = getOrCreateHordeWorld();
+        if (world == null) return false;
+        return world.getPersistentDataContainer().has(CUSTOM_ARENA_KEY, PersistentDataType.BYTE);
+    }
+
+    public void setCustomArena(boolean custom) {
+        World world = getOrCreateHordeWorld();
+        if (world == null) return;
+        if (custom) {
+            world.getPersistentDataContainer().set(CUSTOM_ARENA_KEY, PersistentDataType.BYTE, (byte) 1);
+        } else {
+            world.getPersistentDataContainer().remove(CUSTOM_ARENA_KEY);
+        }
+    }
+
+    public Location getPlayerSpawnLocation() {
+        World world = getOrCreateHordeWorld();
+        if (world == null) return new Location(Bukkit.getWorlds().get(0), 0, 100, 0);
+        return new Location(world, ARENA_X + 0.5, ARENA_Y + 1.0, ARENA_Z - 4.5, 0f, 0f);
+    }
+
+    public void setupStartPedestal(World world) {
+        if (world == null) return;
+        Block base = world.getBlockAt(ARENA_X, ARENA_Y + 1, ARENA_Z);
+        base.setType(Material.LODESTONE, false);
+
+        Block btn = world.getBlockAt(ARENA_X, ARENA_Y + 2, ARENA_Z);
+        btn.setType(Material.STONE_BUTTON, false);
+        if (btn.getBlockData() instanceof org.bukkit.block.data.type.Switch sw) {
+            sw.setAttachedFace(org.bukkit.block.data.FaceAttachable.AttachedFace.FLOOR);
+            btn.setBlockData(sw, false);
+        }
+    }
+
+    public void removeStartPedestal(World world) {
+        if (world == null) return;
+        Block btn = world.getBlockAt(ARENA_X, ARENA_Y + 2, ARENA_Z);
+        if (btn.getType() != Material.AIR) {
+            btn.setType(Material.AIR, false);
+        }
+        Block base = world.getBlockAt(ARENA_X, ARENA_Y + 1, ARENA_Z);
+        if (base.getType() == Material.LODESTONE) {
+            base.setType(Material.AIR, false);
+        }
+    }
+
+    public synchronized boolean triggerWaveStart(Player player) {
+        if (state != State.STARTING) {
+            return false;
+        }
+        state = State.STARTING_COUNTDOWN;
+        World world = (centerLocation != null && centerLocation.getWorld() != null) ? centerLocation.getWorld() : getOrCreateHordeWorld();
+        if (world == null) return false;
+
+        String name = (player != null) ? player.getName() : "Un combattant";
+        for (Player p : world.getPlayers()) {
+            if (isInArena(p.getLocation())) {
+                p.sendMessage(Component.text("✦ " + name + " a déclenché le départ ! La Horde arrive...", NamedTextColor.GOLD, TextDecoration.BOLD));
+            }
+        }
+
+        if (countdownTask != null) {
+            countdownTask.cancel();
+        }
+
+        countdownSeconds = 5;
+        countdownTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (state != State.STARTING_COUNTDOWN) {
+                    cancel();
+                    return;
+                }
+
+                if (countdownSeconds > 0) {
+                    for (Player p : world.getPlayers()) {
+                        if (isInArena(p.getLocation())) {
+                            p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.2f, 1.0f + (5 - countdownSeconds) * 0.2f);
+                            p.showTitle(Title.title(
+                                    Component.text("☠ " + countdownSeconds + " ☠", NamedTextColor.RED, TextDecoration.BOLD),
+                                    Component.text("Préparez vos armes !", NamedTextColor.YELLOW),
+                                    Title.Times.times(Duration.ZERO, Duration.ofMillis(900), Duration.ofMillis(200))
+                            ));
+                        }
+                    }
+                    if (bossBar != null) {
+                        bossBar.name(Component.text("☠ Vague 1 dans " + countdownSeconds + "s... ☠", NamedTextColor.RED, TextDecoration.BOLD));
+                        bossBar.progress((float) countdownSeconds / 5f);
+                    }
+                    countdownSeconds--;
+                } else {
+                    cancel();
+                    removeStartPedestal(world);
+                    for (Player p : world.getPlayers()) {
+                        if (isInArena(p.getLocation())) {
+                            p.playSound(p.getLocation(), Sound.EVENT_RAID_HORN, SoundCategory.HOSTILE, 2.0f, 1.0f);
+                            p.showTitle(Title.title(
+                                    Component.text("⚔ AUX ARMES ! ⚔", NamedTextColor.DARK_RED, TextDecoration.BOLD),
+                                    Component.text("La première vague déferle !", NamedTextColor.GOLD),
+                                    Title.Times.times(Duration.ofMillis(200), Duration.ofSeconds(2), Duration.ofMillis(500))
+                            ));
+                        }
+                    }
+                    nextWave();
+                }
+            }
+        }.runTaskTimer(plugin, 0L, 20L);
+
+        return true;
+    }
+
     public void ensureArenaBuilt(World world) {
         if (world == null) return;
+        if (isCustomArena()) {
+            return; // Mode arène personnalisée : le plugin ne touche à aucun bloc
+        }
 
         Block centerFloor = world.getBlockAt(ARENA_X, ARENA_Y, ARENA_Z);
         Block outerCheck = world.getBlockAt(ARENA_X + ARENA_RADIUS, ARENA_Y + 1, ARENA_Z);
@@ -160,6 +279,19 @@ public class HordeManager {
             return;
         }
 
+        buildDefaultArenaBlocks(world);
+        arenaAlreadyGenerated = true;
+    }
+
+    public void resetDefaultArena(World world) {
+        if (world == null) return;
+        setCustomArena(false);
+        arenaAlreadyGenerated = false;
+        buildDefaultArenaBlocks(world);
+        arenaAlreadyGenerated = true;
+    }
+
+    private void buildDefaultArenaBlocks(World world) {
         // Préchargement des chunks de l'arène
         int minChunkX = (ARENA_X - ARENA_RADIUS - 2) >> 4;
         int maxChunkX = (ARENA_X + ARENA_RADIUS + 2) >> 4;
@@ -212,8 +344,6 @@ public class HordeManager {
                 }
             }
         }
-
-        arenaAlreadyGenerated = true;
     }
 
     public boolean joinArena(Player player) {
@@ -227,11 +357,15 @@ public class HordeManager {
         }
         returnLocations.put(player.getUniqueId(), player.getLocation().clone());
         activeParticipants.add(player.getUniqueId());
-        player.teleportAsync(centerLocation).thenAccept(success -> {
+        Location spawnLoc = getPlayerSpawnLocation();
+        player.teleportAsync(spawnLoc).thenAccept(success -> {
             if (success && player.isOnline()) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 160, 4));
-                player.playSound(centerLocation, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+                player.playSound(spawnLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
                 player.sendMessage(Component.text("✦ Vous rejoignez l'Arène des Damnés ! Combattez pour votre survie !", NamedTextColor.GOLD, TextDecoration.BOLD));
+                if (state == State.STARTING) {
+                    player.sendMessage(Component.text("✦ Appuyez sur le bouton au centre quand votre équipe est prête !", NamedTextColor.YELLOW, TextDecoration.BOLD));
+                }
             }
         });
         return true;
@@ -313,6 +447,7 @@ public class HordeManager {
         }
 
         ensureArenaBuilt(hordeWorld);
+        setupStartPedestal(hordeWorld);
 
         this.centerLocation = new Location(hordeWorld, ARENA_X + 0.5, ARENA_Y + 1.0, ARENA_Z + 0.5, 0f, 0f);
         this.state = State.STARTING;
@@ -332,6 +467,8 @@ public class HordeManager {
         hordeWorld.setThundering(true);
         hordeWorld.setWeatherDuration(20 * 60 * 15); // 15 min d'orage dans le monde horde
 
+        Location playerSpawn = getPlayerSpawnLocation();
+
         // Téléportation asynchrone sécurisée de l'initiateur et des compagnons proches
         if (initiator != null && initiator.isOnline()) {
             Location orig = initiator.getLocation().clone();
@@ -342,19 +479,21 @@ public class HordeManager {
                 if (!near.equals(initiator) && near.getLocation().distance(orig) <= 8.0) {
                     returnLocations.put(near.getUniqueId(), near.getLocation().clone());
                     activeParticipants.add(near.getUniqueId());
-                    near.teleportAsync(centerLocation).thenAccept(success -> {
+                    near.teleportAsync(playerSpawn).thenAccept(success -> {
                         if (success && near.isOnline()) {
                             near.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 160, 4));
                             near.sendMessage(Component.text("✦ Vous avez été entraîné dans l'Arène du Néant avec " + initiator.getName() + " !", NamedTextColor.GOLD));
+                            near.sendMessage(Component.text("✦ Appuyez sur le bouton au centre quand tout le monde est prêt !", NamedTextColor.YELLOW, TextDecoration.BOLD));
                         }
                     });
                 }
             }
 
-            initiator.teleportAsync(centerLocation).thenAccept(success -> {
+            initiator.teleportAsync(playerSpawn).thenAccept(success -> {
                 if (success && initiator.isOnline()) {
                     initiator.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 160, 4));
-                    initiator.playSound(centerLocation, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+                    initiator.playSound(playerSpawn, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+                    initiator.sendMessage(Component.text("✦ Appuyez sur le bouton au centre quand votre équipe est prête !", NamedTextColor.YELLOW, TextDecoration.BOLD));
                 }
             });
         }
@@ -376,12 +515,12 @@ public class HordeManager {
         // Sons et effets
         for (Player p : hordeWorld.getPlayers()) {
             if (isInArena(p.getLocation())) {
-                p.playSound(centerLocation, Sound.EVENT_RAID_HORN, SoundCategory.HOSTILE, 2.0f, 0.8f);
+                p.playSound(centerLocation, Sound.BLOCK_BEACON_ACTIVATE, 1.5f, 1.2f);
                 p.playSound(p.getLocation(), Sound.ENTITY_WITHER_SPAWN, 1.0f, 0.8f);
                 p.showTitle(Title.title(
                         Component.text("☠ " + currentTier.getDisplayName().toUpperCase() + " : L'ARÈNE ☠", currentTier.getColor(), TextDecoration.BOLD),
-                        Component.text("Préparez-vous à l'assaut...", NamedTextColor.GOLD),
-                        Title.Times.times(Duration.ofMillis(500), Duration.ofSeconds(3), Duration.ofSeconds(1))
+                        Component.text("Appuyez sur le bouton central pour débuter !", NamedTextColor.GOLD),
+                        Title.Times.times(Duration.ofMillis(500), Duration.ofSeconds(4), Duration.ofSeconds(1))
                 ));
             }
         }
@@ -390,23 +529,16 @@ public class HordeManager {
         hordeWorld.strikeLightningEffect(centerLocation.clone().add(2, 0, 2));
         hordeWorld.strikeLightningEffect(centerLocation.clone().add(-2, 0, -2));
 
-        // Création de la BossBar
+        // Création de la BossBar (indique d'appuyer sur le bouton)
         bossBar = BossBar.bossBar(
-                Component.text("☠ Horde (" + currentTier.getDisplayName() + ") : Préparation de l'assaut... ☠", currentTier.getColor(), TextDecoration.BOLD),
+                Component.text("✦ En attente : Appuyez sur le bouton central pour commencer ✦", NamedTextColor.GREEN, TextDecoration.BOLD),
                 1.0f,
-                currentTier == HordeTier.REINFORCED_BLOCK ? BossBar.Color.PURPLE : (currentTier == HordeTier.BLOCK ? BossBar.Color.RED : BossBar.Color.YELLOW),
-                BossBar.Overlay.NOTCHED_10
+                BossBar.Color.GREEN,
+                BossBar.Overlay.PROGRESS
         );
 
         // Lancement de la boucle périodique (1 seconde)
         startHordeTask();
-
-        // Début de la Vague 1 après 5 secondes
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (state == State.STARTING) {
-                nextWave();
-            }
-        }, 100L);
     }
 
     private void startHordeTask() {
@@ -447,6 +579,31 @@ public class HordeManager {
                 p.showBossBar(bossBar);
             } else {
                 p.hideBossBar(bossBar);
+            }
+        }
+
+        // 1.5 Particules et action bar pendant l'attente du bouton
+        if (state == State.STARTING) {
+            world.spawnParticle(Particle.HAPPY_VILLAGER, ARENA_X + 0.5, ARENA_Y + 2.3, ARENA_Z + 0.5, 3, 0.2, 0.2, 0.2, 0.02);
+            world.spawnParticle(Particle.TOTEM_OF_UNDYING, ARENA_X + 0.5, ARENA_Y + 1.8, ARENA_Z + 0.5, 2, 0.15, 0.2, 0.15, 0.05);
+
+            boolean anyPlayerPresent = false;
+            for (Player p : world.getPlayers()) {
+                if (p.isOnline() && !p.isDead() && isInArena(p.getLocation())) {
+                    anyPlayerPresent = true;
+                    p.sendActionBar(Component.text("✦ Appuyez sur le bouton central pour lancer la Horde ! ✦", NamedTextColor.GREEN, TextDecoration.BOLD));
+                }
+            }
+
+            // Si aucun joueur n'est présent pendant 120s (2 minutes), abandon automatique
+            if (!anyPlayerPresent) {
+                defeatCountdown++;
+                if (defeatCountdown >= 120) {
+                    stopHorde(false);
+                    return;
+                }
+            } else {
+                defeatCountdown = 0;
             }
         }
 
@@ -1989,6 +2146,12 @@ public class HordeManager {
 
     public void cleanUp() {
         this.state = State.INACTIVE;
+        if (countdownTask != null) {
+            countdownTask.cancel();
+            countdownTask = null;
+        }
+        removeStartPedestal(getHordeWorld());
+
         if (hordeTask != null) {
             hordeTask.cancel();
             hordeTask = null;
