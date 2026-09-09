@@ -48,9 +48,10 @@ public class HordeManager {
     public static final NamespacedKey SUPER_KAMIKAZE_KEY = new NamespacedKey("horde", "super_kamikaze");
     public static final NamespacedKey INFERNAL_BLAZE_KEY = new NamespacedKey("horde", "infernal_blaze");
 
-    public static final int ARENA_X = 10000;
-    public static final int ARENA_Y = 120;
-    public static final int ARENA_Z = 10000;
+    public static final String HORDE_WORLD_NAME = "horde_arena";
+    public static final int ARENA_X = 0;
+    public static final int ARENA_Y = 100;
+    public static final int ARENA_Z = 0;
     public static final int ARENA_RADIUS = 18;
 
     private static boolean arenaAlreadyGenerated = false;
@@ -74,6 +75,36 @@ public class HordeManager {
 
     public HordeManager(NewAdventurePlugin plugin) {
         this.plugin = plugin;
+    }
+
+    public World getOrCreateHordeWorld() {
+        World world = Bukkit.getWorld(HORDE_WORLD_NAME);
+        if (world == null) {
+            WorldCreator creator = new WorldCreator(HORDE_WORLD_NAME);
+            creator.generator(new VoidChunkGenerator());
+            creator.environment(World.Environment.NORMAL);
+            creator.generateStructures(false);
+            world = creator.createWorld();
+        }
+        if (world != null) {
+            world.setGameRule(GameRule.KEEP_INVENTORY, true);
+            world.setGameRule(GameRule.DO_MOB_SPAWNING, false);
+            world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+            world.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
+            world.setGameRule(GameRule.MOB_GRIEFING, false);
+            world.setGameRule(GameRule.DO_FIRE_TICK, false);
+            world.setTime(18000);
+            world.setDifficulty(Difficulty.HARD);
+        }
+        return world;
+    }
+
+    public World getHordeWorld() {
+        return Bukkit.getWorld(HORDE_WORLD_NAME);
+    }
+
+    public boolean isHordeWorld(World world) {
+        return world != null && world.getName().equalsIgnoreCase(HORDE_WORLD_NAME);
     }
 
     public boolean isHordeActive() {
@@ -108,9 +139,13 @@ public class HordeManager {
         returnLocations.remove(uuid);
     }
 
+    public Location getAndClearReturnLocation(UUID uuid) {
+        return returnLocations.remove(uuid);
+    }
+
     public boolean isInArena(Location loc) {
-        if (loc == null || loc.getWorld() == null || centerLocation == null) return false;
-        if (!loc.getWorld().equals(centerLocation.getWorld())) return false;
+        if (loc == null || loc.getWorld() == null) return false;
+        if (!isHordeWorld(loc.getWorld())) return false;
         return Math.abs(loc.getX() - ARENA_X) <= (ARENA_RADIUS + 8) &&
                 Math.abs(loc.getZ() - ARENA_Z) <= (ARENA_RADIUS + 8) &&
                 loc.getY() >= (ARENA_Y - 5) && loc.getY() <= (ARENA_Y + 30);
@@ -210,8 +245,8 @@ public class HordeManager {
                 player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
             });
             return true;
-        } else if (isInArena(player.getLocation())) {
-            Location spawn = player.getWorld().getSpawnLocation();
+        } else if (isHordeWorld(player.getWorld()) || isInArena(player.getLocation())) {
+            Location spawn = Bukkit.getWorlds().get(0).getSpawnLocation();
             player.teleportAsync(spawn).thenAccept(s -> {
                 player.sendMessage(Component.text("✦ Vous avez quitté l'Arène.", NamedTextColor.YELLOW));
                 player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
@@ -222,16 +257,17 @@ public class HordeManager {
     }
 
     public void teleportParticipantsBack() {
-        for (Map.Entry<UUID, Location> entry : returnLocations.entrySet()) {
+        for (Map.Entry<UUID, Location> entry : new HashMap<>(returnLocations).entrySet()) {
             Player p = Bukkit.getPlayer(entry.getKey());
-            if (p != null && p.isOnline()) {
+            if (p != null && p.isOnline() && !p.isDead()) {
                 p.teleportAsync(entry.getValue()).thenAccept(s -> {
                     p.sendMessage(Component.text("✦ Vous avez été retéléporté à votre position d'origine.", NamedTextColor.GREEN));
                     p.playSound(p.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
                 });
+                returnLocations.remove(entry.getKey());
             }
+            // Les joueurs actuellement morts conservent leur returnLocation pour onPlayerRespawn
         }
-        returnLocations.clear();
         activeParticipants.clear();
     }
 
@@ -266,12 +302,18 @@ public class HordeManager {
 
         this.currentTier = (tier != null) ? tier : HordeTier.INGOT;
 
-        World world = (initiator != null) ? initiator.getWorld() : ((location != null && location.getWorld() != null) ? location.getWorld() : Bukkit.getWorlds().get(0));
-        if (world == null) return;
+        // Récupération ou génération du monde vide dédié
+        World hordeWorld = getOrCreateHordeWorld();
+        if (hordeWorld == null) {
+            if (initiator != null) {
+                initiator.sendMessage(Component.text("Erreur : Impossible de charger le monde du Néant de l'Arène !", NamedTextColor.RED));
+            }
+            return;
+        }
 
-        ensureArenaBuilt(world);
+        ensureArenaBuilt(hordeWorld);
 
-        this.centerLocation = new Location(world, ARENA_X + 0.5, ARENA_Y + 1.0, ARENA_Z + 0.5, 0f, 0f);
+        this.centerLocation = new Location(hordeWorld, ARENA_X + 0.5, ARENA_Y + 1.0, ARENA_Z + 0.5, 0f, 0f);
         this.state = State.STARTING;
         this.currentWave = 0;
         this.defeatCountdown = 0;
@@ -285,9 +327,9 @@ public class HordeManager {
         this.returnLocations.clear();
         this.activeParticipants.clear();
 
-        world.setStorm(true);
-        world.setThundering(true);
-        world.setWeatherDuration(20 * 60 * 15); // 15 min d'orage
+        hordeWorld.setStorm(true);
+        hordeWorld.setThundering(true);
+        hordeWorld.setWeatherDuration(20 * 60 * 15); // 15 min d'orage dans le monde horde
 
         // Téléportation asynchrone sécurisée de l'initiateur et des compagnons proches
         if (initiator != null && initiator.isOnline()) {
@@ -302,7 +344,7 @@ public class HordeManager {
                     near.teleportAsync(centerLocation).thenAccept(success -> {
                         if (success && near.isOnline()) {
                             near.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 160, 4));
-                            near.sendMessage(Component.text("✦ Vous avez été entraîné dans l'Arène avec " + initiator.getName() + " !", NamedTextColor.GOLD));
+                            near.sendMessage(Component.text("✦ Vous avez été entraîné dans l'Arène du Néant avec " + initiator.getName() + " !", NamedTextColor.GOLD));
                         }
                     });
                 }
@@ -331,7 +373,7 @@ public class HordeManager {
         Bukkit.broadcast(Component.empty());
 
         // Sons et effets
-        for (Player p : world.getPlayers()) {
+        for (Player p : hordeWorld.getPlayers()) {
             if (isInArena(p.getLocation())) {
                 p.playSound(centerLocation, Sound.EVENT_RAID_HORN, SoundCategory.HOSTILE, 2.0f, 0.8f);
                 p.playSound(p.getLocation(), Sound.ENTITY_WITHER_SPAWN, 1.0f, 0.8f);
@@ -344,8 +386,8 @@ public class HordeManager {
         }
 
         // Foudre d'ambiance (sans dégât)
-        world.strikeLightningEffect(centerLocation.clone().add(2, 0, 2));
-        world.strikeLightningEffect(centerLocation.clone().add(-2, 0, -2));
+        hordeWorld.strikeLightningEffect(centerLocation.clone().add(2, 0, 2));
+        hordeWorld.strikeLightningEffect(centerLocation.clone().add(-2, 0, -2));
 
         // Création de la BossBar
         bossBar = BossBar.bossBar(
@@ -386,6 +428,18 @@ public class HordeManager {
         if (centerLocation == null || centerLocation.getWorld() == null) return;
         World world = centerLocation.getWorld();
 
+        // 0. Protection anti-chute dans le vide (Void rescue)
+        for (Player p : world.getPlayers()) {
+            if (p.isOnline() && !p.isDead() && p.getLocation().getY() < (ARENA_Y - 5)) {
+                p.setVelocity(new Vector(0, 0, 0));
+                p.setFallDistance(0);
+                p.teleportAsync(centerLocation).thenAccept(s -> {
+                    p.sendMessage(Component.text("⚠ Une barrière mystique vous propulse hors du vide abyssal !", NamedTextColor.RED, TextDecoration.BOLD));
+                    p.playSound(centerLocation, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+                });
+            }
+        }
+
         // 1. Mise à jour de la visibilité de la BossBar
         for (Player p : Bukkit.getOnlinePlayers()) {
             if (isInArena(p.getLocation())) {
@@ -398,18 +452,15 @@ public class HordeManager {
         // 2. Vérifier si des combattants vivants sont encore présents dans l'Arène
         if (state == State.WAVE_IN_PROGRESS || state == State.WAVE_CLEARED) {
             boolean anyPlayerAlive = false;
-            for (UUID uuid : new ArrayList<>(activeParticipants)) {
-                Player p = Bukkit.getPlayer(uuid);
-                if (p != null && p.isOnline() && !p.isDead()) {
-                    if (isInArena(p.getLocation())) {
-                        anyPlayerAlive = true;
-                        break;
-                    }
+            for (Player p : world.getPlayers()) {
+                if (p.isOnline() && !p.isDead() && isInArena(p.getLocation())) {
+                    anyPlayerAlive = true;
+                    break;
                 }
             }
 
-            // Ne déclarer défaite que si tous les participants enregistrés sont absents/morts pendant au moins 4 secondes
-            if (!anyPlayerAlive && !activeParticipants.isEmpty()) {
+            // Ne déclarer défaite que si tous les participants sont absents/morts pendant au moins 4 secondes
+            if (!anyPlayerAlive) {
                 defeatCountdown++;
                 if (defeatCountdown >= 4) {
                     handleHordeDefeat();

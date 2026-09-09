@@ -186,6 +186,7 @@ public final class NewAdventurePlugin extends JavaPlugin {
 
         // 9quater. Système d'invasion de Horde & Boss
         this.hordeManager = new HordeManager(this);
+        this.hordeManager.getOrCreateHordeWorld(); // Précharge le monde vide dédié à l'Arène
         pm.registerEvents(new HordeListener(this, hordeManager), this);
         HordeCommand hordeCommand = new HordeCommand(this, hordeManager);
         PluginCommand cmdHorde = getCommand("horde");

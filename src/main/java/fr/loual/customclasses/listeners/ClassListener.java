@@ -17,6 +17,8 @@ import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.*;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.*;
@@ -80,6 +82,7 @@ public class ClassListener implements Listener {
     private final Set<UUID> sauterelleSuperDrop = new HashSet<>();
     private final Set<UUID> sauterelleFallImmunity = new HashSet<>();
     private final Set<UUID> diablePuddleActive = new HashSet<>();
+    private final Set<UUID> diablePuddleDamageInProgress = new HashSet<>();
     private final Map<UUID, ItemStack[]> diableStoredArmor = new HashMap<>();
     private final Set<UUID> archerExplosiveArrowReady = new HashSet<>();
     private final NamespacedKey explosiveArrowKey;
@@ -527,8 +530,22 @@ public class ClassListener implements Listener {
         Entity damager = event.getDamager();
         Entity victim = event.getEntity();
 
-        // Ne pas déclencher les effets de frappe du joueur lors des dégâts périodiques internes de la Peste
-        if (plagueDamageInProgress.contains(victim.getUniqueId())) {
+        // Ne pas déclencher les effets de frappe du joueur lors des dégâts périodiques internes de la Peste ou de la Flaque de Braises
+        if (plagueDamageInProgress.contains(victim.getUniqueId()) || diablePuddleDamageInProgress.contains(victim.getUniqueId())) {
+            return;
+        }
+
+        // Bloquer toute tentative d'attaque directe ou à distance du Diable sous forme de braises
+        Player attackerPlayer = null;
+        if (damager instanceof Player p) {
+            attackerPlayer = p;
+        } else if (damager instanceof Projectile proj && proj.getShooter() instanceof Player p) {
+            attackerPlayer = p;
+        }
+
+        if (attackerPlayer != null && diablePuddleActive.contains(attackerPlayer.getUniqueId())) {
+            event.setCancelled(true);
+            attackerPlayer.sendActionBar(Component.text("⚠ Vous ne pouvez pas attaquer sous forme de braises !", NamedTextColor.RED, TextDecoration.BOLD));
             return;
         }
 
@@ -1721,7 +1738,12 @@ public class ClassListener implements Listener {
                         if (necroMinions.contains(target.getUniqueId())) continue;
 
                         target.setFireTicks(80);
-                        target.damage(2.5, player);
+                        diablePuddleDamageInProgress.add(target.getUniqueId());
+                        try {
+                            target.damage(2.5, player);
+                        } finally {
+                            diablePuddleDamageInProgress.remove(target.getUniqueId());
+                        }
                         w.spawnParticle(Particle.SMALL_FLAME, target.getLocation().add(0, 0.5, 0), 5, 0.2, 0.2, 0.2, 0.05);
                     }
                 }
@@ -1907,6 +1929,75 @@ public class ClassListener implements Listener {
             player.sendActionBar(Component.text("✦ ÉLIMINATION FURTIVE ! Pas de l'Ombre réinitialisé ! ✦", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
             player.sendMessage(Component.text("[Assassin] ", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD)
                     .append(Component.text("✦ Combo Furtif réussi ! Votre Pas de l'Ombre est immédiatement prêt.", NamedTextColor.LIGHT_PURPLE)));
+        }
+    }
+
+    // ==========================================================
+    // RESTRICTIONS DU DIABLE EN FLAQUE DE BRAISES (NI TAPER NI MANGER)
+    // ==========================================================
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDiableItemConsume(PlayerItemConsumeEvent event) {
+        if (diablePuddleActive.contains(event.getPlayer().getUniqueId())) {
+            event.setCancelled(true);
+            event.getPlayer().sendActionBar(Component.text("⚠ Vous ne pouvez pas manger sous forme de braises !", NamedTextColor.RED, TextDecoration.BOLD));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onDiableInteract(PlayerInteractEvent event) {
+        Player player = event.getPlayer();
+        if (!diablePuddleActive.contains(player.getUniqueId())) {
+            return;
+        }
+
+        Action action = event.getAction();
+        ItemStack item = event.getItem();
+
+        // 1. Bloquer la tentative de consommer (nourriture, potions) ou d'armer un arc/arbalète/trident
+        if (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK) {
+            if (item != null && (item.getType().isEdible()
+                    || item.getType() == Material.POTION
+                    || item.getType() == Material.SPLASH_POTION
+                    || item.getType() == Material.LINGERING_POTION
+                    || item.getType() == Material.MILK_BUCKET
+                    || item.getType() == Material.HONEY_BOTTLE
+                    || item.getType() == Material.BOW
+                    || item.getType() == Material.CROSSBOW
+                    || item.getType() == Material.TRIDENT
+                    || item.getType() == Material.WIND_CHARGE)) {
+                event.setCancelled(true);
+                player.sendActionBar(Component.text("⚠ Vous ne pouvez ni manger ni attaquer sous forme de braises !", NamedTextColor.RED, TextDecoration.BOLD));
+                return;
+            }
+        }
+
+        // 2. Bloquer les frappes de blocs
+        if (action == Action.LEFT_CLICK_BLOCK) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDiableBlockBreak(BlockBreakEvent event) {
+        if (diablePuddleActive.contains(event.getPlayer().getUniqueId())) {
+            event.setCancelled(true);
+            event.getPlayer().sendActionBar(Component.text("⚠ Vous ne pouvez pas miner sous forme de braises !", NamedTextColor.RED, TextDecoration.BOLD));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDiableShootBow(EntityShootBowEvent event) {
+        if (event.getEntity() instanceof Player player && diablePuddleActive.contains(player.getUniqueId())) {
+            event.setCancelled(true);
+            player.sendActionBar(Component.text("⚠ Vous ne pouvez pas attaquer sous forme de braises !", NamedTextColor.RED, TextDecoration.BOLD));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDiableLaunchProjectile(ProjectileLaunchEvent event) {
+        if (event.getEntity().getShooter() instanceof Player player && diablePuddleActive.contains(player.getUniqueId())) {
+            event.setCancelled(true);
+            player.sendActionBar(Component.text("⚠ Vous ne pouvez pas attaquer sous forme de braises !", NamedTextColor.RED, TextDecoration.BOLD));
         }
     }
 }
