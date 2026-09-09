@@ -26,7 +26,6 @@ import fr.loual.casino.listeners.BlackjackListener;
 import fr.loual.casino.spawner.VillageCroupierSpawner;
 import fr.loual.casino.stats.CasinoStatsManager;
 import fr.loual.customminerals.recipes.RecipeManager;
-import fr.loual.newadventure.commands.ChlorineCommand;
 import fr.loual.horde.HordeManager;
 import fr.loual.horde.HordeListener;
 import fr.loual.horde.commands.HordeCommand;
@@ -183,15 +182,6 @@ public final class NewAdventurePlugin extends JavaPlugin {
         if (cmdCroupier != null) {
             cmdCroupier.setExecutor(casinoCommand);
             cmdCroupier.setTabCompleter(casinoCommand);
-        }
-
-        // 9ter. Commande /chlorine (Twenty One Pilots)
-        ChlorineCommand chlorineCommand = new ChlorineCommand(this);
-        pm.registerEvents(chlorineCommand, this);
-        PluginCommand cmdChlorine = getCommand("chlorine");
-        if (cmdChlorine != null) {
-            cmdChlorine.setExecutor(chlorineCommand);
-            cmdChlorine.setTabCompleter(chlorineCommand);
         }
 
         // 9quater. Système d'invasion de Horde & Boss

@@ -346,8 +346,8 @@ public class ClassListener implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
 
-        String url = "https://github.com/lucasvncent-maker/NewAdventuresPlugin/releases/download/v1.0.0/newAdventureTexturePack.zip";
-        String hash = "04b7af75206492f0dd16dd1445a180bd0d474a82";
+        String url = "https://github.com/lucasvncent-maker/NewAdventuresPlugin/releases/download/v1.0.1/NewAdventuresTexturePack.zip";
+        String hash = "ED12750C6BAF2B4AFC832C571662FB3F9A67EB6F";
 
         // 2. Créer l'info du pack
         ResourcePackInfo packInfo = ResourcePackInfo.resourcePackInfo()
