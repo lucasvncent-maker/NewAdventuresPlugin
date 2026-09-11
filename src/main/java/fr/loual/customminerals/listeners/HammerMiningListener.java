@@ -92,6 +92,8 @@ public class HammerMiningListener implements Listener {
                 fortuneTool.addUnsafeEnchantment(Enchantment.FORTUNE, 3);
             }
 
+            List<Block> brokenBlocks = new ArrayList<>();
+
             for (Block b : blocksToMine) {
                 if (b.getType().isAir() || EXCLUDED_MATERIALS.contains(b.getType()) || !isAllowedMaterial(b.getType())) {
                     continue;
@@ -124,8 +126,35 @@ public class HammerMiningListener implements Listener {
                 // Calcul d'expérience pour les minerais
                 totalExp += calculateExp(b.getType());
 
-                // Destruction du bloc
-                b.setType(Material.AIR, false);
+                // Destruction du bloc avec actualisation de la physique
+                b.setType(Material.AIR, true);
+                brokenBlocks.add(b);
+            }
+
+            // Mise à jour de la physique des fluides voisins (eau / lave) pour qu'ils s'écoulent
+            Set<Block> adjacentFluids = new HashSet<>();
+            for (Block b : brokenBlocks) {
+                for (BlockFace face : BlockFace.values()) {
+                    if (!face.isCartesian()) continue;
+                    Block neighbor = b.getRelative(face);
+                    if (neighbor.isLiquid() || neighbor.getType() == Material.WATER || neighbor.getType() == Material.LAVA) {
+                        adjacentFluids.add(neighbor);
+                    }
+                }
+            }
+
+            for (Block fluid : adjacentFluids) {
+                fluid.setBlockData(fluid.getBlockData(), true);
+            }
+
+            if (!adjacentFluids.isEmpty()) {
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    for (Block fluid : adjacentFluids) {
+                        if (fluid.isLiquid() || fluid.getType() == Material.WATER || fluid.getType() == Material.LAVA) {
+                            fluid.setBlockData(fluid.getBlockData(), true);
+                        }
+                    }
+                });
             }
 
             // Regroupement et drop des items au niveau du bloc d'origine
