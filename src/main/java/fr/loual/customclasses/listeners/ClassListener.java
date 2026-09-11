@@ -22,9 +22,14 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.*;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.inventory.PrepareAnvilEvent;
 import org.bukkit.event.player.*;
+import org.bukkit.inventory.AnvilInventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -61,10 +66,20 @@ public class ClassListener implements Listener {
     private static class NecroPlague {
         final UUID masterId;
         double remainingDamage;
+        int tickInterval; // Cadence des dégâts (influencée par Efficacité I-V)
+        int ticksSinceLastDamage;
+        boolean soulFire; // Présence de flammes d'âmes (influencée par Aura de Feu)
+        int contagionLevel; // Niveau d'Aura de Feu pour la contagion
+        int lastContagionTick; // Compteur pour la contagion périodique
 
-        NecroPlague(UUID masterId, double initialDamage) {
+        NecroPlague(UUID masterId, double initialDamage, int tickInterval, boolean soulFire, int contagionLevel) {
             this.masterId = masterId;
             this.remainingDamage = initialDamage;
+            this.tickInterval = tickInterval;
+            this.ticksSinceLastDamage = 0;
+            this.soulFire = soulFire;
+            this.contagionLevel = contagionLevel;
+            this.lastContagionTick = 0;
         }
     }
     private final Map<UUID, NecroPlague> activePlagues = new HashMap<>();
@@ -265,7 +280,7 @@ public class ClassListener implements Listener {
             }
         }, 5L, 5L);
 
-        // Tâche 3 : Peste Nécrotique (toutes les 10 ticks = 0.5s) - applique les dégâts indirects du poison
+        // Tâche 3 : Peste Nécrotique (toutes les 1 tick) - applique les dégâts selon la cadence d'Efficacité
         Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (activePlagues.isEmpty()) return;
 
@@ -277,9 +292,28 @@ public class ClassListener implements Listener {
 
                 Entity victimEnt = Bukkit.getEntity(victimId);
                 if (!(victimEnt instanceof LivingEntity victim) || !victim.isValid() || victim.isDead()) {
+                    if (plague.soulFire && victimEnt instanceof LivingEntity le) {
+                        spreadSoulFireContagion(le, plague);
+                    }
                     it.remove();
                     continue;
                 }
+
+                // Contagion périodique d'Aura de Feu (toutes les 20 ticks = 1s)
+                if (plague.soulFire) {
+                    plague.lastContagionTick++;
+                    if (plague.lastContagionTick >= 20) {
+                        plague.lastContagionTick = 0;
+                        spreadSoulFireContagion(victim, plague);
+                    }
+                }
+
+                // Cadence déterminée par l'enchantement Efficacité (10 ticks de base -> 5 ticks à Eff V)
+                plague.ticksSinceLastDamage++;
+                if (plague.ticksSinceLastDamage < plague.tickInterval) {
+                    continue;
+                }
+                plague.ticksSinceLastDamage = 0;
 
                 Player master = Bukkit.getPlayer(plague.masterId);
                 double dmgToApply = Math.min(plague.remainingDamage, 1.0);
@@ -297,19 +331,59 @@ public class ClassListener implements Listener {
                 Location center = victim.getLocation().add(0, victim.getHeight() * 0.55, 0);
                 Location head = victim.getEyeLocation().add(0, 0.25, 0);
 
-                // Nuage visible de poison toxique vert et de magie nécrotique (indique clairement l'empoisonnement)
-                Particle.DustOptions greenDust = new Particle.DustOptions(Color.fromRGB(45, 220, 45), 1.4f);
-                Particle.DustOptions darkPoisonDust = new Particle.DustOptions(Color.fromRGB(20, 140, 30), 1.1f);
-                world.spawnParticle(Particle.DUST, center, 8, 0.35, 0.4, 0.35, 0.02, greenDust);
-                world.spawnParticle(Particle.DUST, head, 5, 0.2, 0.25, 0.2, 0.02, darkPoisonDust);
-                world.spawnParticle(Particle.ITEM_SLIME, center, 4, 0.25, 0.3, 0.25, 0.02);
-                world.spawnParticle(Particle.WITCH, center, 4, 0.3, 0.3, 0.3, 0.02);
+                // Nuage visible de poison toxique vert et magie nécrotique
+                Particle.DustOptions greenDust = new Particle.DustOptions(Color.fromRGB(45, 220, 45), 1.3f);
+                Particle.DustOptions darkPoisonDust = new Particle.DustOptions(Color.fromRGB(20, 140, 30), 1.0f);
+                world.spawnParticle(Particle.DUST, center, 6, 0.35, 0.4, 0.35, 0.02, greenDust);
+                world.spawnParticle(Particle.DUST, head, 3, 0.2, 0.25, 0.2, 0.02, darkPoisonDust);
+                world.spawnParticle(Particle.ITEM_SLIME, center, 3, 0.25, 0.3, 0.25, 0.02);
+                world.spawnParticle(Particle.WITCH, center, 3, 0.3, 0.3, 0.3, 0.02);
+
+                // Particules de flammes d'âmes bleues si Aura de Feu
+                if (plague.soulFire) {
+                    world.spawnParticle(Particle.SOUL_FIRE_FLAME, center, 5, 0.25, 0.3, 0.25, 0.03);
+                    world.spawnParticle(Particle.SOUL, head, 2, 0.2, 0.2, 0.2, 0.02);
+                }
 
                 if (plague.remainingDamage <= 0.05) {
+                    if (plague.soulFire) {
+                        spreadSoulFireContagion(victim, plague);
+                    }
                     it.remove();
                 }
             }
-        }, 10L, 10L);
+        }, 1L, 1L);
+    }
+
+    private void spreadSoulFireContagion(LivingEntity victim, NecroPlague sourcePlague) {
+        if (victim == null || sourcePlague == null) return;
+        Location loc = victim.getLocation();
+        World world = loc.getWorld();
+        if (world == null) return;
+
+        world.spawnParticle(Particle.SOUL_FIRE_FLAME, loc.clone().add(0, 0.8, 0), 25, 0.6, 0.6, 0.6, 0.08);
+        world.spawnParticle(Particle.SOUL, loc.clone().add(0, 0.5, 0), 10, 0.4, 0.4, 0.4, 0.04);
+        try {
+            world.playSound(loc, Sound.ENTITY_BLAZE_SHOOT, 0.6f, 1.4f);
+        } catch (Exception ignored) {}
+
+        double spreadDamage = Math.max(2.0, sourcePlague.remainingDamage * 0.40);
+        for (Entity nearby : world.getNearbyEntities(loc, 4.0, 3.0, 4.0)) {
+            if (nearby instanceof LivingEntity target && !(target instanceof Player) && !target.equals(victim)) {
+                if (necroMinions.contains(target.getUniqueId())) continue;
+                if (target.isDead() || !target.isValid()) continue;
+
+                target.setFireTicks(Math.max(target.getFireTicks(), 60 * sourcePlague.contagionLevel));
+                NecroPlague existing = activePlagues.get(target.getUniqueId());
+                if (existing == null) {
+                    activePlagues.put(target.getUniqueId(), new NecroPlague(sourcePlague.masterId, spreadDamage, sourcePlague.tickInterval, true, sourcePlague.contagionLevel));
+                } else {
+                    existing.remainingDamage += spreadDamage;
+                    existing.soulFire = true;
+                }
+                target.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME, target.getLocation().add(0, 0.8, 0), 10, 0.3, 0.3, 0.3, 0.05);
+            }
+        }
     }
 
     private NecroHoeTier getNecroHoeTier(Material mat) {
@@ -652,16 +726,37 @@ public class ClassListener implements Listener {
                         event.setDamage(event.getDamage() * 0.20);
                     }
 
-                    // Bonus houe : Dégâts indirects progressifs de la Peste Nécrotique selon la houe
+                    // Bonus houe : Dégâts indirects progressifs de la Peste Nécrotique selon la houe & ses enchantements
                     if (isHoe(hand) && victim instanceof LivingEntity livingVictim) {
                         NecroHoeTier tier = getNecroHoeTier(hand.getType());
+
+                        // 1. Efficacité (Efficiency I-V) : Vitesse de la Peste (intervalle réduit de 10 ticks jusqu'à 5 ticks au niveau V)
+                        int effLevel = hand.getEnchantmentLevel(Enchantment.EFFICIENCY);
+                        int interval = Math.max(3, 10 - effLevel);
+
+                        // 2. Tranchant (Sharpness I-V) : Toxicité (+20% dégâts par niveau, +100% au niveau V)
+                        int sharpLevel = hand.getEnchantmentLevel(Enchantment.SHARPNESS);
+                        double sharpMultiplier = 1.0 + (0.20 * sharpLevel);
+                        double totalDamage = tier.poisonTotalDamage * sharpMultiplier;
+
+                        // 3. Aura de Feu (Fire Aspect I-II) : Peste Flamboyante & Contagion
+                        int fireLevel = hand.getEnchantmentLevel(Enchantment.FIRE_ASPECT);
+                        boolean hasFire = fireLevel > 0;
+                        if (hasFire) {
+                            livingVictim.setFireTicks(Math.max(livingVictim.getFireTicks(), 80 * fireLevel));
+                        }
 
                         // Cumul des dégâts indirects de poison / peste nécrotique
                         NecroPlague existing = activePlagues.get(livingVictim.getUniqueId());
                         if (existing == null) {
-                            activePlagues.put(livingVictim.getUniqueId(), new NecroPlague(player.getUniqueId(), tier.poisonTotalDamage));
+                            activePlagues.put(livingVictim.getUniqueId(), new NecroPlague(player.getUniqueId(), totalDamage, interval, hasFire, fireLevel));
                         } else {
-                            existing.remainingDamage += tier.poisonTotalDamage;
+                            existing.remainingDamage += totalDamage;
+                            existing.tickInterval = Math.min(existing.tickInterval, interval);
+                            if (hasFire) {
+                                existing.soulFire = true;
+                                existing.contagionLevel = Math.max(existing.contagionLevel, fireLevel);
+                            }
                         }
 
                         // Effets de statut
@@ -676,7 +771,15 @@ public class ClassListener implements Listener {
                         }
 
                         livingVictim.getWorld().spawnParticle(Particle.WITCH, livingVictim.getLocation().clone().add(0, 1, 0), 20, 0.4, 0.4, 0.4, 0.05);
-                        livingVictim.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME, livingVictim.getLocation().clone().add(0, 0.8, 0), 15, 0.3, 0.3, 0.3, 0.05);
+                        if (hasFire) {
+                            livingVictim.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME, livingVictim.getLocation().clone().add(0, 0.8, 0), 25, 0.4, 0.4, 0.4, 0.08);
+                            livingVictim.getWorld().spawnParticle(Particle.SOUL, livingVictim.getLocation().clone().add(0, 1.0, 0), 10, 0.3, 0.3, 0.3, 0.05);
+                            try {
+                                player.playSound(player.getLocation(), Sound.ITEM_FIRECHARGE_USE, 0.7f, 1.2f);
+                            } catch (Exception ignored) {}
+                        } else {
+                            livingVictim.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME, livingVictim.getLocation().clone().add(0, 0.8, 0), 15, 0.3, 0.3, 0.3, 0.05);
+                        }
                         try {
                             player.playSound(player.getLocation(), Sound.ENTITY_EVOKER_CAST_SPELL, 0.8f, 1.6f);
                             player.playSound(player.getLocation(), Sound.ENTITY_WITHER_SHOOT, 0.6f, 1.8f);
@@ -1120,18 +1223,82 @@ public class ClassListener implements Listener {
         if (killer == null) return;
 
         if (classManager.getPlayerClass(killer) == PlayerClass.NECROMANCIEN && entity instanceof Monster) {
-            // 40% de chances de réanimer un serviteur
-            if (Math.random() <= 0.40) {
-                spawnNecroMinion(killer, entity.getLocation());
+            ItemStack hand = killer.getInventory().getItemInMainHand();
+            int fortuneLevel = isHoe(hand) ? hand.getEnchantmentLevel(Enchantment.FORTUNE) : 0;
+            int lootLevel = isHoe(hand) ? hand.getEnchantmentLevel(Enchantment.LOOTING) : 0;
+
+            // 4. Butin (Looting I-III) : 40% -> 50% -> 62% -> 75%
+            double chance = switch (lootLevel) {
+                case 1 -> 0.50;
+                case 2 -> 0.62;
+                case 3 -> 0.75;
+                default -> lootLevel > 3 ? 0.85 : 0.40;
+            };
+
+            if (Math.random() <= chance) {
+                spawnNecroMinion(killer, entity.getLocation(), fortuneLevel, lootLevel);
             }
         }
     }
 
-    private void spawnNecroMinion(Player master, Location loc) {
+    private void spawnNecroMinion(Player master, Location loc, int fortuneLevel, int lootLevel) {
         World world = loc.getWorld();
         if (world == null) return;
 
-        EntityType minionType = (Math.random() < 0.5) ? EntityType.ZOMBIE : EntityType.SKELETON;
+        // Fortune (Fortune I-III) : Maître de la Horde
+        // Durée : 25s de base, +5s par niveau de Fortune (jusqu'à 40s à Fortune III)
+        int durationSeconds = 25 + (fortuneLevel * 5);
+        long durationTicks = durationSeconds * 20L;
+
+        // Limite max : 3 de base, +1 par niveau de Fortune (jusqu'à 6 serviteurs à Fortune III)
+        int maxMinions = 3 + fortuneLevel;
+
+        List<UUID> currentMinions = new ArrayList<>();
+        for (Map.Entry<UUID, UUID> e : minionToMaster.entrySet()) {
+            if (e.getValue().equals(master.getUniqueId())) {
+                currentMinions.add(e.getKey());
+            }
+        }
+
+        if (currentMinions.size() >= maxMinions) {
+            // Retirer le serviteur le plus ancien
+            UUID oldestId = currentMinions.get(0);
+            Entity oldest = Bukkit.getEntity(oldestId);
+            if (oldest != null && oldest.isValid()) {
+                oldest.getWorld().spawnParticle(Particle.POOF, oldest.getLocation().add(0, 1, 0), 15, 0.3, 0.3, 0.3, 0.05);
+                oldest.remove();
+            }
+            necroMinions.remove(oldestId);
+            minionToMaster.remove(oldestId);
+            currentMinions.remove(oldestId);
+        }
+
+        // Butin (Looting I-III) : Nécromancie Supérieure
+        EntityType minionType;
+        String typeName;
+        double r = Math.random();
+
+        if (lootLevel >= 3 && r < 0.35) {
+            minionType = EntityType.WITHER_SKELETON;
+            typeName = "Wither Squelette";
+        } else if (lootLevel >= 2 && r < 0.30) {
+            if (Math.random() < 0.5) {
+                minionType = EntityType.STRAY;
+                typeName = "Vagabond";
+            } else {
+                minionType = EntityType.HUSK;
+                typeName = "Zombie Momifié";
+            }
+        } else {
+            if (Math.random() < 0.5) {
+                minionType = EntityType.ZOMBIE;
+                typeName = "Zombie";
+            } else {
+                minionType = EntityType.SKELETON;
+                typeName = "Squelette";
+            }
+        }
+
         Entity spawned = world.spawnEntity(loc, minionType);
 
         if (spawned instanceof Monster minion) {
@@ -1140,22 +1307,32 @@ public class ClassListener implements Listener {
             minionToMaster.put(minionId, master.getUniqueId());
 
             // Nom du serviteur
-            minion.customName(Component.text("Serviteur de " + master.getName(), NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
+            minion.customName(Component.text("Serviteur " + typeName + " de " + master.getName(), NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
             minion.setCustomNameVisible(true);
 
             // Équiper pour immuniser au soleil et armer le serviteur
             org.bukkit.inventory.EntityEquipment equip = minion.getEquipment();
             if (equip != null) {
-                equip.setHelmet(new ItemStack(Material.CHAINMAIL_HELMET));
+                if (lootLevel >= 3) {
+                    equip.setHelmet(new ItemStack(Material.DIAMOND_HELMET));
+                    equip.setChestplate(new ItemStack(Material.DIAMOND_CHESTPLATE));
+                } else if (lootLevel >= 1) {
+                    equip.setHelmet(new ItemStack(Material.IRON_HELMET));
+                    equip.setChestplate(new ItemStack(Material.IRON_CHESTPLATE));
+                } else {
+                    equip.setHelmet(new ItemStack(Material.CHAINMAIL_HELMET));
+                }
                 equip.setHelmetDropChance(0.0f);
+                equip.setChestplateDropChance(0.0f);
 
-                if (minionType == EntityType.ZOMBIE) {
-                    equip.setItemInMainHand(new ItemStack(Material.IRON_HOE));
-                    equip.setItemInMainHandDropChance(0.0f);
+                if (minionType == EntityType.WITHER_SKELETON) {
+                    equip.setItemInMainHand(new ItemStack(Material.DIAMOND_HOE));
+                } else if (minionType == EntityType.ZOMBIE || minionType == EntityType.HUSK) {
+                    equip.setItemInMainHand(new ItemStack(lootLevel >= 2 ? Material.DIAMOND_HOE : Material.IRON_HOE));
                 } else {
                     equip.setItemInMainHand(new ItemStack(Material.BOW));
-                    equip.setItemInMainHandDropChance(0.0f);
                 }
+                equip.setItemInMainHandDropChance(0.0f);
             }
 
             // Aggro direct immédiat sur le monstre ennemi le plus proche
@@ -1165,7 +1342,6 @@ public class ClassListener implements Listener {
             }
 
             // Boucle d'aggro automatique continue (toutes les 10 ticks = 0.5s)
-            // afin de chercher immédiatement un nouvel ennemi et ne JAMAIS cibler le joueur
             new BukkitRunnable() {
                 @Override
                 public void run() {
@@ -1190,11 +1366,15 @@ public class ClassListener implements Listener {
             world.spawnParticle(Particle.WITCH, loc.clone().add(0, 0.5, 0), 12, 0.4, 0.4, 0.4, 0.05);
             try {
                 world.playSound(loc, Sound.ENTITY_ZOMBIE_VILLAGER_CONVERTED, 0.8f, 1.8f);
+                if (minionType == EntityType.WITHER_SKELETON) {
+                    world.playSound(loc, Sound.ENTITY_WITHER_SPAWN, 0.6f, 1.9f);
+                }
             } catch (Exception ignored) {}
 
-            master.sendActionBar(Component.text("✦ Serviteur " + (minionType == EntityType.ZOMBIE ? "Zombie" : "Squelette") + " réanimé (25s) !", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
+            int newCount = currentMinions.size() + 1;
+            master.sendActionBar(Component.text("✦ Serviteur " + typeName + " réanimé (" + durationSeconds + "s) ! [" + newCount + "/" + maxMinions + " Serviteurs] ✦", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
 
-            // Serviteur éphémère (25 secondes max = 500 ticks)
+            // Serviteur éphémère avec durée de Fortune
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (!minion.isDead() && minion.isValid()) {
                     world.spawnParticle(Particle.SMOKE, minion.getLocation().clone().add(0, 1, 0), 12, 0.3, 0.5, 0.3, 0.05);
@@ -1205,7 +1385,7 @@ public class ClassListener implements Listener {
                 }
                 necroMinions.remove(minionId);
                 minionToMaster.remove(minionId);
-            }, 500L);
+            }, durationTicks);
         }
     }
 
@@ -2084,5 +2264,127 @@ public class ClassListener implements Listener {
             event.setCancelled(true);
             player.sendActionBar(Component.text("⚠ Vous ne pouvez pas attaquer sous forme de braises !", NamedTextColor.RED, TextDecoration.BOLD));
         }
+    }
+
+    // ==========================================================
+    // ENCLUME : ENCHANTEMENTS DE COMBAT POUR LA HOUE DU NÉCROMANCIEN
+    // Permet d'appliquer Tranchant, Butin et Aura de Feu sur les houes
+    // ==========================================================
+    private boolean isNecroEnchantment(Enchantment e) {
+        return e == Enchantment.SHARPNESS || e == Enchantment.LOOTING || e == Enchantment.FIRE_ASPECT;
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPrepareAnvil(PrepareAnvilEvent event) {
+        AnvilInventory inv = event.getInventory();
+        ItemStack left = inv.getItem(0);
+        ItemStack right = inv.getItem(1);
+        if (left == null || right == null) return;
+        if (!isHoe(left)) return;
+
+        Map<Enchantment, Integer> toAdd = new HashMap<>();
+
+        if (right.getType() == Material.ENCHANTED_BOOK && right.getItemMeta() instanceof EnchantmentStorageMeta bookMeta) {
+            Map<Enchantment, Integer> bookEnchants = bookMeta.getStoredEnchants();
+            for (Map.Entry<Enchantment, Integer> entry : bookEnchants.entrySet()) {
+                if (isNecroEnchantment(entry.getKey())) {
+                    toAdd.put(entry.getKey(), entry.getValue());
+                }
+            }
+        } else if (isHoe(right)) {
+            Map<Enchantment, Integer> rightEnchants = right.getEnchantments();
+            for (Map.Entry<Enchantment, Integer> entry : rightEnchants.entrySet()) {
+                if (isNecroEnchantment(entry.getKey())) {
+                    toAdd.put(entry.getKey(), entry.getValue());
+                }
+            }
+        }
+
+        if (toAdd.isEmpty()) return;
+
+        ItemStack result = (event.getResult() != null && !event.getResult().getType().isAir()) ? event.getResult().clone() : left.clone();
+        int baseCost = Math.max(1, inv.getRepairCost());
+
+        for (Map.Entry<Enchantment, Integer> entry : toAdd.entrySet()) {
+            Enchantment ench = entry.getKey();
+            int rightLvl = entry.getValue();
+            int currentLvl = result.getEnchantmentLevel(ench);
+
+            int newLvl = currentLvl;
+            if (currentLvl == rightLvl) {
+                newLvl = Math.min(ench.getMaxLevel(), currentLvl + 1);
+            } else {
+                newLvl = Math.max(currentLvl, rightLvl);
+            }
+
+            result.addUnsafeEnchantment(ench, newLvl);
+            baseCost += newLvl * 2;
+        }
+
+        String renameText = event.getView().getRenameText();
+        if (renameText != null && !renameText.isBlank()) {
+            ItemMeta meta = result.getItemMeta();
+            meta.displayName(Component.text(renameText));
+            result.setItemMeta(meta);
+            baseCost += 1;
+        }
+
+        event.setResult(result);
+        event.getView().setRepairCost(baseCost);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onAnvilClick(InventoryClickEvent event) {
+        if (!(event.getInventory() instanceof AnvilInventory anvilInv)) return;
+        if (event.getRawSlot() != 2) return; // Le slot résultat de l'enclume est le slot 2
+
+        ItemStack result = event.getCurrentItem();
+        if (result == null || result.getType().isAir() || !isHoe(result)) return;
+
+        boolean hasNecroEnchant = false;
+        for (Enchantment e : result.getEnchantments().keySet()) {
+            if (isNecroEnchantment(e)) {
+                hasNecroEnchant = true;
+                break;
+            }
+        }
+        if (!hasNecroEnchant) return;
+
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+
+        int cost = anvilInv.getRepairCost();
+        if (player.getGameMode() != GameMode.CREATIVE) {
+            if (player.getLevel() < cost) {
+                event.setCancelled(true);
+                player.sendMessage(Component.text("✦ Vous n'avez pas assez d'expérience (" + cost + " niveaux requis) !", NamedTextColor.RED));
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                return;
+            }
+            player.setLevel(player.getLevel() - cost);
+        }
+
+        // Accorder l'objet résultat
+        event.setCancelled(true);
+        anvilInv.setItem(0, null);
+
+        ItemStack second = anvilInv.getItem(1);
+        if (second != null) {
+            if (second.getAmount() > 1) {
+                second.setAmount(second.getAmount() - 1);
+                anvilInv.setItem(1, second);
+            } else {
+                anvilInv.setItem(1, null);
+            }
+        }
+
+        anvilInv.setItem(2, null);
+        HashMap<Integer, ItemStack> overflow = player.getInventory().addItem(result);
+        for (ItemStack leftover : overflow.values()) {
+            if (leftover != null && !leftover.getType().isAir()) {
+                player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+            }
+        }
+
+        player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_USE, 1.0f, 1.0f);
     }
 }
