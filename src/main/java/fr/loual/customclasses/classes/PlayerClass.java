@@ -123,7 +123,7 @@ public enum PlayerClass {
             Component.text("✦ Bonus & Enchantements de la Houe :", NamedTextColor.GREEN, TextDecoration.BOLD),
             Component.text("  • Coup de houe : Peste Nécrotique (dégâts de poison croissants).", NamedTextColor.AQUA),
             Component.text("  • Efficacité (I-V) : Vitesse de Peste (dégâts 2x plus rapides à Eff V) !", NamedTextColor.YELLOW),
-            Component.text("  • Fortune (I-III) : Maître de la Horde (+15s durée, jusqu'à 6 serviteurs) !", NamedTextColor.YELLOW),
+            Component.text("  • Fortune (I-III) : Maître de la Horde (+20s durée jusqu'à 3 min, max 6 serviteurs) !", NamedTextColor.YELLOW),
             Component.text("  • Tranchant (I-V) : Toxicité (+20% dégâts par niveau, +100% au niv V) !", NamedTextColor.YELLOW),
             Component.text("  • Butin (I-III) : Nécromancie (jusqu'à 75% réanimation, Wither Squelettes) !", NamedTextColor.YELLOW),
             Component.text("  • Aura de Feu : Peste Flamboyante (Flammes d'âmes & Contagion de zone) !", NamedTextColor.YELLOW),

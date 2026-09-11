@@ -1246,8 +1246,8 @@ public class ClassListener implements Listener {
         if (world == null) return;
 
         // Fortune (Fortune I-III) : Maître de la Horde
-        // Durée : 25s de base, +5s par niveau de Fortune (jusqu'à 40s à Fortune III)
-        int durationSeconds = 25 + (fortuneLevel * 5);
+        // Durée : 120s (2 min) de base, +20s par niveau de Fortune (jusqu'à 180s / 3 min à Fortune III)
+        int durationSeconds = 120 + (fortuneLevel * 20);
         long durationTicks = durationSeconds * 20L;
 
         // Limite max : 3 de base, +1 par niveau de Fortune (jusqu'à 6 serviteurs à Fortune III)
@@ -1372,7 +1372,8 @@ public class ClassListener implements Listener {
             } catch (Exception ignored) {}
 
             int newCount = currentMinions.size() + 1;
-            master.sendActionBar(Component.text("✦ Serviteur " + typeName + " réanimé (" + durationSeconds + "s) ! [" + newCount + "/" + maxMinions + " Serviteurs] ✦", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
+            String durStr = (durationSeconds % 60 == 0) ? (durationSeconds / 60) + " min" : (durationSeconds / 60) + "m" + (durationSeconds % 60) + "s";
+            master.sendActionBar(Component.text("✦ Serviteur " + typeName + " réanimé (" + durStr + ") ! [" + newCount + "/" + maxMinions + " Serviteurs] ✦", NamedTextColor.DARK_PURPLE, TextDecoration.BOLD));
 
             // Serviteur éphémère avec durée de Fortune
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
