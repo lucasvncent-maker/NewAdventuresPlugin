@@ -577,8 +577,8 @@ public class ClassListener implements Listener {
                 return;
             }
 
-            // Nécromancien : ordonner aux serviteurs de se focaliser sur la cible attaquée
-            if (pc == PlayerClass.NECROMANCIEN && victim instanceof LivingEntity target && !necroMinions.contains(victim.getUniqueId())) {
+            // Nécromancien : ordonner aux serviteurs de se focaliser sur la cible attaquée (jamais sur un joueur)
+            if (pc == PlayerClass.NECROMANCIEN && victim instanceof LivingEntity target && !(target instanceof Player) && !necroMinions.contains(victim.getUniqueId())) {
                 focusMinionsOnTarget(player.getUniqueId(), target);
             }
 
@@ -749,8 +749,8 @@ public class ClassListener implements Listener {
 
         if (actualDamager instanceof LivingEntity minion && necroMinions.contains(minion.getUniqueId())) {
             UUID masterId = minionToMaster.get(minion.getUniqueId());
-            // Protéger le maître : immunité absolue aux coups et flèches de ses serviteurs
-            if (victim.getUniqueId().equals(masterId)) {
+            // Protéger les joueurs (le maître et ses coéquipiers) : immunité absolue aux coups et projectiles des serviteurs
+            if (victim instanceof Player) {
                 event.setCancelled(true);
                 if (damager instanceof Projectile proj) {
                     proj.remove();
@@ -767,9 +767,9 @@ public class ClassListener implements Listener {
             }
         }
 
-        // Si le maître est attaqué, riposte coordonnée de ses serviteurs
-        if (victim instanceof Player master && minionToMaster.containsValue(master.getUniqueId())) {
-            if (damager instanceof LivingEntity attacker && !necroMinions.contains(attacker.getUniqueId())) {
+        // Si le maître est attaqué, riposte coordonnée de ses serviteurs (sauf si l'attaquant est un joueur)
+        if (victim instanceof Player master && classManager.getPlayerClass(master) == PlayerClass.NECROMANCIEN) {
+            if (actualDamager instanceof LivingEntity attacker && !(attacker instanceof Player) && !necroMinions.contains(attacker.getUniqueId())) {
                 focusMinionsOnTarget(master.getUniqueId(), attacker);
             }
         }
@@ -1243,8 +1243,8 @@ public class ClassListener implements Listener {
 
         UUID masterId = minionToMaster.get(event.getEntity().getUniqueId());
 
-        // Interdiction formelle de cibler son maître ou un autre serviteur allié
-        if (target.getUniqueId().equals(masterId) || (necroMinions.contains(target.getUniqueId()) && masterId != null && masterId.equals(minionToMaster.get(target.getUniqueId())))) {
+        // Interdiction formelle de cibler les joueurs (maître et coéquipiers) ou un autre serviteur allié
+        if (target instanceof Player || (necroMinions.contains(target.getUniqueId()) && masterId != null && masterId.equals(minionToMaster.get(target.getUniqueId())))) {
             event.setCancelled(true);
             event.setTarget(null);
         }
@@ -1885,7 +1885,8 @@ public class ClassListener implements Listener {
 
         int count = 0;
         for (Entity entity : world.getNearbyEntities(mLoc, 7.5, 4.0, 7.5)) {
-            if (entity instanceof LivingEntity target && !target.equals(player)) {
+            // Ne jamais affecter les joueurs (maître et coéquipiers)
+            if (entity instanceof LivingEntity target && !(target instanceof Player)) {
                 if (necroMinions.contains(target.getUniqueId())) continue;
 
                 target.damage(35.0, player);
