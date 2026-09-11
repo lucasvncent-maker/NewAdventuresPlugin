@@ -66,7 +66,7 @@ public enum PlayerJob {
             Component.text("  • Coffres de structures enrichis : minerais précieux, cuprite, épée en or Sharpness VII Looting IV !", NamedTextColor.YELLOW),
             Component.empty(),
             Component.text("✦ Progression (4 Missions) :", NamedTextColor.AQUA, TextDecoration.BOLD),
-            Component.text("  • M1 : Explorer 5 structures Overworld ➔ Meilleurs loots + /sethome & /home", NamedTextColor.DARK_AQUA),
+            Component.text("  • M1 : Explorer 5 structures Overworld ➔ Meilleurs loots + /sethome & /home de groupe (téléporte les alliés proches)", NamedTextColor.DARK_AQUA),
             Component.text("  • M2 : Explorer les 5 biomes du Nether ➔ Perle infinie + Boussole Antique de Découverte", NamedTextColor.DARK_AQUA),
             Component.text("  • M3 : 3 Pommes Cheat, 3 Élytres, 8 Éponges ➔ Élytres Incassables & Feu d'artifice infini", NamedTextColor.DARK_AQUA),
             Component.text("  • M4 : 4 Totems, 16 Shulkers, 2 Cœurs de la Mer ➔ Grappin d'Exploration + /ec + /sethome 2", NamedTextColor.DARK_AQUA)

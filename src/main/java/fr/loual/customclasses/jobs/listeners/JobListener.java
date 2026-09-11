@@ -1358,10 +1358,10 @@ public class JobListener implements Listener {
             inv.addItem(new ItemStack(Material.EMERALD, 3 + rnd.nextInt(6)));
         }
 
-        // 2. Cuprite (35% niveau 0, 70% niveau 1+)
-        int cupriteChance = level >= 1 ? 70 : 35;
+        // 2. Cuprite (Nerf : 15% niveau 0, 30% niveau 1+)
+        int cupriteChance = level >= 1 ? 30 : 15;
         if (rnd.nextInt(100) < cupriteChance) {
-            int amount = (level >= 1 ? 2 : 1) + rnd.nextInt(2);
+            int amount = (level >= 1 && rnd.nextInt(100) < 25) ? 2 : 1;
             inv.addItem(Cuprite.create(plugin, amount));
         }
 

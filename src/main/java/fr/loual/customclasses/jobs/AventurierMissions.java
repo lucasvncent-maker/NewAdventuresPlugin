@@ -11,7 +11,7 @@ public class AventurierMissions {
             new JobMission(
                     1,
                     "Mission 1 : L'Explorateur de l'Overworld",
-                    "Meilleurs butins dans les coffres de structures + Déblocage des commandes /sethome et /home.",
+                    "Meilleurs butins dans les coffres de structures + Déblocage des commandes /sethome et /home de groupe (téléporte les alliés proches).",
                     List.of(
                             new JobMission.Requirement("OVERWORLD_STRUCTURES", "Structures explorées (Overworld)", Material.FILLED_MAP, 5)
                     )

@@ -92,15 +92,66 @@ public class HomeCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        player.getWorld().spawnParticle(Particle.PORTAL, player.getLocation().clone().add(0, 1, 0), 25, 0.4, 0.5, 0.4, 0.1);
+        // Détection des compagnons très proches (rayon de 3.0 blocs maximum)
+        double radius = 3.0;
+        double radiusSquared = radius * radius;
+        Location playerLoc = player.getLocation();
+        List<Player> companions = new java.util.ArrayList<>();
+
+        for (Player other : player.getWorld().getPlayers()) {
+            if (!other.equals(player) && !other.isDead() && other.getLocation().distanceSquared(playerLoc) <= radiusSquared) {
+                companions.add(other);
+            }
+        }
+
+        // Particules et sons au point de départ
+        player.getWorld().spawnParticle(Particle.PORTAL, playerLoc.clone().add(0, 1, 0), 30, 0.4, 0.5, 0.4, 0.1);
+        player.getWorld().spawnParticle(Particle.REVERSE_PORTAL, playerLoc.clone().add(0, 1, 0), 20, 0.3, 0.3, 0.3, 0.05);
+        player.playSound(playerLoc, Sound.ITEM_CHORUS_FRUIT_TELEPORT, 1.0f, 1.0f);
+
+        for (Player comp : companions) {
+            Location cLoc = comp.getLocation();
+            cLoc.getWorld().spawnParticle(Particle.PORTAL, cLoc.clone().add(0, 1, 0), 30, 0.4, 0.5, 0.4, 0.1);
+            cLoc.getWorld().spawnParticle(Particle.REVERSE_PORTAL, cLoc.clone().add(0, 1, 0), 20, 0.3, 0.3, 0.3, 0.05);
+            comp.playSound(cLoc, Sound.ITEM_CHORUS_FRUIT_TELEPORT, 1.0f, 1.0f);
+        }
+
+        // Téléportation de l'aventurier et de ses compagnons
         player.teleport(home);
-        player.getWorld().spawnParticle(Particle.PORTAL, home.clone().add(0, 1, 0), 35, 0.4, 0.6, 0.4, 0.1);
-        player.getWorld().spawnParticle(Particle.REVERSE_PORTAL, home.clone().add(0, 1, 0), 20, 0.3, 0.4, 0.3, 0.05);
-        player.playSound(home, Sound.ITEM_CHORUS_FRUIT_TELEPORT, 1.0f, 1.2f);
-        player.sendMessage(
-                Component.text("[Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)
-                        .append(Component.text("✦ Téléportation à votre Home #" + slot + " réussie !", NamedTextColor.GREEN, TextDecoration.BOLD))
-        );
+        for (Player comp : companions) {
+            comp.teleport(home);
+        }
+
+        // Particules et sons à l'arrivée
+        home.getWorld().spawnParticle(Particle.PORTAL, home.clone().add(0, 1, 0), 40, 0.5, 0.7, 0.5, 0.1);
+        home.getWorld().spawnParticle(Particle.REVERSE_PORTAL, home.clone().add(0, 1, 0), 25, 0.4, 0.5, 0.4, 0.05);
+        home.getWorld().playSound(home, Sound.ITEM_CHORUS_FRUIT_TELEPORT, 1.0f, 1.2f);
+        home.getWorld().playSound(home, Sound.BLOCK_AMETHYST_BLOCK_CHIME, 1.0f, 1.5f);
+
+        // Notifications
+        if (companions.isEmpty()) {
+            player.sendMessage(
+                    Component.text("[Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("✦ Téléportation à votre Home #" + slot + " réussie !", NamedTextColor.GREEN, TextDecoration.BOLD))
+            );
+        } else {
+            String compNames = companions.stream().map(Player::getName).reduce((a, b) -> a + ", " + b).orElse("");
+            player.sendMessage(
+                    Component.text("[Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("✦ Téléportation de groupe à votre Home #" + slot + " réussie avec ", NamedTextColor.GREEN, TextDecoration.BOLD))
+                            .append(Component.text(companions.size() + " compagnon(s)", NamedTextColor.YELLOW, TextDecoration.BOLD))
+                            .append(Component.text(" (" + compNames + ") !", NamedTextColor.GREEN))
+            );
+
+            for (Player comp : companions) {
+                comp.sendMessage(
+                        Component.text("[Aventurier] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                                .append(Component.text("✦ Vous avez été téléporté au Home de l'Aventurier ", NamedTextColor.AQUA))
+                                .append(Component.text(player.getName(), NamedTextColor.YELLOW, TextDecoration.BOLD))
+                                .append(Component.text(" !", NamedTextColor.AQUA))
+                );
+            }
+        }
         return true;
     }
 
