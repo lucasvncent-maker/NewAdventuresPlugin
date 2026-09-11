@@ -30,6 +30,7 @@ import org.bukkit.scheduler.BukkitTask;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.UUID;
 
 public class BlackjackGame {
 
@@ -66,7 +67,8 @@ public class BlackjackGame {
     public static final int GILDED_BLACKSTONE_COST = 8;
     public static final NamespacedKey HARMLESS_FIREWORK_KEY = new NamespacedKey("casino", "harmless_firework");
 
-    private final Player player;
+    private Player player;
+    private final UUID playerUuid;
     private final Plugin plugin;
     private final Deck deck = new Deck();
     private final List<Card> playerHand = new ArrayList<>();
@@ -97,7 +99,14 @@ public class BlackjackGame {
 
     public BlackjackGame(Player player, Plugin plugin) {
         this.player = player;
+        this.playerUuid = player.getUniqueId();
         this.plugin = plugin;
+    }
+
+    public void setPlayer(Player player) {
+        if (player != null) {
+            this.player = player;
+        }
     }
 
     public static int calculateScore(List<Card> hand) {
@@ -396,6 +405,11 @@ public class BlackjackGame {
         if (paidOut) return;
         paidOut = true;
 
+        Player online = getPlayer();
+        if (online != null && online.isOnline()) {
+            targetPlayer = online;
+        }
+
         Location loc = targetPlayer.getLocation();
         Plugin currentPlugin = (this.plugin != null) ? this.plugin : Bukkit.getPluginManager().getPlugin("NewAdventurePlugin");
 
@@ -582,9 +596,10 @@ public class BlackjackGame {
                 saveHordeToPdc(currentPlugin);
 
                 if (currentPlugin instanceof NewAdventurePlugin nap && nap.getHordeManager() != null) {
+                    final Player pForHorde = targetPlayer;
                     Bukkit.getScheduler().runTaskLater(currentPlugin, () -> {
-                        targetPlayer.closeInventory();
-                        nap.getHordeManager().startHorde(targetPlayer, targetPlayer.getLocation(), tier);
+                        pForHorde.closeInventory();
+                        nap.getHordeManager().startHorde(pForHorde, pForHorde.getLocation(), tier);
                     }, 30L);
                 }
             } else if (hordeChips <= 0) {
@@ -678,6 +693,12 @@ public class BlackjackGame {
     private void giveReward(Player targetPlayer, int multiplier) {
         if (betItem == null || betItem.getType().isAir()) return;
 
+        Player online = getPlayer();
+        if (online != null && online.isOnline()) {
+            targetPlayer = online;
+        }
+        if (targetPlayer == null) return;
+
         int totalAmount = betItem.getAmount() * multiplier;
         int maxStack = betItem.getMaxStackSize();
 
@@ -697,6 +718,13 @@ public class BlackjackGame {
 
     private void giveCuprite(Player targetPlayer, int amount, Plugin currentPlugin) {
         if (currentPlugin == null) return;
+
+        Player online = getPlayer();
+        if (online != null && online.isOnline()) {
+            targetPlayer = online;
+        }
+        if (targetPlayer == null) return;
+
         ItemStack cuprite = Cuprite.create(currentPlugin, amount);
         HashMap<Integer, ItemStack> leftover = targetPlayer.getInventory().addItem(cuprite);
         for (ItemStack rem : leftover.values()) {
@@ -911,7 +939,14 @@ public class BlackjackGame {
     public HordeTier getHordeTier() { return hordeTier; }
     public void setHordeTier(HordeTier hordeTier) { this.hordeTier = hordeTier != null ? hordeTier : HordeTier.INGOT; }
 
-    public Player getPlayer() { return player; }
+    public Player getPlayer() {
+        Player online = Bukkit.getPlayer(playerUuid);
+        if (online != null && online.isOnline()) {
+            this.player = online;
+            return online;
+        }
+        return player;
+    }
     public List<Card> getPlayerHand() { return playerHand; }
     public List<Card> getDealerHand() { return dealerHand; }
     public State getState() { return state; }

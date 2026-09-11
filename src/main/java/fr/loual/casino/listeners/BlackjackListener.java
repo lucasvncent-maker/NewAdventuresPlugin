@@ -59,6 +59,7 @@ public class BlackjackListener implements Listener {
             Player player = event.getPlayer();
 
             BlackjackGame game = activeSessions.computeIfAbsent(player.getUniqueId(), id -> new BlackjackGame(player, plugin));
+            game.setPlayer(player);
             game.loadChallengeFromPdc(plugin);
             game.loadHordeFromPdc(plugin);
             if (game.getHordeChips() > 0) {
@@ -521,5 +522,10 @@ public class BlackjackListener implements Listener {
                 event.setCancelled(true);
             }
         }
+    }
+
+    @EventHandler
+    public void onPlayerQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+        activeSessions.remove(event.getPlayer().getUniqueId());
     }
 }
