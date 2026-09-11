@@ -1659,91 +1659,134 @@ public class JobListener implements Listener {
 
         player.sendMessage(Component.text("🧭 Analyse des résonances cartographiques en cours...", NamedTextColor.YELLOW));
         player.playSound(player.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1.0f, 1.2f);
-        discoveryCompassCooldowns.put(uuid, now + 60_000L);
+        discoveryCompassCooldowns.put(uuid, now + 30_000L);
 
         Location origin = player.getLocation();
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            Structure[] candidateStructures = {
-                    Structure.ANCIENT_CITY,
-                    Structure.TRIAL_CHAMBERS,
-                    Structure.VILLAGE_PLAINS,
-                    Structure.VILLAGE_DESERT,
-                    Structure.VILLAGE_SAVANNA,
-                    Structure.VILLAGE_TAIGA,
-                    Structure.VILLAGE_SNOWY,
-                    Structure.MONUMENT,
-                    Structure.MANSION,
-                    Structure.PILLAGER_OUTPOST,
-                    Structure.MINESHAFT,
-                    Structure.DESERT_PYRAMID,
-                    Structure.JUNGLE_PYRAMID,
-                    Structure.SWAMP_HUT,
-                    Structure.STRONGHOLD
-            };
+        final int initialRadiusChunks = 160; // 160 chunks = 2560 blocs
 
-            Location bestLoc = null;
-            Structure bestStruct = null;
-            double bestDist = Double.MAX_VALUE;
+        final Structure[] candidateStructures = {
+                Structure.VILLAGE_PLAINS,
+                Structure.VILLAGE_DESERT,
+                Structure.VILLAGE_SAVANNA,
+                Structure.VILLAGE_TAIGA,
+                Structure.VILLAGE_SNOWY,
+                Structure.SHIPWRECK,
+                Structure.SHIPWRECK_BEACHED,
+                Structure.MINESHAFT,
+                Structure.MINESHAFT_MESA,
+                Structure.PILLAGER_OUTPOST,
+                Structure.DESERT_PYRAMID,
+                Structure.JUNGLE_PYRAMID,
+                Structure.SWAMP_HUT,
+                Structure.IGLOO,
+                Structure.TRAIL_RUINS,
+                Structure.TRIAL_CHAMBERS,
+                Structure.OCEAN_RUIN_COLD,
+                Structure.OCEAN_RUIN_WARM,
+                Structure.MONUMENT,
+                Structure.ANCIENT_CITY,
+                Structure.STRONGHOLD,
+                Structure.MANSION
+        };
 
-            for (Structure struct : candidateStructures) {
-                try {
-                    var searchResult = world.locateNearestStructure(origin, struct, 160, true);
-                    if (searchResult != null && searchResult.getLocation() != null) {
-                        double d = origin.distance(searchResult.getLocation());
-                        if (d < bestDist) {
-                            bestDist = d;
-                            bestLoc = searchResult.getLocation();
-                            bestStruct = struct;
-                        }
-                    }
-                } catch (Exception ignored) {}
-            }
+        new BukkitRunnable() {
+            private int index = 0;
+            private Location bestLoc = null;
+            private Structure bestStruct = null;
+            private double bestDist = Double.MAX_VALUE;
+            private int currentMaxRadius = initialRadiusChunks;
 
-            final Location foundLoc = bestLoc;
-            final Structure foundStruct = bestStruct;
-            final double finalDist = bestDist;
-
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                if (!player.isOnline()) return;
-
-                if (foundLoc == null) {
-                    player.sendMessage(Component.text("[Aventurier] Aucune structure inexplorée détectée dans un rayon de 2500 blocs.", NamedTextColor.GRAY));
-                    discoveryCompassCooldowns.put(uuid, System.currentTimeMillis() + 10_000L);
+            @Override
+            public void run() {
+                if (!player.isOnline()) {
+                    cancel();
                     return;
                 }
 
-                ItemMeta meta = item.getItemMeta();
+                // Examiner jusqu'à 3 structures par tick sur le thread principal pour 0 lag
+                int processed = 0;
+                while (index < candidateStructures.length && processed < 3) {
+                    Structure struct = candidateStructures[index++];
+                    processed++;
+
+                    try {
+                        var searchResult = world.locateNearestStructure(origin, struct, currentMaxRadius, true);
+                        if (searchResult != null && searchResult.getLocation() != null) {
+                            double d = origin.distance(searchResult.getLocation());
+                            if (d < bestDist) {
+                                bestDist = d;
+                                bestLoc = searchResult.getLocation();
+                                bestStruct = struct;
+                                // Rétrécir le rayon de recherche pour les structures restantes
+                                currentMaxRadius = Math.max(10, (int) Math.ceil(bestDist / 16.0));
+                            }
+                        }
+                    } catch (Exception e) {
+                        plugin.getLogger().warning("[Boussole Antique] Erreur lors de la recherche de " + struct + " : " + e.getMessage());
+                    }
+                }
+
+                if (index >= candidateStructures.length) {
+                    cancel();
+                    onCompassSearchComplete(player, item, origin, world, bestLoc, bestStruct, bestDist);
+                }
+            }
+        }.runTaskTimer(plugin, 1L, 1L);
+    }
+
+    private void onCompassSearchComplete(Player player, ItemStack item, Location origin, World world, Location foundLoc, Structure foundStruct, double finalDist) {
+        UUID uuid = player.getUniqueId();
+        if (foundLoc == null) {
+            player.sendMessage(Component.text("[Aventurier] Aucune structure inexplorée détectée dans un rayon de 2500 blocs.", NamedTextColor.GRAY));
+            discoveryCompassCooldowns.put(uuid, System.currentTimeMillis() + 5_000L);
+            return;
+        }
+
+        // Mettre à jour l'item et le CompassTarget
+        if (item != null && item.getType() == Material.COMPASS) {
+            ItemMeta meta = item.getItemMeta();
+            if (meta instanceof CompassMeta cm) {
+                cm.setLodestone(foundLoc);
+                cm.setLodestoneTracked(false);
+                item.setItemMeta(cm);
+            }
+        }
+        for (ItemStack invItem : player.getInventory().getContents()) {
+            if (invItem != null && CustomJobItems.isJobItem(invItem, CustomJobItems.ID_AVENTURIER_DISCOVERY_COMPASS)) {
+                ItemMeta meta = invItem.getItemMeta();
                 if (meta instanceof CompassMeta cm) {
                     cm.setLodestone(foundLoc);
                     cm.setLodestoneTracked(false);
-                    item.setItemMeta(cm);
+                    invItem.setItemMeta(cm);
                 }
-                player.setCompassTarget(foundLoc);
+            }
+        }
+        player.setCompassTarget(foundLoc);
+        player.updateInventory();
 
-                String name = getStructureFriendlyName(foundStruct);
-                String direction = getCardinalDirection(origin, foundLoc);
-                int distInt = (int) finalDist;
+        String name = getStructureFriendlyName(foundStruct);
+        String direction = getCardinalDirection(origin, foundLoc);
+        int distInt = (int) finalDist;
 
-                player.sendMessage(Component.text("★ ========================================= ★", NamedTextColor.GOLD, TextDecoration.BOLD));
-                player.sendMessage(Component.text("     ✦ BOUSSOLE ANTIQUE DE DÉCOUVERTE ✦", NamedTextColor.YELLOW, TextDecoration.BOLD));
-                player.sendMessage(Component.text("  • Structure détectée : ", NamedTextColor.GRAY).append(Component.text(name, NamedTextColor.AQUA, TextDecoration.BOLD)));
-                player.sendMessage(Component.text("  • Distance : ", NamedTextColor.GRAY).append(Component.text(distInt + " blocs", NamedTextColor.WHITE, TextDecoration.BOLD)));
-                player.sendMessage(Component.text("  • Direction : ", NamedTextColor.GRAY).append(Component.text(direction, NamedTextColor.GOLD, TextDecoration.BOLD)));
-                player.sendMessage(Component.text("  • Coordonnées : ", NamedTextColor.GRAY).append(Component.text("X=" + foundLoc.getBlockX() + ", Z=" + foundLoc.getBlockZ(), NamedTextColor.YELLOW)));
-                player.sendMessage(Component.text("  ➜ L'aiguille de votre boussole pointe vers cette structure !", NamedTextColor.GREEN));
-                player.sendMessage(Component.text("★ ========================================= ★", NamedTextColor.GOLD, TextDecoration.BOLD));
+        player.sendMessage(Component.text("★ ========================================= ★", NamedTextColor.GOLD, TextDecoration.BOLD));
+        player.sendMessage(Component.text("     ✦ BOUSSOLE ANTIQUE DE DÉCOUVERTE ✦", NamedTextColor.YELLOW, TextDecoration.BOLD));
+        player.sendMessage(Component.text("  • Structure détectée : ", NamedTextColor.GRAY).append(Component.text(name, NamedTextColor.AQUA, TextDecoration.BOLD)));
+        player.sendMessage(Component.text("  • Distance : ", NamedTextColor.GRAY).append(Component.text(distInt + " blocs", NamedTextColor.WHITE, TextDecoration.BOLD)));
+        player.sendMessage(Component.text("  • Direction : ", NamedTextColor.GRAY).append(Component.text(direction, NamedTextColor.GOLD, TextDecoration.BOLD)));
+        player.sendMessage(Component.text("  • Coordonnées : ", NamedTextColor.GRAY).append(Component.text("X=" + foundLoc.getBlockX() + ", Z=" + foundLoc.getBlockZ(), NamedTextColor.YELLOW)));
+        player.sendMessage(Component.text("  ➜ L'aiguille de votre boussole pointe vers cette structure !", NamedTextColor.GREEN));
+        player.sendMessage(Component.text("★ ========================================= ★", NamedTextColor.GOLD, TextDecoration.BOLD));
 
-                player.sendActionBar(Component.text("✦ Découverte : " + name + " à " + distInt + "m (" + direction + ") ✦", NamedTextColor.GOLD, TextDecoration.BOLD));
-                player.playSound(player.getLocation(), Sound.ITEM_LODESTONE_COMPASS_LOCK, 1.0f, 1.1f);
-                player.playSound(player.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.8f, 1.5f);
-                world.spawnParticle(Particle.END_ROD, player.getLocation().add(0, 1.5, 0), 25, 0.4, 0.5, 0.4, 0.1);
-            });
-        });
+        player.sendActionBar(Component.text("✦ Découverte : " + name + " à " + distInt + "m (" + direction + ") ✦", NamedTextColor.GOLD, TextDecoration.BOLD));
+        player.playSound(player.getLocation(), Sound.ITEM_LODESTONE_COMPASS_LOCK, 1.0f, 1.1f);
+        player.playSound(player.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.8f, 1.5f);
+        world.spawnParticle(Particle.END_ROD, player.getLocation().add(0, 1.5, 0), 25, 0.4, 0.5, 0.4, 0.1);
     }
 
     private String getStructureFriendlyName(Structure structure) {
         if (structure == null) return "Structure Mystérieuse";
-        String key = structure.getKey().getKey();
+        org.bukkit.NamespacedKey nk = org.bukkit.Registry.STRUCTURE.getKey(structure);
+        String key = (nk != null) ? nk.getKey().toLowerCase() : structure.toString().toLowerCase();
         if (key.contains("village")) return "Village";
         if (key.contains("ancient_city")) return "Cité des Abîmes (Ancient City)";
         if (key.contains("trial_chambers")) return "Chambre des Épreuves (Trial Chamber)";
@@ -1755,6 +1798,11 @@ public class JobListener implements Listener {
         if (key.contains("jungle_pyramid")) return "Temple de la Jungle";
         if (key.contains("swamp_hut")) return "Hutte de Sorcière";
         if (key.contains("stronghold")) return "Fort de l'End (Stronghold)";
+        if (key.contains("shipwreck")) return "Épave de Navire";
+        if (key.contains("ocean_ruin")) return "Ruines Océaniques";
+        if (key.contains("igloo")) return "Igloo";
+        if (key.contains("trail_ruins")) return "Ruines des Sentiers";
+        if (key.contains("buried_treasure")) return "Trésor Enfoui";
         return "Structure Inexplorée (" + key + ")";
     }
 
