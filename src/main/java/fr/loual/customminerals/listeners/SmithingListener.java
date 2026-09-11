@@ -46,7 +46,7 @@ public class SmithingListener implements Listener {
             if (CupriteHammer.isCupriteHammer(plugin, base)) {
                 int currentTier = CupriteHammer.getTier(plugin, base);
 
-                if (currentTier == 1 && CupriteBlock.isCupriteBlock(plugin, addition)) {
+                if (currentTier == 1 && ReinforcedCupriteBlock.isReinforcedCupriteBlock(plugin, addition)) {
                     event.setResult(CupriteHammer.upgrade(plugin, base, 2));
                     return;
                 } else if (currentTier == 2 && ReinforcedCupriteBlock.isReinforcedCupriteBlock(plugin, addition)) {

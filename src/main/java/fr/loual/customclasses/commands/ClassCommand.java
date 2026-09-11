@@ -45,6 +45,10 @@ public class ClassCommand implements CommandExecutor, TabCompleter {
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         if (args.length == 0) {
             if (sender instanceof Player player) {
+                if (classManager.hasClass(player) && !player.hasPermission("customclasses.admin")) {
+                    sendClassStatus(player);
+                    return true;
+                }
                 ClassSelectionGui.open(plugin, player);
             } else {
                 sendHelp(sender, label);
@@ -60,17 +64,25 @@ public class ClassCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage(Component.text("Cette commande ne peut être exécutée que par un joueur.", NamedTextColor.RED));
                     return true;
                 }
+                if (classManager.hasClass(player) && !player.hasPermission("customclasses.admin")) {
+                    sendClassStatus(player);
+                    return true;
+                }
                 ClassSelectionGui.open(plugin, player);
                 return true;
             }
 
             case "reset" -> {
+                if (!sender.hasPermission("customclasses.admin")) {
+                    sender.sendMessage(Component.text("✦ [Classes] ", NamedTextColor.GOLD, TextDecoration.BOLD)
+                            .append(Component.text("Pour changer de classe, vous devez fabriquer et utiliser l'objet mystique : ", NamedTextColor.RED))
+                            .append(Component.text("✦ Nouvelle Âme ✦", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD)));
+                    sender.sendMessage(Component.text("  • Recette : 1 Bloc de Diamant, 1 Éclat d'Améthyste, 1 Perle de l'Ender, 1 Éclat d'Écho, 1 Larme de Ghast.", NamedTextColor.DARK_AQUA));
+                    return true;
+                }
+
                 Player target;
                 if (args.length >= 2) {
-                    if (!sender.hasPermission("customclasses.admin")) {
-                        sender.sendMessage(Component.text("Vous n'avez pas la permission de réinitialiser la classe d'un autre joueur.", NamedTextColor.RED));
-                        return true;
-                    }
                     target = Bukkit.getPlayer(args[1]);
                     if (target == null) {
                         sender.sendMessage(Component.text("Joueur introuvable : " + args[1], NamedTextColor.RED));
@@ -144,6 +156,30 @@ public class ClassCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
 
+            case "giveame", "ame" -> {
+                if (!sender.hasPermission("customclasses.admin")) {
+                    sender.sendMessage(Component.text("Vous n'avez pas la permission.", NamedTextColor.RED));
+                    return true;
+                }
+                Player target;
+                if (args.length >= 2) {
+                    target = Bukkit.getPlayer(args[1]);
+                    if (target == null) {
+                        sender.sendMessage(Component.text("Joueur introuvable : " + args[1], NamedTextColor.RED));
+                        return true;
+                    }
+                } else if (sender instanceof Player player) {
+                    target = player;
+                } else {
+                    sender.sendMessage(Component.text("Usage console: /" + label + " giveame <joueur>", NamedTextColor.RED));
+                    return true;
+                }
+
+                target.getInventory().addItem(fr.loual.customclasses.items.NouvelleAme.create(plugin, 1));
+                sender.sendMessage(Component.text("✦ Nouvelle Âme donnée à " + target.getName() + " !", NamedTextColor.GREEN));
+                return true;
+            }
+
             case "help" -> {
                 sendHelp(sender, label);
                 return true;
@@ -154,6 +190,21 @@ public class ClassCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
         }
+    }
+
+    private void sendClassStatus(Player player) {
+        PlayerClass currentClass = classManager.getPlayerClass(player);
+        player.sendMessage(Component.empty());
+        player.sendMessage(Component.text("✦ ======================================== ✦", NamedTextColor.GOLD, TextDecoration.BOLD));
+        player.sendMessage(Component.text("  Classe active : ", NamedTextColor.YELLOW)
+                .append(Component.text(currentClass.getDisplayName(), NamedTextColor.AQUA, TextDecoration.BOLD)));
+        player.sendMessage(Component.text("  Pour changer de classe, vous devez fabriquer et utiliser :", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("  ➜ ", NamedTextColor.GOLD)
+                .append(Component.text("✦ Nouvelle Âme ✦", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD)));
+        player.sendMessage(Component.text("  Recette : 1 Bloc de Diamant, 1 Éclat d'Améthyste, 1 Perle de l'Ender, 1 Éclat d'Écho, 1 Larme de Ghast.", NamedTextColor.DARK_AQUA));
+        player.sendMessage(Component.text("✦ ======================================== ✦", NamedTextColor.GOLD, TextDecoration.BOLD));
+        player.sendMessage(Component.empty());
+        player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_PLING, 0.8f, 1.2f);
     }
 
     private void sendHelp(CommandSender sender, String label) {
@@ -167,6 +218,8 @@ public class ClassCommand implements CommandExecutor, TabCompleter {
         if (sender.hasPermission("customclasses.admin")) {
             sender.sendMessage(Component.text("/" + label + " set <joueur> <classe> ", NamedTextColor.YELLOW)
                     .append(Component.text("- Définir directement la classe d'un joueur", NamedTextColor.GRAY)));
+            sender.sendMessage(Component.text("/" + label + " giveame [joueur] ", NamedTextColor.YELLOW)
+                    .append(Component.text("- Donner un item Nouvelle Âme", NamedTextColor.GRAY)));
         }
     }
 
@@ -178,6 +231,7 @@ public class ClassCommand implements CommandExecutor, TabCompleter {
             List<String> subs = new ArrayList<>(List.of("choose", "reset", "info", "help"));
             if (sender.hasPermission("customclasses.admin")) {
                 subs.add("set");
+                subs.add("giveame");
             }
             for (String s : subs) {
                 if (s.toLowerCase().startsWith(args[0].toLowerCase())) {
@@ -186,7 +240,7 @@ public class ClassCommand implements CommandExecutor, TabCompleter {
             }
         } else if (args.length == 2) {
             String sub = args[0].toLowerCase();
-            if (sub.equals("reset") || sub.equals("set") || sub.equals("info")) {
+            if (sub.equals("reset") || sub.equals("set") || sub.equals("info") || sub.equals("giveame") || sub.equals("ame")) {
                 for (Player p : Bukkit.getOnlinePlayers()) {
                     if (p.getName().toLowerCase().startsWith(args[1].toLowerCase())) {
                         completions.add(p.getName());

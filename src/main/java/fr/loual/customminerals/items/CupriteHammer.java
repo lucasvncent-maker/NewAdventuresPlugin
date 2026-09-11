@@ -103,7 +103,7 @@ public final class CupriteHammer {
                         .decoration(TextDecoration.ITALIC, false));
                 lore.add(Component.empty());
                 lore.add(Component.text("Améliorable à la table de forge avec un ", NamedTextColor.DARK_GRAY)
-                        .append(Component.text("Bloc de Cuprite", NamedTextColor.GOLD))
+                        .append(Component.text("Bloc Renforcé de Cuprite", NamedTextColor.LIGHT_PURPLE))
                         .decoration(TextDecoration.ITALIC, false));
 
             } else if (tier == 2) {

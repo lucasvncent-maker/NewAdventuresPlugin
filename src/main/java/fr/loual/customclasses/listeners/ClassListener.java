@@ -6,11 +6,13 @@ import fr.loual.customclasses.classes.PlayerClass;
 import fr.loual.customclasses.gui.ClassGuiHolder;
 import fr.loual.customclasses.gui.ClassSelectionGui;
 import fr.loual.customclasses.jobs.gui.JobSelectionGui;
+import fr.loual.customclasses.items.NouvelleAme;
 import net.kyori.adventure.resource.ResourcePackInfo;
 import net.kyori.adventure.resource.ResourcePackRequest;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.title.Title;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.entity.*;
@@ -948,6 +950,55 @@ public class ClassListener implements Listener {
         return false;
     }
 
+    // ==========================================================
+    // NOUVELLE ÂME : Changement de classe par clic droit
+    // ==========================================================
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onUseNouvelleAme(PlayerInteractEvent event) {
+        if (!event.getAction().isRightClick()) return;
+
+        ItemStack item = event.getItem();
+        if (item == null) return;
+
+        if (NouvelleAme.isNouvelleAme(plugin, item)) {
+            event.setCancelled(true);
+            Player player = event.getPlayer();
+
+            // Consommer 1 Nouvelle Âme
+            item.subtract(1);
+
+            Location loc = player.getLocation();
+            World world = loc.getWorld();
+            if (world != null) {
+                world.playSound(loc, Sound.ITEM_TOTEM_USE, 1.2f, 1.1f);
+                world.playSound(loc, Sound.BLOCK_BEACON_ACTIVATE, 1.3f, 1.3f);
+                world.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.4f);
+                world.playSound(loc, Sound.ENTITY_ILLUSIONER_PREPARE_MIRROR, 1.2f, 0.9f);
+
+                world.spawnParticle(Particle.TOTEM_OF_UNDYING, loc.clone().add(0, 1.0, 0), 60, 0.5, 0.8, 0.5, 0.2);
+                world.spawnParticle(Particle.SOUL, loc.clone().add(0, 1.0, 0), 40, 0.4, 0.6, 0.4, 0.08);
+                world.spawnParticle(Particle.END_ROD, loc.clone().add(0, 1.0, 0), 30, 0.5, 0.5, 0.5, 0.05);
+            }
+
+            // Réinitialiser la classe du joueur
+            classManager.setPlayerClass(player, PlayerClass.NONE);
+
+            player.showTitle(Title.title(
+                    Component.text("✦ NOUVELLE ÂME ✦", NamedTextColor.AQUA, TextDecoration.BOLD),
+                    Component.text("Choisissez votre nouvelle destinée...", NamedTextColor.YELLOW)
+            ));
+
+            player.sendMessage(Component.text("✦ Votre âme s'est réincarnée ! Choisissez maintenant votre nouvelle classe.", NamedTextColor.GREEN, TextDecoration.BOLD));
+
+            // Ouvrir l'interface de sélection
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (player.isOnline()) {
+                    ClassSelectionGui.open(plugin, player);
+                }
+            }, 8L);
+        }
+    }
+
     private void resetSirenHydration(Player player) {
         sirenLastWaterTime.put(player.getUniqueId(), System.currentTimeMillis());
         player.removePotionEffect(PotionEffectType.HUNGER);
@@ -964,36 +1015,69 @@ public class ClassListener implements Listener {
         if (world == null) return;
 
         try {
-            world.playSound(loc, Sound.ENTITY_WARDEN_SONIC_BOOM, 1.3f, 1.4f);
+            world.playSound(loc, Sound.ENTITY_WARDEN_SONIC_BOOM, 1.4f, 1.3f);
+            world.playSound(loc, Sound.ITEM_TRIDENT_THUNDER, 1.2f, 1.2f);
+            world.playSound(loc, Sound.ITEM_TRIDENT_RIPTIDE_3, 1.2f, 0.9f);
         } catch (Exception e) {
             world.playSound(loc, Sound.ENTITY_ALLAY_HURT, 1.5f, 0.5f);
         }
-        world.playSound(loc, Sound.ENTITY_ELDER_GUARDIAN_CURSE, 0.8f, 1.8f);
+        world.playSound(loc, Sound.ENTITY_ELDER_GUARDIAN_CURSE, 1.0f, 1.5f);
 
-        world.spawnParticle(Particle.SONIC_BOOM, loc.clone().add(0, 1.2, 0), 1);
-        world.spawnParticle(Particle.BUBBLE_COLUMN_UP, loc.clone().add(0, 1.0, 0), 40, 1.5, 0.5, 1.5, 0.1);
-        world.spawnParticle(Particle.NAUTILUS, loc.clone().add(0, 1.0, 0), 30, 1.2, 0.5, 1.2, 0.1);
-        world.spawnParticle(Particle.SPLASH, loc.clone().add(0, 1.0, 0), 50, 1.5, 0.5, 1.5, 0.2);
+        // Ondes de choc concentriques de Sonic Boom et gerbes d'eau
+        for (double r = 2.0; r <= 14.0; r += 3.0) {
+            int points = (int) (r * 5);
+            for (int i = 0; i < points; i++) {
+                double angle = (2 * Math.PI / points) * i;
+                Location pLoc = loc.clone().add(Math.cos(angle) * r, 1.0, Math.sin(angle) * r);
+                world.spawnParticle(Particle.SPLASH, pLoc, 6, 0.2, 0.2, 0.2, 0.1);
+                world.spawnParticle(Particle.BUBBLE_COLUMN_UP, pLoc, 4, 0.1, 0.2, 0.1, 0.05);
+                world.spawnParticle(Particle.NAUTILUS, pLoc, 2, 0.1, 0.1, 0.1, 0.02);
+            }
+        }
+        world.spawnParticle(Particle.SONIC_BOOM, loc.clone().add(0, 1.2, 0), 4, 0.8, 0.4, 0.8, 0);
+        world.spawnParticle(Particle.EXPLOSION_EMITTER, loc.clone().add(0, 1.0, 0), 1);
 
+        boolean playerInWaterOrRain = player.isInWaterOrRain();
         int affected = 0;
-        for (Entity entity : world.getNearbyEntities(loc, 8.0, 5.0, 8.0)) {
+
+        for (Entity entity : world.getNearbyEntities(loc, 14.0, 6.0, 14.0)) {
             if (entity instanceof LivingEntity target && !target.equals(player)) {
                 if (necroMinions.contains(target.getUniqueId())) continue;
 
-                // Lenteur III (amplifier 2) pendant 5s (100 ticks)
-                target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 100, 2, false, true, true));
-                // Faiblesse II (amplifier 1) pendant 5s (100 ticks)
-                target.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 100, 1, false, true, true));
+                double dist = target.getLocation().distance(loc);
+                if (dist > 14.0) continue;
 
-                // Recul aquatique
-                Vector push = target.getLocation().toVector().subtract(loc.toVector()).normalize().multiply(0.8).setY(0.35);
+                // Dégâts directs : 14.0 dégâts de base (7 cœurs), portés à 20.0 (10 cœurs) si dans l'eau ou sous la pluie
+                boolean targetInWaterOrRain = target.isInWaterOrRain();
+                double damage = (playerInWaterOrRain || targetInWaterOrRain) ? 20.0 : 14.0;
+                target.damage(damage, player);
+
+                // Lenteur IV (amplifier 3) pendant 6s (120 ticks)
+                target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 120, 3, false, true, true));
+                // Faiblesse III (amplifier 2) pendant 6s (120 ticks)
+                target.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 120, 2, false, true, true));
+                // Ténèbres / Étourdissement acoustique pendant 5s
+                target.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 100, 0, false, true, true));
+                if (target instanceof Player) {
+                    target.addPotionEffect(new PotionEffect(PotionEffectType.NAUSEA, 100, 0, false, false, false));
+                }
+
+                // Violent recul aquatique centrifuge
+                Vector push = target.getLocation().toVector().subtract(loc.toVector());
+                if (push.lengthSquared() < 0.01) {
+                    push = target.getLocation().getDirection().multiply(-1);
+                }
+                push = push.normalize().multiply(1.35).setY(0.52);
                 target.setVelocity(push);
+
+                world.spawnParticle(Particle.SONIC_BOOM, target.getEyeLocation(), 1);
+                world.spawnParticle(Particle.CRIT, target.getEyeLocation(), 15, 0.3, 0.3, 0.3, 0.1);
                 affected++;
             }
         }
 
-        player.sendActionBar(Component.text("⚡ CRI SONIQUE LIBÉRÉ ! (" + affected + " créatures affaiblies) ⚡", NamedTextColor.DARK_AQUA, TextDecoration.BOLD));
-        player.sendMessage(Component.text("✦ Cri sonique : Toutes les créatures dans 8 blocs subissent Lenteur III et Faiblesse II pendant 5s !", NamedTextColor.DARK_AQUA));
+        player.sendActionBar(Component.text("⚡ CRI SONIQUE TITANESQUE ! (" + affected + " ennemis pulvérisés) ⚡", NamedTextColor.DARK_AQUA, TextDecoration.BOLD));
+        player.sendMessage(Component.text("✦ Cri Sonique Déferlant : Onde de choc acoustique sur 14 blocs ! Inflige 14 à 20 dégâts de zone, projette les créatures et applique Lenteur IV, Faiblesse III et Ténèbres pendant 6s !", NamedTextColor.AQUA));
     }
 
     private void focusMinionsOnTarget(UUID masterId, LivingEntity target) {
