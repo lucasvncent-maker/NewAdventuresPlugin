@@ -407,6 +407,24 @@ public class CustomJobItems {
                 && isJobItem(inv.getBoots(), ID_ARCHITECT_BOOTS);
     }
 
+    public static boolean playerHasJobItem(Player player, String id) {
+        if (player == null || id == null) return false;
+        var inv = player.getInventory();
+        for (ItemStack item : inv.getContents()) {
+            if (isJobItem(item, id)) return true;
+        }
+        for (ItemStack item : inv.getArmorContents()) {
+            if (isJobItem(item, id)) return true;
+        }
+        if (isJobItem(inv.getItemInOffHand(), id)) return true;
+        if (player.getEnderChest() != null) {
+            for (ItemStack item : player.getEnderChest().getContents()) {
+                if (isJobItem(item, id)) return true;
+            }
+        }
+        return false;
+    }
+
     public static String getJobItemId(ItemStack item) {
         if (item == null || !item.hasItemMeta()) return null;
         return item.getItemMeta().getPersistentDataContainer().get(ITEM_KEY, PersistentDataType.STRING);

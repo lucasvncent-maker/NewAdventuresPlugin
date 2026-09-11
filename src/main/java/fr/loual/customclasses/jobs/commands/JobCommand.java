@@ -64,6 +64,20 @@ public class JobCommand implements CommandExecutor, TabCompleter {
                 JobSelectionGui.open(plugin, player);
                 return true;
             }
+            case "reclaim", "recup", "recuperer" -> {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(Component.text("Cette commande ne peut être exécutée que par un joueur.", NamedTextColor.RED));
+                    return true;
+                }
+                int reclaimed = jobManager.reclaimAllUnlockedItems(player);
+                if (reclaimed > 0) {
+                    player.sendMessage(Component.text("✦ Vous avez récupéré " + reclaimed + " objet(s) de métier exclusif(s) perdu(s) !", NamedTextColor.GREEN, TextDecoration.BOLD));
+                    player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_ITEM_PICKUP, 1.0f, 1.2f);
+                } else {
+                    player.sendMessage(Component.text("✦ Vous possédez déjà tous vos objets de métier débloqués (ou aucun objet exclusif à récupérer) !", NamedTextColor.YELLOW));
+                }
+                return true;
+            }
 
             case "recipes", "recipe", "recettes", "recette" -> {
                 if (!(sender instanceof Player player)) {
@@ -320,6 +334,8 @@ public class JobCommand implements CommandExecutor, TabCompleter {
                 .append(Component.text("- Ouvrir le menu des métiers et des missions", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/" + label + " recipes [nom] ", NamedTextColor.YELLOW)
                 .append(Component.text("- Consulter les recettes de craft exclusives dans l'établi", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.text("/" + label + " reclaim / recup ", NamedTextColor.YELLOW)
+                .append(Component.text("- Récupérer vos objets de métier exclusifs perdus", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/" + label + " info [joueur] ", NamedTextColor.YELLOW)
                 .append(Component.text("- Voir sa progression détaillée et ses recettes", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/" + label + " reset [joueur] ", NamedTextColor.YELLOW)
@@ -335,7 +351,7 @@ public class JobCommand implements CommandExecutor, TabCompleter {
         List<String> completions = new ArrayList<>();
 
         if (args.length == 1) {
-            List<String> subs = new ArrayList<>(List.of("choose", "menu", "info", "reset", "recipes", "recettes"));
+            List<String> subs = new ArrayList<>(List.of("choose", "menu", "info", "reset", "recipes", "recettes", "reclaim", "recup"));
             if (sender.hasPermission("customclasses.admin")) {
                 subs.add("set");
             }

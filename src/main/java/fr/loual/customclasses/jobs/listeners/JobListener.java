@@ -234,10 +234,37 @@ public class JobListener implements Listener {
             return;
         }
 
-        // Clic sur une mission pour afficher directement ses détails
+        // Clic sur le bouton de Récupération Globale (Slot 33)
+        if (meta.getPersistentDataContainer().has(JobSelectionGui.RECLAIM_ALL_KEY, PersistentDataType.BYTE)) {
+            int total = jobManager.reclaimAllUnlockedItems(player);
+            if (total > 0) {
+                player.sendMessage(Component.text("✦ [Métier] Vous avez récupéré " + total + " objet(s) exclusif(s) perdu(s) !", NamedTextColor.GREEN, TextDecoration.BOLD));
+                player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1.0f, 1.2f);
+            } else {
+                player.sendMessage(Component.text("✦ Vous possédez déjà tous vos objets de métier débloqués (ou aucun objet à récupérer) !", NamedTextColor.YELLOW));
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+            }
+            return;
+        }
+
+        // Clic sur une mission pour afficher directement ses détails ou récupérer ses items
         Integer missionNum = meta.getPersistentDataContainer().get(JobSelectionGui.MISSION_ITEM_KEY, PersistentDataType.INTEGER);
         if (missionNum != null) {
             PlayerJob pj = jobManager.getPlayerJob(player);
+            int currentLevel = jobManager.getJobLevel(player, pj);
+            if (currentLevel >= missionNum) {
+                int res = jobManager.reclaimMissionItems(player, pj, missionNum);
+                if (res > 0) {
+                    player.sendMessage(Component.text("✦ [Métier] Vous avez récupéré " + res + " objet(s) exclusif(s) de cette mission !", NamedTextColor.GREEN, TextDecoration.BOLD));
+                    player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1.0f, 1.2f);
+                    return;
+                } else if (res == 0) {
+                    player.sendMessage(Component.text("✦ Vous possédez déjà tous les objets exclusifs de cette mission dans votre inventaire / armure / enderchest !", NamedTextColor.YELLOW));
+                    player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                    return;
+                }
+            }
+
             if (pj == PlayerJob.AGRICULTEUR) {
                 switch (missionNum) {
                     case 1 -> {

@@ -14,6 +14,7 @@ import fr.loual.customclasses.jobs.commands.StonecutterCommand;
 import fr.loual.customclasses.jobs.listeners.JobListener;
 import fr.loual.customclasses.listeners.ClassListener;
 import fr.loual.customminerals.commands.CustomMineralsCommand;
+import fr.loual.customminerals.commands.GraveCommand;
 import fr.loual.customminerals.listeners.CopperMiningListener;
 import fr.loual.customminerals.listeners.CupriteChestListener;
 import fr.loual.customminerals.listeners.DeathChestListener;
@@ -77,7 +78,8 @@ public final class NewAdventurePlugin extends JavaPlugin {
         pm.registerEvents(new SmithingListener(this), this);
         pm.registerEvents(new TreeMiningListener(this), this);
         pm.registerEvents(new CupriteChestListener(this), this);
-        pm.registerEvents(new DeathChestListener(this), this);
+        DeathChestListener deathChestListener = new DeathChestListener(this);
+        pm.registerEvents(deathChestListener, this);
         pm.registerEvents(this.mineralRecipeManager, this);
 
         // 4. Enregistrement des recettes artisanales de métiers
@@ -159,6 +161,14 @@ public final class NewAdventurePlugin extends JavaPlugin {
             EnderChestCommand ecCommand = new EnderChestCommand(this);
             cmdEc.setExecutor(ecCommand);
             cmdEc.setTabCompleter(ecCommand);
+        }
+
+        // 8quater. Commande /tombe pour récupérer sa tombe en toute circonstance
+        GraveCommand graveCommand = new GraveCommand(this, deathChestListener);
+        PluginCommand cmdTombe = getCommand("tombe");
+        if (cmdTombe != null) {
+            cmdTombe.setExecutor(graveCommand);
+            cmdTombe.setTabCompleter(graveCommand);
         }
 
         // 9. Tâche périodique pour les auras sous la couche Y=30 (Mineur M3) et l'armure de l'Architecte

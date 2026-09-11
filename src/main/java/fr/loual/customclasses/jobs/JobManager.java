@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -823,6 +824,70 @@ public class JobManager {
             leftover.values().forEach(drop -> player.getWorld().dropItemNaturally(player.getLocation(), drop));
             player.sendMessage(Component.text("Votre inventaire était plein, un objet a été déposé à vos pieds !", NamedTextColor.YELLOW));
         }
+    }
+
+    public List<String> getJobItemsForMission(PlayerJob job, int missionNumber) {
+        if (job == PlayerJob.AVENTURIER) {
+            if (missionNumber == 2) {
+                return List.of(CustomJobItems.ID_AVENTURIER_INFINITE_PEARL, CustomJobItems.ID_AVENTURIER_DISCOVERY_COMPASS);
+            } else if (missionNumber == 3) {
+                return List.of(CustomJobItems.ID_AVENTURIER_UNBREAKABLE_ELYTRA, CustomJobItems.ID_AVENTURIER_INFINITE_FIREWORK);
+            } else if (missionNumber == 4) {
+                return List.of(CustomJobItems.ID_AVENTURIER_GRAPPLING_HOOK);
+            }
+        } else if (job == PlayerJob.MINEUR) {
+            if (missionNumber == 2) {
+                return List.of(CustomJobItems.ID_MINEUR_ORE_POUCH);
+            }
+        } else if (job == PlayerJob.ARCHITECTE) {
+            if (missionNumber == 2) {
+                return List.of(CustomJobItems.ID_ARCHITECT_HELMET);
+            } else if (missionNumber == 3) {
+                return List.of(CustomJobItems.ID_ARCHITECT_CHESTPLATE);
+            } else if (missionNumber == 4) {
+                return List.of(CustomJobItems.ID_ARCHITECT_LEGGINGS);
+            } else if (missionNumber == 5) {
+                return List.of(CustomJobItems.ID_ARCHITECT_BOOTS, CustomJobItems.ID_ARCHITECT_FEATHER);
+            }
+        }
+        return List.of();
+    }
+
+    public int reclaimMissionItems(Player player, PlayerJob job, int missionNumber) {
+        if (player == null || job == null) return 0;
+        int currentLevel = getJobLevel(player, job);
+        if (currentLevel < missionNumber) return -1; // Mission non accomplie
+
+        List<String> items = getJobItemsForMission(job, missionNumber);
+        if (items.isEmpty()) return -2; // Aucun item exclusif pour cette mission
+
+        int given = 0;
+        for (String itemId : items) {
+            if (!CustomJobItems.playerHasJobItem(player, itemId)) {
+                org.bukkit.inventory.ItemStack item = CustomJobItems.getItemById(itemId);
+                if (item != null) {
+                    giveOrDropItem(player, item);
+                    given++;
+                }
+            }
+        }
+        return given;
+    }
+
+    public int reclaimAllUnlockedItems(Player player) {
+        if (player == null) return 0;
+        PlayerJob currentJob = getPlayerJob(player);
+        if (currentJob == PlayerJob.NONE) return 0;
+
+        int currentLevel = getJobLevel(player, currentJob);
+        int totalGiven = 0;
+        for (int m = 1; m <= currentLevel; m++) {
+            int res = reclaimMissionItems(player, currentJob, m);
+            if (res > 0) {
+                totalGiven += res;
+            }
+        }
+        return totalGiven;
     }
 
     public void unloadPlayer(Player player) {

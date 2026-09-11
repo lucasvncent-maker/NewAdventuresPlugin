@@ -56,6 +56,10 @@ commands:
     description: Ouvrir son coffre de l'End a distance (Aventurier M4)
     usage: /enderchest
     aliases: [ec]
+  tombe:
+    description: Recuperer vos affaires dans votre tombe proche
+    usage: /tombe [restore]
+    aliases: [grave, recuptombe, claimgrave]
   chlorine:
     description: Joue la musique Chlorine de Twenty One Pilots
     usage: /chlorine [play|stop]

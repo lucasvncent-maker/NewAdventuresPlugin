@@ -30,6 +30,7 @@ public class JobSelectionGui {
     public static final NamespacedKey JOB_ICON_KEY = new NamespacedKey("customclasses", "job_choice");
     public static final NamespacedKey MISSION_ITEM_KEY = new NamespacedKey("customclasses", "mission_num");
     public static final NamespacedKey RECIPE_BOOK_KEY = new NamespacedKey("customclasses", "recipe_book_btn");
+    public static final NamespacedKey RECLAIM_ALL_KEY = new NamespacedKey("customclasses", "reclaim_all_btn");
 
     public static void open(NewAdventurePlugin plugin, Player player) {
         JobGuiHolder holder = new JobGuiHolder();
@@ -198,6 +199,27 @@ public class JobSelectionGui {
             inv.setItem(22, info);
         }
 
+        // Bouton de récupération des objets perdus (si un métier est actif)
+        if (currentJob != PlayerJob.NONE) {
+            ItemStack reclaimBtn = new ItemStack(Material.RECOVERY_COMPASS);
+            ItemMeta recMeta = reclaimBtn.getItemMeta();
+            if (recMeta != null) {
+                recMeta.displayName(Component.text("✦ Récupérer vos Objets Perdus ✦", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
+                recMeta.lore(List.of(
+                        Component.text("Avez-vous égaré vos équipements de métier ?", NamedTextColor.GRAY),
+                        Component.text("(Perle Infinie, Élytres, Boussole, Sacoche, Armures...)", NamedTextColor.GRAY),
+                        Component.empty(),
+                        Component.text("✦ Restaure tous les objets exclusifs débloqués", NamedTextColor.YELLOW),
+                        Component.text("✦ Sécurité : Aucun doublon ne sera créé !", NamedTextColor.AQUA),
+                        Component.empty(),
+                        Component.text("➜ Cliquez pour récupérer vos objets manquants !", NamedTextColor.GREEN, TextDecoration.BOLD)
+                ));
+                recMeta.getPersistentDataContainer().set(RECLAIM_ALL_KEY, PersistentDataType.BYTE, (byte) 1);
+                reclaimBtn.setItemMeta(recMeta);
+            }
+            inv.setItem(33, reclaimBtn);
+        }
+
         player.openInventory(inv);
     }
 
@@ -273,6 +295,14 @@ public class JobSelectionGui {
             lore.add(Component.empty());
             lore.add(Component.text("✦ Récompense :", NamedTextColor.AQUA, TextDecoration.BOLD));
             lore.add(Component.text("  " + mission.getRewardDescription(), NamedTextColor.WHITE));
+
+            if (isCompleted) {
+                List<String> exclusiveItems = jm.getJobItemsForMission(job, missionNum);
+                if (!exclusiveItems.isEmpty()) {
+                    lore.add(Component.empty());
+                    lore.add(Component.text("➜ Clic pour récupérer vos objets exclusifs perdus !", NamedTextColor.LIGHT_PURPLE));
+                }
+            }
 
             if (job == PlayerJob.AGRICULTEUR) {
                 if (missionNum == 1) {
