@@ -23,6 +23,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.ItemSpawnEvent;
@@ -761,6 +762,33 @@ public class JobListener implements Listener {
                 jobManager.applyJobEffects(event.getPlayer());
             }
         });
+    }
+
+    // =========================================================================
+    // 3.5 AGRICULTEUR : PROTECTION DU PIÉTINEMENT DES CULTURES (FARMLAND TRAMPLE)
+    // =========================================================================
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onFarmlandPhysicalInteract(PlayerInteractEvent event) {
+        if (event.getAction() != Action.PHYSICAL) return;
+        Block clicked = event.getClickedBlock();
+        if (clicked == null || clicked.getType() != Material.FARMLAND) return;
+
+        Player player = event.getPlayer();
+        if (jobManager.getPlayerJob(player) == PlayerJob.AGRICULTEUR) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onFarmlandTrample(EntityChangeBlockEvent event) {
+        if (event.getBlock().getType() != Material.FARMLAND) return;
+        if (event.getTo() != Material.DIRT) return;
+
+        if (event.getEntity() instanceof Player player) {
+            if (jobManager.getPlayerJob(player) == PlayerJob.AGRICULTEUR) {
+                event.setCancelled(true);
+            }
+        }
     }
 
     // =========================================================================

@@ -18,6 +18,7 @@ public enum PlayerJob {
             Component.empty(),
             Component.text("✦ Passif :", NamedTextColor.GOLD, TextDecoration.BOLD),
             Component.text("  • Augmentation des drops de toutes les cultures récoltées.", NamedTextColor.YELLOW),
+            Component.text("  • Terre sacrée : Les cultures et terres labourées ne se cassent jamais quand vous sautez dessus !", NamedTextColor.YELLOW),
             Component.empty(),
             Component.text("✦ Progression (4 Missions) :", NamedTextColor.AQUA, TextDecoration.BOLD),
             Component.text("  • M1 : Soupe nutritive instantanée (Regen II)", NamedTextColor.DARK_AQUA),
