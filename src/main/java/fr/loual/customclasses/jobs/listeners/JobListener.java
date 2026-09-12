@@ -1689,7 +1689,7 @@ public class JobListener implements Listener {
         discoveryCompassCooldowns.put(uuid, now + 30_000L);
 
         Location origin = player.getLocation();
-        final int initialRadiusChunks = 160; // 160 chunks = 2560 blocs
+        final int initialRadiusChunks = 62; // 62 chunks = 992 blocs (~1000 blocs)
 
         final Structure[] candidateStructures = {
                 Structure.VILLAGE_PLAINS,
@@ -1697,23 +1697,21 @@ public class JobListener implements Listener {
                 Structure.VILLAGE_SAVANNA,
                 Structure.VILLAGE_TAIGA,
                 Structure.VILLAGE_SNOWY,
-                Structure.SHIPWRECK,
-                Structure.SHIPWRECK_BEACHED,
                 Structure.MINESHAFT,
-                Structure.MINESHAFT_MESA,
+                Structure.SHIPWRECK,
                 Structure.PILLAGER_OUTPOST,
                 Structure.DESERT_PYRAMID,
-                Structure.JUNGLE_PYRAMID,
+                Structure.TRAIL_RUINS,
                 Structure.SWAMP_HUT,
                 Structure.IGLOO,
-                Structure.TRAIL_RUINS,
-                Structure.TRIAL_CHAMBERS,
+                Structure.JUNGLE_PYRAMID,
                 Structure.OCEAN_RUIN_COLD,
                 Structure.OCEAN_RUIN_WARM,
+                Structure.MINESHAFT_MESA,
+                Structure.SHIPWRECK_BEACHED,
+                Structure.TRIAL_CHAMBERS,
                 Structure.MONUMENT,
-                Structure.ANCIENT_CITY,
-                Structure.STRONGHOLD,
-                Structure.MANSION
+                Structure.ANCIENT_CITY
         };
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
@@ -1734,7 +1732,11 @@ public class JobListener implements Listener {
                             bestLoc = searchResult.getLocation();
                             bestStruct = struct;
                             // Rétrécir immédiatement le rayon de recherche pour toutes les structures restantes
-                            currentMaxRadius = Math.max(10, (int) Math.ceil(bestDist / 16.0));
+                            currentMaxRadius = Math.max(8, (int) Math.ceil(bestDist / 16.0));
+                            // Si on trouve une structure très proche (moins de 200 blocs), on s'arrête tout de suite pour 0 lag
+                            if (bestDist <= 200.0) {
+                                break;
+                            }
                         }
                     }
                 } catch (Exception e) {
@@ -1757,7 +1759,7 @@ public class JobListener implements Listener {
     private void onCompassSearchComplete(Player player, ItemStack item, Location origin, World world, Location foundLoc, Structure foundStruct, double finalDist) {
         UUID uuid = player.getUniqueId();
         if (foundLoc == null) {
-            player.sendMessage(Component.text("[Aventurier] Aucune structure inexplorée détectée dans un rayon de 2500 blocs.", NamedTextColor.GRAY));
+            player.sendMessage(Component.text("[Aventurier] Aucune structure inexplorée détectée dans un rayon de 1000 blocs.", NamedTextColor.GRAY));
             discoveryCompassCooldowns.put(uuid, System.currentTimeMillis() + 5_000L);
             return;
         }

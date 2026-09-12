@@ -335,7 +335,7 @@ public class CustomJobItems {
                     Component.text("Un antique artefact forgé par les premiers cartographes.", NamedTextColor.GRAY),
                     Component.empty(),
                     Component.text("✦ Clic Droit : Détecte la structure inexplorée la plus proche", NamedTextColor.YELLOW),
-                    Component.text("  (Portée : jusqu'à 5000 blocs dans l'Overworld)", NamedTextColor.DARK_AQUA),
+                    Component.text("  (Portée : jusqu'à 1000 blocs dans l'Overworld)", NamedTextColor.DARK_AQUA),
                     Component.text("✦ Aiguille Mystique : Oriente votre boussole vers l'objectif", NamedTextColor.AQUA),
                     Component.text("✦ Détecte : Temples, Cités, Villages, Manoirs, Épreuves...", NamedTextColor.LIGHT_PURPLE),
                     Component.empty(),
