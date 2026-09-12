@@ -65,6 +65,10 @@ import org.bukkit.entity.FishHook;
 import org.bukkit.event.player.PlayerFishEvent;
 import org.bukkit.inventory.meta.CompassMeta;
 import fr.loual.customclasses.jobs.MineurPouchManager;
+import org.bukkit.util.StructureSearchResult;
+import java.lang.reflect.Method;
+import java.util.List;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -1691,7 +1695,7 @@ public class JobListener implements Listener {
         Location origin = player.getLocation();
         final int initialRadiusChunks = 62; // 62 chunks = 992 blocs (~1000 blocs)
 
-        final Structure[] candidateStructures = {
+        final List<Structure> candidateStructures = List.of(
                 Structure.VILLAGE_PLAINS,
                 Structure.VILLAGE_DESERT,
                 Structure.VILLAGE_SAVANNA,
@@ -1712,35 +1716,43 @@ public class JobListener implements Listener {
                 Structure.TRIAL_CHAMBERS,
                 Structure.MONUMENT,
                 Structure.ANCIENT_CITY
-        };
+        );
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             Location bestLoc = null;
             Structure bestStruct = null;
             double bestDist = Double.MAX_VALUE;
-            int currentMaxRadius = initialRadiusChunks;
 
-            for (Structure struct : candidateStructures) {
-                if (!player.isOnline()) return;
+            // 1. Scan unique de toutes les structures en une seule passe via NMS/CraftWorld (HolderSet)
+            StructureSearchResult singlePass = locateNearestAnyStructure(world, origin, candidateStructures, initialRadiusChunks);
 
-                try {
-                    var searchResult = world.locateNearestStructure(origin, struct, currentMaxRadius, true);
-                    if (searchResult != null && searchResult.getLocation() != null) {
-                        double d = origin.distance(searchResult.getLocation());
-                        if (d < bestDist) {
-                            bestDist = d;
-                            bestLoc = searchResult.getLocation();
-                            bestStruct = struct;
-                            // Rétrécir immédiatement le rayon de recherche pour toutes les structures restantes
-                            currentMaxRadius = Math.max(8, (int) Math.ceil(bestDist / 16.0));
-                            // Si on trouve une structure très proche (moins de 200 blocs), on s'arrête tout de suite pour 0 lag
-                            if (bestDist <= 200.0) {
-                                break;
+            if (singlePass != null && singlePass.getLocation() != null) {
+                bestLoc = singlePass.getLocation();
+                bestStruct = singlePass.getStructure();
+                bestDist = origin.distance(bestLoc);
+            } else if (!craftWorldLocateMethodAvailable) {
+                // Repli séquentiel uniquement si la méthode interne CraftWorld n'est pas disponible
+                int currentMaxRadius = initialRadiusChunks;
+                for (Structure struct : candidateStructures) {
+                    if (!player.isOnline()) return;
+
+                    try {
+                        var searchResult = world.locateNearestStructure(origin, struct, currentMaxRadius, true);
+                        if (searchResult != null && searchResult.getLocation() != null) {
+                            double d = origin.distance(searchResult.getLocation());
+                            if (d < bestDist) {
+                                bestDist = d;
+                                bestLoc = searchResult.getLocation();
+                                bestStruct = struct;
+                                currentMaxRadius = Math.max(8, (int) Math.ceil(bestDist / 16.0));
+                                if (bestDist <= 200.0) {
+                                    break;
+                                }
                             }
                         }
+                    } catch (Exception e) {
+                        plugin.getLogger().warning("[Boussole Antique] Erreur lors de la recherche de " + struct + " : " + e.getMessage());
                     }
-                } catch (Exception e) {
-                    plugin.getLogger().warning("[Boussole Antique] Erreur lors de la recherche de " + struct + " : " + e.getMessage());
                 }
             }
 
@@ -1754,6 +1766,32 @@ public class JobListener implements Listener {
                 }
             });
         });
+    }
+
+    private static Method craftWorldLocateMethod = null;
+    private static boolean craftWorldLocateMethodChecked = false;
+    private static boolean craftWorldLocateMethodAvailable = false;
+
+    private StructureSearchResult locateNearestAnyStructure(World world, Location origin, List<Structure> structures, int radiusChunks) {
+        try {
+            if (!craftWorldLocateMethodChecked) {
+                craftWorldLocateMethodChecked = true;
+                try {
+                    craftWorldLocateMethod = world.getClass().getDeclaredMethod("locateNearestStructure", Location.class, List.class, int.class, boolean.class);
+                    craftWorldLocateMethod.setAccessible(true);
+                    craftWorldLocateMethodAvailable = true;
+                } catch (NoSuchMethodException e) {
+                    craftWorldLocateMethodAvailable = false;
+                }
+            }
+
+            if (craftWorldLocateMethod != null) {
+                return (StructureSearchResult) craftWorldLocateMethod.invoke(world, origin, structures, radiusChunks, true);
+            }
+        } catch (Throwable t) {
+            plugin.getLogger().warning("[Boussole Antique] Erreur scan groupé : " + t.getMessage());
+        }
+        return null;
     }
 
     private void onCompassSearchComplete(Player player, ItemStack item, Location origin, World world, Location foundLoc, Structure foundStruct, double finalDist) {
