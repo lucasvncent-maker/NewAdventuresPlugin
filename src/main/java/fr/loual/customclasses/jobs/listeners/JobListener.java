@@ -1716,49 +1716,42 @@ public class JobListener implements Listener {
                 Structure.MANSION
         };
 
-        new BukkitRunnable() {
-            private int index = 0;
-            private Location bestLoc = null;
-            private Structure bestStruct = null;
-            private double bestDist = Double.MAX_VALUE;
-            private int currentMaxRadius = initialRadiusChunks;
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            Location bestLoc = null;
+            Structure bestStruct = null;
+            double bestDist = Double.MAX_VALUE;
+            int currentMaxRadius = initialRadiusChunks;
 
-            @Override
-            public void run() {
-                if (!player.isOnline()) {
-                    cancel();
-                    return;
-                }
+            for (Structure struct : candidateStructures) {
+                if (!player.isOnline()) return;
 
-                // Examiner jusqu'à 3 structures par tick sur le thread principal pour 0 lag
-                int processed = 0;
-                while (index < candidateStructures.length && processed < 3) {
-                    Structure struct = candidateStructures[index++];
-                    processed++;
-
-                    try {
-                        var searchResult = world.locateNearestStructure(origin, struct, currentMaxRadius, true);
-                        if (searchResult != null && searchResult.getLocation() != null) {
-                            double d = origin.distance(searchResult.getLocation());
-                            if (d < bestDist) {
-                                bestDist = d;
-                                bestLoc = searchResult.getLocation();
-                                bestStruct = struct;
-                                // Rétrécir le rayon de recherche pour les structures restantes
-                                currentMaxRadius = Math.max(10, (int) Math.ceil(bestDist / 16.0));
-                            }
+                try {
+                    var searchResult = world.locateNearestStructure(origin, struct, currentMaxRadius, true);
+                    if (searchResult != null && searchResult.getLocation() != null) {
+                        double d = origin.distance(searchResult.getLocation());
+                        if (d < bestDist) {
+                            bestDist = d;
+                            bestLoc = searchResult.getLocation();
+                            bestStruct = struct;
+                            // Rétrécir immédiatement le rayon de recherche pour toutes les structures restantes
+                            currentMaxRadius = Math.max(10, (int) Math.ceil(bestDist / 16.0));
                         }
-                    } catch (Exception e) {
-                        plugin.getLogger().warning("[Boussole Antique] Erreur lors de la recherche de " + struct + " : " + e.getMessage());
                     }
-                }
-
-                if (index >= candidateStructures.length) {
-                    cancel();
-                    onCompassSearchComplete(player, item, origin, world, bestLoc, bestStruct, bestDist);
+                } catch (Exception e) {
+                    plugin.getLogger().warning("[Boussole Antique] Erreur lors de la recherche de " + struct + " : " + e.getMessage());
                 }
             }
-        }.runTaskTimer(plugin, 1L, 1L);
+
+            final Location finalLoc = bestLoc;
+            final Structure finalStruct = bestStruct;
+            final double finalDistance = bestDist;
+
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (player.isOnline()) {
+                    onCompassSearchComplete(player, item, origin, world, finalLoc, finalStruct, finalDistance);
+                }
+            });
+        });
     }
 
     private void onCompassSearchComplete(Player player, ItemStack item, Location origin, World world, Location foundLoc, Structure foundStruct, double finalDist) {
